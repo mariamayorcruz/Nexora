@@ -1,4 +1,5 @@
 import { Campaign, Invoice, Subscription, User } from '@prisma/client';
+import { buildLifecycleTemplates } from '@/lib/customer-success';
 
 type CampaignWithAnalytics = Campaign & {
   analytics?: {
@@ -48,6 +49,8 @@ export interface EmailTemplateCard {
   trigger: string;
   subject: string;
   preview: string;
+  cta?: string;
+  replyTo?: string;
 }
 
 export interface EmailCenterSummary {
@@ -202,53 +205,13 @@ export function buildEmailCenterSummary(supportEmail: string) {
   const senderReady = Boolean(process.env.EMAIL_FROM);
   const supportEmailReady = Boolean(supportEmail || process.env.SUPPORT_EMAIL);
 
-  const templates: EmailTemplateCard[] = [
-    {
-      id: 'welcome',
-      name: 'Bienvenida',
-      audience: 'Nuevos registros',
-      trigger: 'Cuenta creada',
-      subject: 'Bienvenida a Nexora',
-      preview: 'Activa tu primer flujo y conecta tus cuentas para empezar a centralizar campanas.',
-    },
-    {
-      id: 'trial-day-5',
-      name: 'Trial en curso',
-      audience: 'Usuarios en prueba',
-      trigger: 'Dia 5 del trial',
-      subject: 'Tu prueba sigue activa: aprovecha Nexora mejor',
-      preview: 'Resumen rapido del valor, siguiente accion y empuje para llegar al primer win.',
-    },
-    {
-      id: 'payment-success',
-      name: 'Pago exitoso',
-      audience: 'Clientes activos',
-      trigger: 'Factura pagada',
-      subject: 'Tu suscripcion en Nexora quedo activa',
-      preview: 'Confirma pago, plan actual y acceso a funciones premium o fundadoras.',
-    },
-    {
-      id: 'payment-failed',
-      name: 'Pago fallido',
-      audience: 'Clientes con cobro rechazado',
-      trigger: 'invoice.payment_failed',
-      subject: 'No pudimos procesar tu pago en Nexora',
-      preview: 'Explica el problema, da un CTA de recuperacion y protege la continuidad del servicio.',
-    },
-    {
-      id: 'winback',
-      name: 'Recuperacion',
-      audience: 'Usuarios inactivos o por cancelar',
-      trigger: 'cancelAtPeriodEnd o falta de uso',
-      subject: 'Todavia puedes recuperar traccion con Nexora',
-      preview: 'Reabre la conversacion con ROI, automatizaciones y ayuda concreta para reactivar uso.',
-    },
-  ];
+  const templates: EmailTemplateCard[] = buildLifecycleTemplates(supportEmail || process.env.SUPPORT_EMAIL || '');
 
   const checklist = [
     smtpReady ? 'SMTP listo para envios transaccionales.' : 'Falta configurar SMTP_HOST, SMTP_PORT, SMTP_USER y SMTP_PASS.',
     senderReady ? 'EMAIL_FROM listo para remitente.' : 'Falta definir EMAIL_FROM para los correos salientes.',
     supportEmailReady ? 'Support email visible para replies y confianza.' : 'Falta SUPPORT_EMAIL para firma y atencion.',
+    'Conviene definir secuencias de bienvenida, post-venta y seguimiento para que el cliente no se enfrie despues de comprar.',
   ];
 
   return {

@@ -9,6 +9,8 @@ interface EmailTemplateCard {
   trigger: string;
   subject: string;
   preview: string;
+  cta?: string;
+  replyTo?: string;
 }
 
 interface EmailData {
@@ -114,6 +116,13 @@ export default function AdminEmailsPage() {
               <p className="text-xs uppercase tracking-[0.22em] text-gray-400">Preview</p>
               <p className="mt-2 text-sm leading-6 text-gray-600">{template.preview}</p>
             </div>
+
+            {(template.cta || template.replyTo) && (
+              <div className="mt-4 flex flex-wrap gap-3 text-xs uppercase tracking-[0.22em] text-gray-400">
+                {template.cta && <span>CTA: {template.cta}</span>}
+                {template.replyTo && <span>Reply-to: {template.replyTo}</span>}
+              </div>
+            )}
           </article>
         ))}
       </section>

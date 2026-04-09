@@ -56,6 +56,7 @@ export default function AdminLayout({
     { label: 'Campanas', href: '/admin/campaigns', icon: 'CA' },
     { label: 'Analiticas', href: '/admin/analytics', icon: 'AN' },
     { label: 'Automatizacion', href: '/admin/automation', icon: 'AU' },
+    { label: 'Soporte', href: '/admin/support', icon: 'SO' },
     { label: 'Emails', href: '/admin/emails', icon: 'EM' },
     { label: 'Pagos', href: '/admin/payments', icon: 'PA' },
     { label: 'Configuracion', href: '/admin/settings', icon: 'CO' },
