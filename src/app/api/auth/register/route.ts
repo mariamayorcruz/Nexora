@@ -96,7 +96,19 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error: unknown) {
-    console.error('Register error:', error);
+    const details =
+      error instanceof Error
+        ? {
+            name: error.name,
+            message: error.message,
+            stack:
+              process.env.NODE_ENV === 'development'
+                ? error.stack
+                : undefined,
+          }
+        : { error };
+
+    console.error('Register error:', details);
 
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2002') {
@@ -108,6 +120,20 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json(
         { error: 'No se pudo guardar tu cuenta. Intenta nuevamente.' },
+        { status: 500 }
+      );
+    }
+
+    if (error instanceof Prisma.PrismaClientInitializationError) {
+      return NextResponse.json(
+        { error: 'La conexion con la base de datos no esta lista. Intenta de nuevo en unos minutos.' },
+        { status: 500 }
+      );
+    }
+
+    if (error instanceof Prisma.PrismaClientValidationError) {
+      return NextResponse.json(
+        { error: 'La configuracion del servidor no coincide con la base de datos actual.' },
         { status: 500 }
       );
     }
