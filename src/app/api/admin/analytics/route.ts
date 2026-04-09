@@ -68,14 +68,17 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const platformCounts = campaignsWithPlatform.reduce<Record<string, number>>((acc, campaign) => {
-      const platform = campaign.adAccount.platform;
-      acc[platform] = (acc[platform] || 0) + 1;
-      return acc;
-    }, {});
+    const platformCounts = campaignsWithPlatform.reduce<Record<string, number>>(
+      (acc: Record<string, number>, campaign: typeof campaignsWithPlatform[0]) => {
+        const platform = campaign.adAccount.platform;
+        acc[platform] = (acc[platform] || 0) + 1;
+        return acc;
+      },
+      {}
+    );
 
     const totalCampaignsForPercentage = campaignsWithPlatform.length || 1;
-    const platformDistribution = Object.entries(platformCounts).map(([platform, campaigns]) => ({
+    const platformDistribution = Object.entries(platformCounts).map(([platform, campaigns]: [string, number]) => ({
       platform,
       campaigns,
       percentage: Math.round((campaigns / totalCampaignsForPercentage) * 100),
@@ -100,7 +103,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const topCampaignsWithROI = topAnalytics.map((item) => ({
+    const topCampaignsWithROI = topAnalytics.map((item: typeof topAnalytics[0]) => ({
       id: item.campaign.id,
       name: item.campaign.name,
       platform: item.campaign.adAccount.platform,
