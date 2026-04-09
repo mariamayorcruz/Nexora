@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import Navbar from '@/components/Navbar';
 import { BILLING_PLANS, BillingCycle, BillingPlan } from '@/lib/billing';
 
@@ -14,9 +14,9 @@ function SignupForm() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const selectedPlan = searchParams.get('plan') as BillingPlan | null;
-  const selectedBilling = (searchParams.get('billing') as BillingCycle | null) || 'monthly';
-  const selectedPlanConfig = selectedPlan ? BILLING_PLANS[selectedPlan] : null;
+  const selectedPlanFromUrl = searchParams.get('plan') as BillingPlan | null;
+  const selectedBillingFromUrl = (searchParams.get('billing') as BillingCycle | null) || null;
+  const [fallbackSelection, setFallbackSelection] = useState<{ plan: BillingPlan; billing: BillingCycle } | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -25,6 +25,49 @@ function SignupForm() {
     terms: false,
     marketingOptIn: true,
   });
+
+  useEffect(() => {
+    if (selectedPlanFromUrl) {
+      return;
+    }
+
+    try {
+      const rawSelection = localStorage.getItem('nexoraSelectedPlan');
+      if (!rawSelection) {
+        return;
+      }
+
+      const parsed = JSON.parse(rawSelection) as {
+        plan?: BillingPlan;
+        billing?: BillingCycle;
+        savedAt?: number;
+      };
+
+      if (!parsed.plan || !Object.prototype.hasOwnProperty.call(BILLING_PLANS, parsed.plan)) {
+        return;
+      }
+
+      const isFresh = typeof parsed.savedAt === 'number' && Date.now() - parsed.savedAt < 30 * 60 * 1000;
+      if (!isFresh) {
+        localStorage.removeItem('nexoraSelectedPlan');
+        return;
+      }
+
+      setFallbackSelection({
+        plan: parsed.plan,
+        billing: parsed.billing === 'yearly' ? 'yearly' : 'monthly',
+      });
+    } catch (selectionError) {
+      console.error('Error reading selected plan:', selectionError);
+    }
+  }, [selectedPlanFromUrl]);
+
+  const selectedPlan = selectedPlanFromUrl || fallbackSelection?.plan || null;
+  const selectedBilling = selectedBillingFromUrl || fallbackSelection?.billing || 'monthly';
+  const selectedPlanConfig = useMemo(
+    () => (selectedPlan ? BILLING_PLANS[selectedPlan] : null),
+    [selectedPlan]
+  );
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -64,6 +107,14 @@ function SignupForm() {
       localStorage.setItem('token', data.token);
 
       if (selectedPlanConfig && !data.user?.founderAccess) {
+        localStorage.setItem(
+          'nexoraSelectedPlan',
+          JSON.stringify({
+            plan: selectedPlanConfig.key,
+            billing: selectedBilling,
+            savedAt: Date.now(),
+          })
+        );
         router.push(`/dashboard/billing?plan=${selectedPlanConfig.key}&billing=${selectedBilling}&autostart=1&source=signup`);
         return;
       }

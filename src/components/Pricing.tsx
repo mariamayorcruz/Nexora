@@ -10,6 +10,18 @@ const displayOrder: BillingPlan[] = ['starter', 'professional', 'enterprise'];
 export default function Pricing() {
   const [billing, setBilling] = useState<BillingCycle>('monthly');
 
+  const persistSelectedPlan = (plan: BillingPlan) => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(
+      'nexoraSelectedPlan',
+      JSON.stringify({
+        plan,
+        billing,
+        savedAt: Date.now(),
+      })
+    );
+  };
+
   return (
     <section id="pricing" className="bg-[#fffdf7] px-4 py-24 text-slate-900 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
@@ -106,6 +118,7 @@ export default function Pricing() {
                 <div className="mt-10">
                   <Link
                     href={`/auth/signup?plan=${plan.key}&billing=${billing}`}
+                    onClick={() => persistSelectedPlan(plan.key)}
                     className={featured ? 'btn-primary w-full text-center' : 'btn-secondary w-full text-center'}
                   >
                     Elegir {plan.marketingLabel}

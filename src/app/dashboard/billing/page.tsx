@@ -23,13 +23,16 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true);
   const [processingPlan, setProcessingPlan] = useState<string | null>(null);
   const [checkoutState, setCheckoutState] = useState<CheckoutState | null>(null);
+  const [fallbackSelection, setFallbackSelection] = useState<{ plan: BillingPlan; billing: BillingCycle } | null>(null);
   const autoCheckoutStarted = useRef(false);
 
   const sessionId = searchParams.get('session_id');
   const checkoutStatus = searchParams.get('checkout');
-  const requestedPlan = searchParams.get('plan') as BillingPlan | null;
-  const requestedBilling = (searchParams.get('billing') as BillingCycle | null) || 'monthly';
+  const requestedPlanFromUrl = searchParams.get('plan') as BillingPlan | null;
+  const requestedBillingFromUrl = (searchParams.get('billing') as BillingCycle | null) || null;
   const shouldAutostart = searchParams.get('autostart') === '1';
+  const requestedPlan = requestedPlanFromUrl || fallbackSelection?.plan || null;
+  const requestedBilling = requestedBillingFromUrl || fallbackSelection?.billing || 'monthly';
 
   const currentPlanLabel = useMemo(() => getBillingPlanLabel(subscription?.plan), [subscription?.plan]);
 
@@ -52,6 +55,42 @@ export default function BillingPage() {
 
     fetchSubscription();
   }, []);
+
+  useEffect(() => {
+    if (requestedPlanFromUrl) {
+      return;
+    }
+
+    try {
+      const rawSelection = localStorage.getItem('nexoraSelectedPlan');
+      if (!rawSelection) {
+        return;
+      }
+
+      const parsed = JSON.parse(rawSelection) as {
+        plan?: BillingPlan;
+        billing?: BillingCycle;
+        savedAt?: number;
+      };
+
+      if (!parsed.plan || !Object.prototype.hasOwnProperty.call(BILLING_PLANS, parsed.plan)) {
+        return;
+      }
+
+      const isFresh = typeof parsed.savedAt === 'number' && Date.now() - parsed.savedAt < 30 * 60 * 1000;
+      if (!isFresh) {
+        localStorage.removeItem('nexoraSelectedPlan');
+        return;
+      }
+
+      setFallbackSelection({
+        plan: parsed.plan,
+        billing: parsed.billing === 'yearly' ? 'yearly' : 'monthly',
+      });
+    } catch (selectionError) {
+      console.error('Error reading selected billing plan:', selectionError);
+    }
+  }, [requestedPlanFromUrl]);
 
   useEffect(() => {
     const verifyCheckout = async () => {
@@ -117,6 +156,7 @@ export default function BillingPage() {
       }
 
       if (data.url) {
+        localStorage.removeItem('nexoraSelectedPlan');
         window.location.href = data.url;
       }
     } catch (error) {
