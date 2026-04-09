@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getFounderPlan, getFounderTrialDays, isAdminEmail, isFounderEmail } from '@/lib/access';
 import jwt from 'jsonwebtoken';
 
 export const dynamic = 'force-dynamic';
@@ -25,6 +26,29 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    const founderAccess = isFounderEmail(user.email);
+    const founderPlan = founderAccess ? getFounderPlan() : null;
+
+    if (
+      founderAccess &&
+      user.subscription &&
+      (user.subscription.plan !== founderPlan || user.subscription.currentPeriodEnd < new Date())
+    ) {
+      const upgradedPeriodEnd = new Date();
+      upgradedPeriodEnd.setDate(upgradedPeriodEnd.getDate() + getFounderTrialDays());
+
+      const updatedSubscription = await prisma.subscription.update({
+        where: { userId: user.id },
+        data: {
+          plan: founderPlan || user.subscription.plan,
+          status: 'active',
+          currentPeriodEnd: upgradedPeriodEnd,
+        },
+      });
+
+      user.subscription = updatedSubscription;
+    }
+
     const adAccounts = await prisma.adAccount.findMany({
       where: { userId: user.id },
     });
@@ -40,6 +64,9 @@ export async function GET(request: NextRequest) {
         email: user.email,
         name: user.name,
         subscription: user.subscription,
+        isAdmin: isAdminEmail(user.email),
+        founderAccess,
+        founderPlan,
       },
       adAccounts,
       campaigns,

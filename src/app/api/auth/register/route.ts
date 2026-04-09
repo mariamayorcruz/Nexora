@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { hashPassword, validateEmail, validatePassword } from '@/lib/auth';
+import { getFounderPlan, getFounderTrialDays, isFounderEmail } from '@/lib/access';
 import jwt from 'jsonwebtoken';
 
 export const dynamic = 'force-dynamic';
@@ -51,8 +52,9 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await hashPassword(password);
 
     // Crear suscripción por defecto (plan Starter con 7 días de prueba)
+    const founderAccess = isFounderEmail(cleanEmail);
     const trialEndDate = new Date();
-    trialEndDate.setDate(trialEndDate.getDate() + 7);
+    trialEndDate.setDate(trialEndDate.getDate() + (founderAccess ? getFounderTrialDays() : 7));
 
     const user = await prisma.$transaction(async (tx) => {
       const createdUser = await tx.user.create({
@@ -66,7 +68,7 @@ export async function POST(request: NextRequest) {
       await tx.subscription.create({
         data: {
           userId: createdUser.id,
-          plan: 'starter',
+          plan: founderAccess ? getFounderPlan() : 'starter',
           status: 'active',
           currentPeriodStart: new Date(),
           currentPeriodEnd: trialEndDate,
@@ -90,6 +92,7 @@ export async function POST(request: NextRequest) {
         id: user.id,
         email: user.email,
         name: user.name,
+        founderAccess,
       },
     });
   } catch (error: unknown) {

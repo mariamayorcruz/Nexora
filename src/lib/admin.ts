@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { isAdminEmail } from '@/lib/access';
 import jwt from 'jsonwebtoken';
 
 // Middleware to check if user is admin
@@ -21,10 +22,7 @@ export async function verifyAdmin(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Check if user is admin (you can add an isAdmin field to User model)
-    // For now, we'll check if email is in admin list
-    const adminEmails = process.env.ADMIN_EMAILS?.split(',') || ['admin@nexora.com'];
-    const isAdmin = adminEmails.includes(user.email);
+    const isAdmin = isAdminEmail(user.email);
 
     if (!isAdmin) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
