@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Eye, Play, Pause, Stop } from 'lucide-react';
+import { Eye, Play, Pause, Square } from 'lucide-react';
 
 interface Campaign {
   id: string;
@@ -165,7 +165,7 @@ export default function AdminCampaignsPage() {
                         variant="outline"
                         onClick={() => handleAction(campaign.id, 'stop')}
                       >
-                        <Stop className="h-4 w-4" />
+                        <Square className="h-4 w-4" />
                       </Button>
                     </div>
                   </TableCell>

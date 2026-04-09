@@ -54,40 +54,57 @@ export async function GET(request: NextRequest) {
       ORDER BY month
     `;
 
-    // Get platform distribution
-    const platformStats = await prisma.campaign.groupBy({
-      by: ['platform'],
-      _count: {
+    // Get platform distribution based on linked ad accounts
+    const campaignsWithPlatform = await prisma.campaign.findMany({
+      select: {
         id: true,
+        adAccount: {
+          select: {
+            platform: true,
+          },
+        },
       },
     });
 
-    const totalCampaignsForPercentage = platformStats.reduce((sum, stat) => sum + stat._count.id, 0);
-    const platformDistribution = platformStats.map(stat => ({
-      platform: stat.platform,
-      campaigns: stat._count.id,
-      percentage: Math.round((stat._count.id / totalCampaignsForPercentage) * 100),
+    const platformCounts = campaignsWithPlatform.reduce<Record<string, number>>((acc, campaign) => {
+      const platform = campaign.adAccount.platform;
+      acc[platform] = (acc[platform] || 0) + 1;
+      return acc;
+    }, {});
+
+    const totalCampaignsForPercentage = campaignsWithPlatform.length || 1;
+    const platformDistribution = Object.entries(platformCounts).map(([platform, campaigns]) => ({
+      platform,
+      campaigns,
+      percentage: Math.round((campaigns / totalCampaignsForPercentage) * 100),
     }));
 
-    // Get top performing campaigns (by conversions)
-    const topPerformingCampaigns = await prisma.campaign.findMany({
+    // Get top performing campaigns from analytics records
+    const topAnalytics = await prisma.analytics.findMany({
       take: 10,
       orderBy: {
         conversions: 'desc',
       },
-      select: {
-        id: true,
-        name: true,
-        platform: true,
-        spent: true,
-        conversions: true,
+      include: {
+        campaign: {
+          include: {
+            adAccount: {
+              select: {
+                platform: true,
+              },
+            },
+          },
+        },
       },
     });
 
-    // Calculate ROI for each campaign
-    const topCampaignsWithROI = topPerformingCampaigns.map(campaign => ({
-      ...campaign,
-      roi: campaign.spent > 0 ? Math.round((campaign.conversions / campaign.spent) * 100) : 0,
+    const topCampaignsWithROI = topAnalytics.map((item) => ({
+      id: item.campaign.id,
+      name: item.campaign.name,
+      platform: item.campaign.adAccount.platform,
+      spent: item.spend,
+      conversions: item.conversions,
+      roi: item.spend > 0 ? Math.round((item.conversions / item.spend) * 100) : 0,
     }));
 
     return NextResponse.json({

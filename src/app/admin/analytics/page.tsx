@@ -164,7 +164,7 @@ export default function AdminAnalyticsPage() {
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={({ platform, percentage }) => `${platform}: ${percentage}%`}
+                      label={(props: any) => `${props?.payload?.platform ?? ''}: ${props?.payload?.percentage ?? 0}%`}
                       outerRadius={80}
                       fill="#8884d8"
                       dataKey="campaigns"
