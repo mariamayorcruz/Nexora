@@ -51,6 +51,7 @@ export default function AdminLayout({
 
   const menuItems = [
     { label: 'Dashboard', href: '/admin', icon: 'DA' },
+    { label: 'Volver al panel', href: '/dashboard', icon: 'NX' },
     { label: 'Funnel', href: '/admin/funnel', icon: 'FU' },
     { label: 'Usuarios', href: '/admin/users', icon: 'US' },
     { label: 'Suscripciones', href: '/admin/subscriptions', icon: 'SU' },
@@ -95,6 +96,14 @@ export default function AdminLayout({
               <p className="text-lg font-bold text-gray-900">Nexora Admin</p>
               <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Control Center</p>
             </div>
+          </Link>
+
+          <Link
+            href="/dashboard"
+            className="mt-5 flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-white"
+          >
+            <span>Ir al panel principal</span>
+            <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-500">NX</span>
           </Link>
         </div>
 
