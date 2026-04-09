@@ -88,7 +88,7 @@ export default function Pricing() {
                 <p className="text-sm text-gray-500 mb-4">o ${plan.yearlyPrice}/año (facturación anual)</p>
               </div>
 
-              <Link href="/signup" className={`block w-full py-3 rounded-lg font-semibold text-center transition-all mb-8 ${plan.popular ? 'btn-primary' : 'border-2 border-gray-300 text-gray-700 hover:border-primary'}`}>
+              <Link href="/auth/signup" className={`block w-full py-3 rounded-lg font-semibold text-center transition-all mb-8 ${plan.popular ? 'btn-primary' : 'border-2 border-gray-300 text-gray-700 hover:border-primary'}`}>
                 Comenzar ahora
               </Link>
 

@@ -52,7 +52,7 @@ export default function Signup() {
       }
 
       localStorage.setItem('token', data.token);
-      router.push('/dashboard/welcome');
+      router.push('/dashboard');
     } catch (err) {
       setError('Error de conexión. Intenta de nuevo.');
     } finally {

@@ -56,9 +56,9 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Crear suscripción por defecto (plan Starter con 14 días de prueba)
+    // Crear suscripción por defecto (plan Starter con 7 días de prueba)
     const trialEndDate = new Date();
-    trialEndDate.setDate(trialEndDate.getDate() + 14);
+    trialEndDate.setDate(trialEndDate.getDate() + 7);
 
     await prisma.subscription.create({
       data: {

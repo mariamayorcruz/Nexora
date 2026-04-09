@@ -20,7 +20,7 @@ export default function FAQ() {
     },
     {
       question: '¿Hay período de prueba?',
-      answer: 'Sí, ofrecemos 14 días de prueba gratuita con acceso completo a todas las características. No necesitas tarjeta de crédito para comenzar.',
+      answer: 'Sí, ofrecemos 7 días de prueba gratuita con acceso completo a todas las características. No necesitas tarjeta de crédito para comenzar.',
     },
     {
       question: '¿Puedo integrar más de una cuenta por plataforma?',

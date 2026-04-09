@@ -25,10 +25,10 @@ export default function Navbar() {
             <Link href="#faq" className="text-gray-600 hover:text-gray-900 transition">
               FAQ
             </Link>
-            <Link href="/login" className="text-gray-600 hover:text-gray-900 transition">
+            <Link href="/auth/login" className="text-gray-600 hover:text-gray-900 transition">
               Inicia Sesión
             </Link>
-            <Link href="/signup" className="btn-primary">
+            <Link href="/auth/signup" className="btn-primary">
               Comienza Gratis
             </Link>
           </div>
@@ -54,10 +54,10 @@ export default function Navbar() {
             <Link href="#faq" className="block text-gray-600 hover:text-gray-900">
               FAQ
             </Link>
-            <Link href="/login" className="block text-gray-600 hover:text-gray-900">
+            <Link href="/auth/login" className="block text-gray-600 hover:text-gray-900">
               Inicia Sesión
             </Link>
-            <Link href="/signup" className="block btn-primary w-full text-center">
+            <Link href="/auth/signup" className="block btn-primary w-full text-center">
               Comienza Gratis
             </Link>
           </div>
