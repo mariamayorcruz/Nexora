@@ -29,6 +29,7 @@ model User {
   subscription      Subscription?
   adAccounts        AdAccount[]
   campaigns         Campaign[]
+  crmLeads          CrmLead[]
   invoices          Invoice[]
 }
 
@@ -114,6 +115,25 @@ model Invoice {
   paidAt            DateTime?
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
+}
+
+model CrmLead {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String
+  email           String?
+  phone           String?
+  company         String?
+  source          String   @default("manual")
+  stage           String   @default("lead")
+  value           Float    @default(0)
+  confidence      Int      @default(25)
+  nextAction      String?
+  notes           String?  @db.Text
+  lastContactedAt DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model VerificationToken {
