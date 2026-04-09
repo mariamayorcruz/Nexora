@@ -102,7 +102,7 @@ export default function DashboardCrmPage() {
     const totalPipeline = leads.filter((lead) => lead.stage !== 'won').reduce((sum, lead) => sum + lead.value, 0);
     const forecast = leads.reduce((sum, lead) => sum + lead.value * (lead.confidence / 100), 0);
     const wonRevenue = leads.filter((lead) => lead.stage === 'won').reduce((sum, lead) => sum + lead.value, 0);
-    const overdueFollowUps = leads.filter((lead) => lead.stage !== 'won' && lead.nextAction).length;
+    const nextActions = leads.filter((lead) => lead.stage !== 'won' && lead.nextAction).length;
     const outreachReady = leads.filter(
       (lead) => lead.stage !== 'won' && ((settings.emailAutomationEnabled && lead.email) || (settings.whatsappEnabled && lead.phone))
     );
@@ -116,7 +116,7 @@ export default function DashboardCrmPage() {
       totalPipeline,
       forecast,
       wonRevenue,
-      overdueFollowUps,
+      nextActions,
       outreachReady,
       byStage,
     };
@@ -228,7 +228,8 @@ export default function DashboardCrmPage() {
             <p className="text-xs uppercase tracking-[0.32em] text-violet-200">CRM comercial</p>
             <h1 className="mt-4 text-4xl font-semibold leading-tight">Tus contactos, oportunidades y cierres en un solo lugar.</h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-              Nexora conecta campañas, funnel, CRM y seguimiento comercial para que tus clientes puedan vender cualquier servicio con más control, mejor visibilidad y una operación más elegante.
+              Nexora conecta campañas, funnel, CRM y seguimiento comercial para que tus clientes puedan vender
+              cualquier servicio con más control, mejor visibilidad y una operación más elegante.
             </p>
           </div>
 
@@ -250,9 +251,7 @@ export default function DashboardCrmPage() {
       </section>
 
       {message && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-sm">
-          {message}
-        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-sm">{message}</div>
       )}
 
       <section className="grid gap-5 md:grid-cols-3">
@@ -263,8 +262,8 @@ export default function DashboardCrmPage() {
         </div>
         <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
           <p className="text-sm text-slate-500">Próximas acciones</p>
-          <p className="mt-3 text-3xl font-semibold text-slate-900">{metrics.overdueFollowUps}</p>
-          <p className="mt-2 text-sm text-slate-500">Oportunidades con siguiente acción definida.</p>
+          <p className="mt-3 text-3xl font-semibold text-slate-900">{metrics.nextActions}</p>
+          <p className="mt-2 text-sm text-slate-500">Oportunidades con siguiente paso definido.</p>
         </div>
         <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
           <p className="text-sm text-slate-500">Cadencia base</p>

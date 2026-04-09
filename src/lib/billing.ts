@@ -7,6 +7,7 @@ export interface BillingPlanConfig {
   marketingLabel: string;
   monthlyPrice: number;
   yearlyPrice: number;
+  aiCreditsMonthly: number;
   description: string;
   features: string[];
   stripePriceIdMonthly?: string;
@@ -35,8 +36,15 @@ export const BILLING_PLANS: Record<BillingPlan, BillingPlanConfig> = {
     marketingLabel: 'Starter',
     monthlyPrice: 29,
     yearlyPrice: 24,
-    description: 'Para negocios que quieren ordenar su operación publicitaria sin crecer costos fijos.',
-    features: ['1 workspace', 'Dashboard principal', 'Centro de campañas', 'Auth y pagos base', 'Soporte por email'],
+    aiCreditsMonthly: 250,
+    description: 'Para negocios que quieren ordenar su operación publicitaria sin subir estructura fija.',
+    features: [
+      '1 workspace',
+      'Dashboard principal',
+      'Centro de campañas',
+      'CRM comercial base',
+      '250 créditos de IA al mes',
+    ],
     stripePriceIdMonthly: process.env.STRIPE_PRICE_STARTER_MONTHLY || STRIPE_PRICE_DEFAULTS.starter.monthly,
     stripePriceIdYearly: process.env.STRIPE_PRICE_STARTER_YEARLY || STRIPE_PRICE_DEFAULTS.starter.yearly,
   },
@@ -46,8 +54,15 @@ export const BILLING_PLANS: Record<BillingPlan, BillingPlanConfig> = {
     marketingLabel: 'Growth',
     monthlyPrice: 79,
     yearlyPrice: 64,
-    description: 'La mejor relación entre control, administración y escalado para una operación activa.',
-    features: ['3 workspaces', 'Analítica avanzada', 'Panel admin', 'Gestión de usuarios y suscripciones', 'Prioridad de soporte'],
+    aiCreditsMonthly: 1800,
+    description: 'La mejor combinación entre control, analítica, IA y capacidad operativa para crecer.',
+    features: [
+      '3 workspaces',
+      'Analítica avanzada',
+      'Radar creativo',
+      'Automatizaciones sugeridas',
+      '1,800 créditos de IA al mes',
+    ],
     stripePriceIdMonthly:
       process.env.STRIPE_PRICE_PROFESSIONAL_MONTHLY || STRIPE_PRICE_DEFAULTS.professional.monthly,
     stripePriceIdYearly:
@@ -59,8 +74,15 @@ export const BILLING_PLANS: Record<BillingPlan, BillingPlanConfig> = {
     marketingLabel: 'Scale',
     monthlyPrice: 149,
     yearlyPrice: 124,
-    description: 'Para equipos que necesitan más control, más cuentas y una base lista para seguir construyendo.',
-    features: ['Workspaces ampliados', 'Configuración administrativa extendida', 'Soporte prioritario', 'Base para personalizaciones', 'Acompañamiento de implementación'],
+    aiCreditsMonthly: 6500,
+    description: 'Para equipos que quieren operar marketing, contenido y seguimiento con amplitud real.',
+    features: [
+      'Capacidad ampliada',
+      'Soporte prioritario',
+      'Video y repurpose avanzado',
+      'Base para personalizaciones',
+      '6,500 créditos de IA al mes',
+    ],
     stripePriceIdMonthly: process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY || STRIPE_PRICE_DEFAULTS.enterprise.monthly,
     stripePriceIdYearly: process.env.STRIPE_PRICE_ENTERPRISE_YEARLY || STRIPE_PRICE_DEFAULTS.enterprise.yearly,
   },
@@ -82,7 +104,9 @@ export function getStripePriceId(plan: BillingPlan, billingCycle: BillingCycle) 
 }
 
 export function resolvePlanFromStripePriceId(priceId?: string | null): BillingPlan | null {
-  if (!priceId) return null;
+  if (!priceId) {
+    return null;
+  }
 
   const entries = Object.values(BILLING_PLANS);
   const match = entries.find(

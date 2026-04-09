@@ -31,6 +31,8 @@ model User {
   campaigns         Campaign[]
   crmLeads          CrmLead[]
   crmSettings       CrmWorkspaceSettings?
+  aiUsageBuckets    AiWorkspaceUsage[]
+  aiJobs            AiWorkspaceJob[]
   invoices          Invoice[]
 }
 
@@ -150,6 +152,38 @@ model CrmWorkspaceSettings {
   defaultCadence         String   @default("48h")
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
+}
+
+model AiWorkspaceUsage {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cycleKey        String
+  cycleStart      DateTime
+  cycleEnd        DateTime
+  creditsIncluded Int
+  creditsPurchased Int     @default(0)
+  creditsUsed     Int      @default(0)
+  lastJobAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, cycleKey])
+}
+
+model AiWorkspaceJob {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tool        String
+  title       String
+  prompt      String   @db.Text
+  channel     String?
+  status      String   @default("completed")
+  creditsUsed Int
+  output      Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model VerificationToken {

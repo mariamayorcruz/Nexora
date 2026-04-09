@@ -30,7 +30,11 @@ export default function DashboardChatbot() {
       role: 'assistant',
       title: 'Asistente Nexora',
       text: 'Puedo ayudarte con campañas, creatividad, conexiones, soporte y facturación sin salir del panel.',
-      steps: ['Pregunta en lenguaje natural.', 'Te devuelvo diagnóstico y siguiente paso.', 'Si hace falta, luego escalamos a soporte humano.'],
+      steps: [
+        'Pregunta en lenguaje natural.',
+        'Te devuelvo diagnóstico y siguiente paso.',
+        'Si hace falta, luego escalamos a soporte humano.',
+      ],
     },
   ]);
 

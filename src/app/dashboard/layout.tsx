@@ -15,6 +15,7 @@ interface DashboardUser {
     capabilities?: {
       canUseRadar?: boolean;
       canUseAdvancedAnalytics?: boolean;
+      canUseAiStudio?: boolean;
     } | null;
   } | null;
   subscription?: {
@@ -68,6 +69,7 @@ export default function DashboardLayout({
     { label: 'Conectar redes', href: '/dashboard/connect', icon: 'CR' },
     { label: 'Funnel', href: '/dashboard/funnel', icon: 'FU' },
     { label: 'CRM', href: '/dashboard/crm', icon: 'CM' },
+    { label: 'AI Studio', href: '/dashboard/studio', icon: 'IA' },
     { label: 'Campañas', href: '/dashboard/campaigns', icon: 'CA' },
     { label: 'Soporte', href: '/dashboard/support', icon: 'SP' },
     { label: 'Facturación', href: '/dashboard/billing', icon: 'FA' },
@@ -79,7 +81,7 @@ export default function DashboardLayout({
   }
 
   if (user?.entitlements?.capabilities?.canUseAdvancedAnalytics) {
-    menuItems.splice(user?.entitlements?.capabilities?.canUseRadar ? 5 : 4, 0, {
+    menuItems.splice(user?.entitlements?.capabilities?.canUseRadar ? 6 : 5, 0, {
       label: 'Analítica',
       href: '/dashboard/analytics',
       icon: 'AN',

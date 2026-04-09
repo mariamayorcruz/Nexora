@@ -121,7 +121,7 @@ export default function BillingPage() {
         const plan = data.session?.plan || 'tu nuevo plan';
         setCheckoutState({
           type: 'success',
-          message: `Pago confirmado para ${plan}. Stripe terminó correctamente el checkout y Nexora está sincronizando tu suscripción.`,
+          message: `Pago confirmado para ${plan}. Stripe terminó correctamente el checkout y Nexora ya está sincronizando tu suscripción.`,
         });
 
         await fetchSubscription();
@@ -206,7 +206,7 @@ export default function BillingPage() {
     <div className="space-y-8">
       <div>
         <h2 className="mb-2 text-3xl font-bold text-gray-900">Facturación y suscripción</h2>
-        <p className="text-gray-600">Gestiona tu plan, ejecuta upgrades y valida el estado real de Stripe.</p>
+        <p className="text-gray-600">Gestiona tu plan, lanza upgrades y valida el estado real de Stripe.</p>
       </div>
 
       {shouldAutostart && requestedPlan && !checkoutState && (
@@ -239,7 +239,7 @@ export default function BillingPage() {
             </div>
             <div className="rounded-2xl bg-gray-50 p-5">
               <p className="text-sm text-gray-500">Estado</p>
-              <p className="mt-2 text-2xl font-semibold text-gray-900">{subscription.status}</p>
+              <p className="mt-2 text-2xl font-semibold capitalize text-gray-900">{subscription.status}</p>
             </div>
             <div className="rounded-2xl bg-gray-50 p-5">
               <p className="text-sm text-gray-500">Próximo corte</p>
@@ -284,9 +284,9 @@ export default function BillingPage() {
               </ul>
 
               <div className="mt-6 rounded-2xl bg-gray-50 p-4 text-sm text-gray-700">
-                {plan.key === 'starter' && 'Incluye 1 cuenta publicitaria, hasta 3 campañas activas y dashboard base.'}
-                {plan.key === 'professional' && 'Incluye radar creativo, analítica avanzada, 3 cuentas y 12 campañas activas.'}
-                {plan.key === 'enterprise' && 'Incluye más capacidad, automatización sugerida y soporte prioritario.'}
+                {plan.key === 'starter' && 'Incluye 1 cuenta publicitaria, hasta 3 campañas activas y una bolsa inicial de IA.'}
+                {plan.key === 'professional' && 'Incluye radar creativo, analítica avanzada, video, 3 cuentas y una bolsa robusta de IA.'}
+                {plan.key === 'enterprise' && 'Incluye máxima capacidad, automatización sugerida, soporte prioritario y créditos amplios para operar todo el mes.'}
               </div>
 
               <button
