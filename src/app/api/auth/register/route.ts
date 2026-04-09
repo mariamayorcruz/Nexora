@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { hashPassword, validateEmail, validatePassword } from '@/lib/auth';
 import jwt from 'jsonwebtoken';
@@ -8,16 +9,18 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
   try {
     const { name, email, password } = await request.json();
+    const cleanName = (name || '').trim();
+    const cleanEmail = (email || '').trim().toLowerCase();
 
     // Validar datos
-    if (!email || !password || !name) {
+    if (!cleanEmail || !password || !cleanName) {
       return NextResponse.json(
         { error: 'Todos los campos son requeridos' },
         { status: 400 }
       );
     }
 
-    if (!validateEmail(email)) {
+    if (!validateEmail(cleanEmail)) {
       return NextResponse.json(
         { error: 'Email inválido' },
         { status: 400 }
@@ -34,7 +37,7 @@ export async function POST(request: NextRequest) {
 
     // Verificar si el usuario ya existe
     const existingUser = await prisma.user.findUnique({
-      where: { email },
+      where: { email: cleanEmail },
     });
 
     if (existingUser) {
@@ -47,27 +50,30 @@ export async function POST(request: NextRequest) {
     // Hashear contraseña
     const hashedPassword = await hashPassword(password);
 
-    // Crear usuario
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-      },
-    });
-
     // Crear suscripción por defecto (plan Starter con 7 días de prueba)
     const trialEndDate = new Date();
     trialEndDate.setDate(trialEndDate.getDate() + 7);
 
-    await prisma.subscription.create({
-      data: {
-        userId: user.id,
-        plan: 'starter',
-        status: 'active',
-        currentPeriodStart: new Date(),
-        currentPeriodEnd: trialEndDate,
-      },
+    const user = await prisma.$transaction(async (tx) => {
+      const createdUser = await tx.user.create({
+        data: {
+          name: cleanName,
+          email: cleanEmail,
+          password: hashedPassword,
+        },
+      });
+
+      await tx.subscription.create({
+        data: {
+          userId: createdUser.id,
+          plan: 'starter',
+          status: 'active',
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: trialEndDate,
+        },
+      });
+
+      return createdUser;
     });
 
     // Generar token JWT
@@ -86,10 +92,34 @@ export async function POST(request: NextRequest) {
         name: user.name,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Register error:', error);
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2002') {
+        return NextResponse.json(
+          { error: 'El email ya está registrado' },
+          { status: 400 }
+        );
+      }
+
+      return NextResponse.json(
+        { error: 'No se pudo guardar tu cuenta. Intenta nuevamente.' },
+        { status: 500 }
+      );
+    }
+
+    if (error instanceof Error) {
+      if (error.message.includes('DATABASE_URL')) {
+        return NextResponse.json(
+          { error: 'Configuración de base de datos incompleta. Contacta soporte.' },
+          { status: 500 }
+        );
+      }
+    }
+
     return NextResponse.json(
-      { error: 'Error al registrarse' },
+      { error: 'No pudimos crear tu cuenta en este momento. Intenta de nuevo.' },
       { status: 500 }
     );
   }
