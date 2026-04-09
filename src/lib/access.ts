@@ -1,5 +1,5 @@
 const DEFAULT_ADMIN_EMAILS = ['info.emprendeelegante@gmail.com', 'admin@nexora.com'];
-const DEFAULT_FOUNDER_EMAILS = ['info.emprendeelegante@gmail.com'];
+const DEFAULT_FOUNDER_EMAILS = ['info.emprendeelegante@gmail.com', 'mayorexcelsiorllc@gmail.com'];
 
 function normalizeEmailList(value?: string | null, fallback: string[] = []) {
   const configuredEmails = value
