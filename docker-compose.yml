@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: saleads-postgres
+    environment:
+      POSTGRES_USER: saleads
+      POSTGRES_PASSWORD: saleads_password
+      POSTGRES_DB: saleads_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U saleads"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    container_name: saleads-app
+    environment:
+      DATABASE_URL: postgresql://saleads:saleads_password@postgres:5432/saleads_db
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: your-secret-key-here
+      JWT_SECRET: your-jwt-secret-here
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_your_key
+      STRIPE_SECRET_KEY: sk_test_your_key
+      NODE_ENV: development
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: sh -c "npm install && npm run db:generate && npm run db:migrate && npm run dev"
+
+volumes:
+  postgres_data:
+
+networks:
+  default:
+    name: saleads-network

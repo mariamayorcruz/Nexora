@@ -1,0 +1,129 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String       @id @default(cuid())
+  email             String       @unique
+  name              String?
+  password          String
+  image             String?
+  emailVerified     DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  subscription      Subscription?
+  adAccounts        AdAccount[]
+  campaigns         Campaign[]
+  invoices          Invoice[]
+}
+
+model Subscription {
+  id                String       @id @default(cuid())
+  userId            String       @unique
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan              String       @default("starter") // starter, pro, enterprise
+  status            String       @default("active") // active, cancelled, paused
+  currentPeriodStart DateTime
+  currentPeriodEnd  DateTime
+  cancelAtPeriodEnd Boolean      @default(false)
+  stripeCustomerId  String?      @unique
+  stripeSubId       String?      @unique
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+}
+
+model AdAccount {
+  id                String       @id @default(cuid())
+  userId            String
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform          String       // instagram, facebook, google, tiktok
+  accountId         String
+  accessToken       String       @db.Text
+  refreshToken      String?      @db.Text
+  expiresAt         DateTime?
+  accountName       String
+  accountEmail      String?
+  connected         Boolean      @default(true)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  campaigns         Campaign[]
+
+  @@unique([userId, platform, accountId])
+}
+
+model Campaign {
+  id                String       @id @default(cuid())
+  userId            String
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adAccountId       String
+  adAccount         AdAccount    @relation(fields: [adAccountId], references: [id], onDelete: Cascade)
+  name              String
+  description       String?      @db.Text
+  budget            Float
+  startDate         DateTime
+  endDate           DateTime?
+  status            String       // active, paused, completed
+  targeting         Json?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  analytics         Analytics?
+}
+
+model Analytics {
+  id                String       @id @default(cuid())
+  campaignId        String       @unique
+  campaign          Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  impressions       Int          @default(0)
+  clicks            Int          @default(0)
+  conversions       Int          @default(0)
+  spend             Float        @default(0)
+  revenue           Float        @default(0)
+  ctr               Float        @default(0)
+  cpc               Float        @default(0)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+}
+
+model Invoice {
+  id                String       @id @default(cuid())
+  userId            String
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeInvoiceId   String?      @unique
+  amount            Float
+  currency          String       @default("USD")
+  description       String?
+  status            String       // draft, open, paid, void, uncollectible
+  periodStart       DateTime
+  periodEnd         DateTime
+  dueDate           DateTime?
+  paidAt            DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model PaymentSettings {
+  id                String   @id @default(cuid())
+  stripeWebhookSecret String?
+  bankAccount       Json?
+  paypalEmail       String?
+  commissionRate    Float    @default(2.9)
+  minimumPayout     Float    @default(25.0)
+  updatedAt         DateTime @updatedAt
+  createdAt         DateTime @default(now())
+}
