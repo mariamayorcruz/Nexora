@@ -9,6 +9,25 @@ interface DashboardUser {
   name?: string | null;
   email: string;
   founderAccess?: boolean;
+  entitlements?: {
+    marketingLabel: string;
+    usage: {
+      adAccounts: number;
+      activeCampaigns: number;
+      adAccountsLimit: number;
+      activeCampaignsLimit: number;
+      adAccountsRemaining: number;
+      activeCampaignsRemaining: number;
+    };
+    capabilities: {
+      canUseRadar: boolean;
+      canUseAdvancedAnalytics: boolean;
+      canUseAutomationSuggestions: boolean;
+      canUsePrioritySupport: boolean;
+      workspaceLimit: number;
+      upgradeCta: string;
+    };
+  } | null;
   subscription?: {
     plan?: string | null;
     status?: string | null;
@@ -57,6 +76,7 @@ export default function DashboardPage() {
   const totalSpend = campaigns.reduce((sum, campaign) => sum + (campaign.analytics?.spend || 0), 0);
   const totalRevenue = campaigns.reduce((sum, campaign) => sum + (campaign.analytics?.revenue || 0), 0);
   const roi = totalSpend > 0 ? Math.round(((totalRevenue - totalSpend) / totalSpend) * 100) : 0;
+  const entitlements = user?.entitlements;
 
   if (loading) {
     return (
@@ -84,7 +104,7 @@ export default function DashboardPage() {
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <span className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm">
-                Plan {user?.subscription?.plan || 'starter'}
+                Plan {entitlements?.marketingLabel || user?.subscription?.plan || 'starter'}
               </span>
               {user?.founderAccess && (
                 <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-sm text-emerald-200">
@@ -96,16 +116,21 @@ export default function DashboardPage() {
 
           <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
             <p className="text-sm text-slate-300">Siguiente mejor accion</p>
-            <p className="mt-3 text-2xl font-semibold text-white">Activar el radar creativo y bajar una campana nueva.</p>
+            <p className="mt-3 text-2xl font-semibold text-white">
+              {entitlements?.capabilities?.canUseRadar
+                ? 'Activar el radar creativo y bajar una campana nueva.'
+                : 'Conectar tu primera cuenta y desbloquear el siguiente nivel del panel.'}
+            </p>
             <p className="mt-4 text-sm leading-6 text-slate-300">
-              El radar traduce cuentas, rendimiento y contexto comercial en hooks, angulos y rutas de ejecucion para
-              que no dependas de intuiciones aisladas.
+              {entitlements?.capabilities?.canUseRadar
+                ? 'El radar traduce cuentas, rendimiento y contexto comercial en hooks, angulos y rutas de ejecucion para que no dependas de intuiciones aisladas.'
+                : entitlements?.capabilities?.upgradeCta}
             </p>
             <Link
-              href="/dashboard/radar"
+              href={entitlements?.capabilities?.canUseRadar ? '/dashboard/radar' : '/dashboard/billing'}
               className="mt-6 inline-flex items-center rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200"
             >
-              Abrir radar creativo
+              {entitlements?.capabilities?.canUseRadar ? 'Abrir radar creativo' : 'Ver opciones de plan'}
             </Link>
           </div>
         </div>
@@ -115,10 +140,16 @@ export default function DashboardPage() {
         <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
           <p className="text-sm text-gray-500">Cuentas conectadas</p>
           <p className="mt-3 text-4xl font-semibold text-gray-900">{adAccounts.length}</p>
+          <p className="mt-2 text-xs uppercase tracking-[0.22em] text-gray-400">
+            de {entitlements?.usage.adAccountsLimit || 1} disponibles
+          </p>
         </div>
         <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
           <p className="text-sm text-gray-500">Campanas activas</p>
           <p className="mt-3 text-4xl font-semibold text-gray-900">{activeCampaigns.length}</p>
+          <p className="mt-2 text-xs uppercase tracking-[0.22em] text-gray-400">
+            de {entitlements?.usage.activeCampaignsLimit || 3} disponibles
+          </p>
         </div>
         <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
           <p className="text-sm text-gray-500">Gasto registrado</p>
@@ -131,12 +162,16 @@ export default function DashboardPage() {
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
-        <Link href="/dashboard/radar" className="group block">
+        <Link href={entitlements?.capabilities?.canUseRadar ? '/dashboard/radar' : '/dashboard/billing'} className="group block">
           <div className="h-full rounded-[30px] border border-cyan-200 bg-gradient-to-br from-cyan-50 via-white to-emerald-50 p-8 transition group-hover:-translate-y-1 group-hover:shadow-xl">
             <Sparkles className="h-12 w-12 text-cyan-600" />
-            <h2 className="mt-6 text-2xl font-semibold text-gray-900">Radar creativo auto-actualizable</h2>
+            <h2 className="mt-6 text-2xl font-semibold text-gray-900">
+              {entitlements?.capabilities?.canUseRadar ? 'Radar creativo auto-actualizable' : 'Desbloquea el radar creativo'}
+            </h2>
             <p className="mt-3 text-sm leading-6 text-gray-600">
-              Lee el momento comercial y devuelve hooks, formatos y campanas listas para lanzar con mas claridad.
+              {entitlements?.capabilities?.canUseRadar
+                ? 'Lee el momento comercial y devuelve hooks, formatos y campanas listas para lanzar con mas claridad.'
+                : 'Growth y Scale activan insights, hooks y sugerencias accionables para acelerar decisiones.'}
             </p>
           </div>
         </Link>
@@ -150,6 +185,33 @@ export default function DashboardPage() {
             </p>
           </div>
         </Link>
+      </section>
+
+      <section className="grid gap-5 xl:grid-cols-4">
+        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+          <p className="text-sm text-gray-500">Workspace</p>
+          <p className="mt-3 text-2xl font-semibold text-gray-900">
+            {entitlements?.capabilities.workspaceLimit || 1} incluidos
+          </p>
+        </div>
+        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+          <p className="text-sm text-gray-500">Analitica avanzada</p>
+          <p className="mt-3 text-2xl font-semibold text-gray-900">
+            {entitlements?.capabilities.canUseAdvancedAnalytics ? 'Activa' : 'Bloqueada'}
+          </p>
+        </div>
+        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+          <p className="text-sm text-gray-500">Automatizaciones</p>
+          <p className="mt-3 text-2xl font-semibold text-gray-900">
+            {entitlements?.capabilities.canUseAutomationSuggestions ? 'Activas' : 'Upgrade'}
+          </p>
+        </div>
+        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+          <p className="text-sm text-gray-500">Soporte</p>
+          <p className="mt-3 text-2xl font-semibold text-gray-900">
+            {entitlements?.capabilities.canUsePrioritySupport ? 'Prioritario' : 'Email'}
+          </p>
+        </div>
       </section>
 
       <section className="grid gap-5 md:grid-cols-3">

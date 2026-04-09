@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getFounderPlan, getFounderTrialDays, isAdminEmail, isFounderEmail } from '@/lib/access';
+import { buildEntitlementSummary } from '@/lib/entitlements';
 import jwt from 'jsonwebtoken';
 
 export const dynamic = 'force-dynamic';
@@ -55,7 +56,20 @@ export async function GET(request: NextRequest) {
 
     const campaigns = await prisma.campaign.findMany({
       where: { userId: user.id },
-      include: { analytics: true },
+      include: {
+        analytics: true,
+        adAccount: {
+          select: {
+            platform: true,
+            accountName: true,
+          },
+        },
+      },
+    });
+
+    const entitlements = buildEntitlementSummary(founderPlan || user.subscription?.plan, {
+      adAccounts: adAccounts.length,
+      activeCampaigns: campaigns.filter((campaign) => campaign.status === 'active').length,
     });
 
     return NextResponse.json({
@@ -67,6 +81,7 @@ export async function GET(request: NextRequest) {
         isAdmin: isAdminEmail(user.email),
         founderAccess,
         founderPlan,
+        entitlements,
       },
       adAccounts,
       campaigns,

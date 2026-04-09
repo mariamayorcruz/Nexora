@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { isFounderEmail } from '@/lib/access';
 import { prisma } from '@/lib/prisma';
+import { canAccessRadar, getPlanCapabilities } from '@/lib/entitlements';
 import { buildTrendRadarReport } from '@/lib/trends';
 
 export const dynamic = 'force-dynamic';
@@ -32,6 +33,18 @@ export async function GET(request: NextRequest) {
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    const effectivePlan = isFounderEmail(user.email) ? 'enterprise' : user.subscription?.plan;
+    if (!canAccessRadar(effectivePlan)) {
+      const capabilities = getPlanCapabilities(effectivePlan);
+      return NextResponse.json(
+        {
+          error: 'El radar creativo esta disponible desde el plan Growth.',
+          capabilities,
+        },
+        { status: 403 }
+      );
     }
 
     const report = buildTrendRadarReport({

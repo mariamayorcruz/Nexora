@@ -1,24 +1,45 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
 
 interface Campaign {
   id: string;
   name: string;
-  adAccount: { platform: string; accountName: string };
   budget: number;
   status: string;
   startDate: string;
+  adAccount?: {
+    platform: string;
+    accountName: string;
+  } | null;
   analytics?: {
     impressions: number;
     clicks: number;
     conversions: number;
     spend: number;
-  };
+    revenue?: number;
+  } | null;
+}
+
+interface CampaignUser {
+  entitlements?: {
+    marketingLabel: string;
+    usage: {
+      activeCampaigns: number;
+      activeCampaignsLimit: number;
+      activeCampaignsRemaining: number;
+    };
+    capabilities: {
+      upgradeCta: string;
+      canUseAutomationSuggestions: boolean;
+    };
+  } | null;
 }
 
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [user, setUser] = useState<CampaignUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,9 +48,11 @@ export default function CampaignsPage() {
         const token = localStorage.getItem('token');
         const response = await fetch('/api/users/me', {
           headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
         });
         const data = await response.json();
         setCampaigns(data.campaigns || []);
+        setUser(data.user);
       } catch (error) {
         console.error('Error fetching campaigns:', error);
       } finally {
@@ -40,69 +63,145 @@ export default function CampaignsPage() {
     fetchCampaigns();
   }, []);
 
+  const activeCampaigns = useMemo(
+    () => campaigns.filter((campaign) => campaign.status === 'active'),
+    [campaigns]
+  );
+  const campaignUsage = user?.entitlements?.usage;
+  const limitReached = !!campaignUsage && campaignUsage.activeCampaigns >= campaignUsage.activeCampaignsLimit;
+
   if (loading) {
     return (
-      <div className="text-center py-12">
-        <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block h-12 w-12 animate-spin rounded-full border-b-2 border-b-primary" />
+          <p className="mt-4 text-gray-600">Cargando campanas...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-8">
-        <h2 className="text-3xl font-bold">Tus Campañas</h2>
-        <button className="btn-primary">+ Nueva Campaña</button>
-      </div>
+    <div className="space-y-8">
+      <section className="rounded-[30px] border border-gray-200 bg-white p-8 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-6">
+          <div>
+            <p className="text-xs uppercase tracking-[0.28em] text-gray-400">Capacidad por plan</p>
+            <h1 className="mt-3 text-3xl font-semibold text-gray-900">Tus campanas ahora viven con limites reales.</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-gray-600">
+              Cada cliente ve cuantas campanas activas puede sostener con su plan actual, y cuando conviene subir de nivel.
+            </p>
+          </div>
+
+          <div className="rounded-[24px] bg-slate-950 px-6 py-5 text-white">
+            <p className="text-sm text-slate-300">Campanas activas</p>
+            <p className="mt-2 text-4xl font-semibold">
+              {campaignUsage?.activeCampaigns || activeCampaigns.length}/{campaignUsage?.activeCampaignsLimit || 3}
+            </p>
+            <p className="mt-2 text-sm text-slate-300">espacios ocupados</p>
+          </div>
+        </div>
+
+        <div className="mt-6 flex flex-wrap gap-3">
+          <button
+            className="rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={limitReached}
+          >
+            {limitReached ? 'Limite de campanas alcanzado' : '+ Nueva campana'}
+          </button>
+          <Link href="/dashboard/billing" className="rounded-2xl border border-gray-300 px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+            Ver upgrade
+          </Link>
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+          {limitReached
+            ? user?.entitlements?.capabilities.upgradeCta
+            : `Te quedan ${campaignUsage?.activeCampaignsRemaining || 0} campanas activas disponibles en ${user?.entitlements?.marketingLabel || 'tu plan actual'}.`}
+        </div>
+      </section>
 
       {campaigns.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-lg">
-          <p className="text-3xl mb-4">📭</p>
-          <p className="text-gray-600 mb-6">No tienes campañas aún</p>
-          <button className="btn-primary">Crear Primera Campaña</button>
-        </div>
+        <section className="rounded-[28px] border border-gray-200 bg-white p-12 text-center shadow-sm">
+          <p className="text-3xl font-semibold text-gray-900">Aun no tienes campanas creadas.</p>
+          <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-gray-600">
+            El siguiente paso es conectar una cuenta real y bajar una primera campana con una promesa clara y una oferta visible.
+          </p>
+          <div className="mt-6 flex justify-center gap-3">
+            <Link href="/dashboard/connect" className="btn-primary">
+              Conectar cuentas
+            </Link>
+            <Link href="/dashboard/billing" className="btn-secondary">
+              Revisar capacidad del plan
+            </Link>
+          </div>
+        </section>
       ) : (
-        <div className="space-y-4">
-          {campaigns.map((campaign) => (
-            <div key={campaign.id} className="card flex justify-between items-start">
-              <div className="flex-1">
-                <h3 className="text-lg font-bold text-gray-900">{campaign.name}</h3>
-                <p className="text-sm text-gray-600">
-                  {campaign.adAccount?.platform} • {campaign.adAccount?.accountName}
-                </p>
-                <div className="mt-4 grid grid-cols-4 gap-4 text-sm">
+        <section className="space-y-4">
+          {campaigns.map((campaign) => {
+            const roi =
+              (campaign.analytics?.spend || 0) > 0 && (campaign.analytics?.revenue || 0) > 0
+                ? Math.round((((campaign.analytics?.revenue || 0) - (campaign.analytics?.spend || 0)) / (campaign.analytics?.spend || 1)) * 100)
+                : null;
+
+            return (
+              <article key={campaign.id} className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <p className="text-gray-500">Presupuesto</p>
-                    <p className="font-bold">${campaign.budget}</p>
+                    <h2 className="text-xl font-semibold text-gray-900">{campaign.name}</h2>
+                    <p className="mt-2 text-sm text-gray-600">
+                      {campaign.adAccount?.platform || 'plataforma no disponible'} · {campaign.adAccount?.accountName || 'sin cuenta asociada'}
+                    </p>
                   </div>
-                  <div>
-                    <p className="text-gray-500">Impresiones</p>
-                    <p className="font-bold">{campaign.analytics?.impressions || 0}</p>
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] ${
+                      campaign.status === 'active'
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : campaign.status === 'paused'
+                          ? 'bg-amber-50 text-amber-700'
+                          : 'bg-gray-100 text-gray-700'
+                    }`}
+                  >
+                    {campaign.status}
+                  </span>
+                </div>
+
+                <div className="mt-6 grid gap-4 md:grid-cols-5">
+                  <div className="rounded-2xl bg-gray-50 p-4">
+                    <p className="text-sm text-gray-500">Presupuesto</p>
+                    <p className="mt-2 text-2xl font-semibold text-gray-900">${campaign.budget}</p>
                   </div>
-                  <div>
-                    <p className="text-gray-500">Clicks</p>
-                    <p className="font-bold">{campaign.analytics?.clicks || 0}</p>
+                  <div className="rounded-2xl bg-gray-50 p-4">
+                    <p className="text-sm text-gray-500">Impresiones</p>
+                    <p className="mt-2 text-2xl font-semibold text-gray-900">{campaign.analytics?.impressions || 0}</p>
                   </div>
-                  <div>
-                    <p className="text-gray-500">Conversiones</p>
-                    <p className="font-bold">{campaign.analytics?.conversions || 0}</p>
+                  <div className="rounded-2xl bg-gray-50 p-4">
+                    <p className="text-sm text-gray-500">Clicks</p>
+                    <p className="mt-2 text-2xl font-semibold text-gray-900">{campaign.analytics?.clicks || 0}</p>
+                  </div>
+                  <div className="rounded-2xl bg-gray-50 p-4">
+                    <p className="text-sm text-gray-500">Conversiones</p>
+                    <p className="mt-2 text-2xl font-semibold text-gray-900">{campaign.analytics?.conversions || 0}</p>
+                  </div>
+                  <div className="rounded-2xl bg-gray-50 p-4">
+                    <p className="text-sm text-gray-500">ROI estimado</p>
+                    <p className="mt-2 text-2xl font-semibold text-gray-900">{roi === null ? 'N/D' : `${roi}%`}</p>
                   </div>
                 </div>
-              </div>
-              <div className="ml-4 text-right">
-                <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${
-                  campaign.status === 'active' 
-                    ? 'bg-green-100 text-green-700' 
-                    : campaign.status === 'paused'
-                    ? 'bg-yellow-100 text-yellow-700'
-                    : 'bg-gray-100 text-gray-700'
-                }`}>
-                  {campaign.status === 'active' ? '▶ Activa' : campaign.status === 'paused' ? '⏸ Pausada' : '✓ Completada'}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
+
+                {user?.entitlements?.capabilities.canUseAutomationSuggestions ? (
+                  <div className="mt-5 rounded-2xl border border-cyan-200 bg-cyan-50 p-4 text-sm text-cyan-950">
+                    Nexora puede sugerirte automatizaciones y ajustes de campana segun el rendimiento de esta pieza.
+                  </div>
+                ) : (
+                  <div className="mt-5 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+                    El plan Growth desbloquea sugerencias automaticas y lectura accionable para cada campana.
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </section>
       )}
     </div>
   );

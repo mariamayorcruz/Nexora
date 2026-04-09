@@ -9,6 +9,13 @@ interface DashboardUser {
   isAdmin?: boolean;
   founderAccess?: boolean;
   founderPlan?: string | null;
+  entitlements?: {
+    marketingLabel?: string;
+    capabilities?: {
+      canUseRadar?: boolean;
+      canUseAdvancedAnalytics?: boolean;
+    } | null;
+  } | null;
   subscription?: {
     plan?: string | null;
   } | null;
@@ -57,13 +64,23 @@ export default function DashboardLayout({
 
   const menuItems = [
     { label: 'Dashboard', href: '/dashboard', icon: 'DA' },
-    { label: 'Radar creativo', href: '/dashboard/radar', icon: 'RC' },
     { label: 'Conectar redes', href: '/dashboard/connect', icon: 'CR' },
     { label: 'Campanas', href: '/dashboard/campaigns', icon: 'CA' },
-    { label: 'Analitica', href: '/dashboard/analytics', icon: 'AN' },
     { label: 'Facturacion', href: '/dashboard/billing', icon: 'FA' },
     { label: 'Configuracion', href: '/dashboard/settings', icon: 'CO' },
   ];
+
+  if (user?.entitlements?.capabilities?.canUseRadar) {
+    menuItems.splice(1, 0, { label: 'Radar creativo', href: '/dashboard/radar', icon: 'RC' });
+  }
+
+  if (user?.entitlements?.capabilities?.canUseAdvancedAnalytics) {
+    menuItems.splice(user?.entitlements?.capabilities?.canUseRadar ? 4 : 3, 0, {
+      label: 'Analitica',
+      href: '/dashboard/analytics',
+      icon: 'AN',
+    });
+  }
 
   if (user?.isAdmin) {
     menuItems.push({ label: 'Panel admin', href: '/admin', icon: 'AD' });
@@ -129,7 +146,7 @@ export default function DashboardLayout({
           <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
             <p className="text-sm font-medium text-gray-900">{user?.email}</p>
             <p className="mt-1 text-xs uppercase tracking-[0.24em] text-gray-400">
-              Plan: {user?.founderPlan || user?.subscription?.plan || 'starter'}
+              Plan: {user?.entitlements?.marketingLabel || user?.founderPlan || user?.subscription?.plan || 'starter'}
             </p>
             {user?.isAdmin && (
               <p className="mt-3 text-xs font-semibold text-primary">Acceso administrador habilitado</p>

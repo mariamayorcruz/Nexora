@@ -1,116 +1,190 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
 
-interface AnalyticsData {
-  totalImpressions: number;
-  totalClicks: number;
-  totalConversions: number;
-  totalSpend: number;
-  averageROI: number;
-  averageCTR: number;
+interface AnalyticsCampaign {
+  id: string;
+  adAccount?: {
+    platform: string;
+  } | null;
+  analytics?: {
+    impressions: number;
+    clicks: number;
+    conversions: number;
+    spend: number;
+    revenue?: number;
+  } | null;
+}
+
+interface AnalyticsUser {
+  entitlements?: {
+    marketingLabel: string;
+    capabilities: {
+      canUseAdvancedAnalytics: boolean;
+      upgradeCta: string;
+    };
+  } | null;
 }
 
 export default function AnalyticsPage() {
-  const [analytics, setAnalytics] = useState<AnalyticsData>({
-    totalImpressions: 0,
-    totalClicks: 0,
-    totalConversions: 0,
-    totalSpend: 0,
-    averageROI: 0,
-    averageCTR: 0,
-  });
-
+  const [campaigns, setCampaigns] = useState<AnalyticsCampaign[]>([]);
+  const [user, setUser] = useState<AnalyticsUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simular carga de datos
-    setTimeout(() => {
-      setAnalytics({
-        totalImpressions: 125000,
-        totalClicks: 3500,
-        totalConversions: 450,
-        totalSpend: 2150,
-        averageROI: 2.8,
-        averageCTR: 2.8,
-      });
-      setLoading(false);
-    }, 1000);
+    const fetchData = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/users/me', {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        });
+
+        const data = await response.json();
+        setCampaigns(data.campaigns || []);
+        setUser(data.user);
+      } catch (error) {
+        console.error('Error fetching analytics data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, []);
+
+  const metrics = useMemo(() => {
+    const totals = campaigns.reduce(
+      (accumulator, campaign) => {
+        accumulator.impressions += campaign.analytics?.impressions || 0;
+        accumulator.clicks += campaign.analytics?.clicks || 0;
+        accumulator.conversions += campaign.analytics?.conversions || 0;
+        accumulator.spend += campaign.analytics?.spend || 0;
+        accumulator.revenue += campaign.analytics?.revenue || 0;
+
+        const platform = campaign.adAccount?.platform || 'sin fuente';
+        accumulator.platformSpend[platform] = (accumulator.platformSpend[platform] || 0) + (campaign.analytics?.spend || 0);
+        return accumulator;
+      },
+      {
+        impressions: 0,
+        clicks: 0,
+        conversions: 0,
+        spend: 0,
+        revenue: 0,
+        platformSpend: {} as Record<string, number>,
+      }
+    );
+
+    const ctr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
+    const roi = totals.spend > 0 ? ((totals.revenue - totals.spend) / totals.spend) * 100 : 0;
+
+    return {
+      ...totals,
+      ctr,
+      roi,
+      platforms: Object.entries(totals.platformSpend).sort((a, b) => b[1] - a[1]),
+    };
+  }, [campaigns]);
 
   if (loading) {
     return (
-      <div className="text-center py-12">
-        <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block h-12 w-12 animate-spin rounded-full border-b-2 border-b-primary" />
+          <p className="mt-4 text-gray-600">Preparando analitica...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user?.entitlements?.capabilities.canUseAdvancedAnalytics) {
+    return (
+      <div className="space-y-8">
+        <section className="rounded-[30px] border border-gray-200 bg-white p-8 shadow-sm">
+          <p className="text-xs uppercase tracking-[0.28em] text-gray-400">Analitica avanzada</p>
+          <h1 className="mt-3 text-3xl font-semibold text-gray-900">Esta vista se desbloquea desde el plan Growth.</h1>
+          <p className="mt-4 max-w-2xl text-sm leading-6 text-gray-600">
+            Tu plan actual puede ver el resumen del dashboard, pero la lectura consolidada por plataforma y rendimiento profundo vive en el siguiente nivel.
+          </p>
+          <div className="mt-6 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+            {user?.entitlements?.capabilities.upgradeCta}
+          </div>
+          <Link href="/dashboard/billing" className="mt-6 inline-flex rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90">
+            Ver upgrade
+          </Link>
+        </section>
       </div>
     );
   }
 
   return (
-    <div>
-      <h2 className="text-3xl font-bold mb-8">Analíticas</h2>
-
-      <div className="grid md:grid-cols-3 gap-6 mb-12">
-        <div className="card">
-          <p className="text-gray-600 text-sm mb-2">Impresiones Totales</p>
-          <p className="text-4xl font-bold text-primary">{analytics.totalImpressions.toLocaleString()}</p>
-          <p className="text-xs text-gray-500 mt-2">↑ 12% vs. mes anterior</p>
-        </div>
-        <div className="card">
-          <p className="text-gray-600 text-sm mb-2">Clicks Totales</p>
-          <p className="text-4xl font-bold text-primary">{analytics.totalClicks.toLocaleString()}</p>
-          <p className="text-xs text-gray-500 mt-2">CTR: {analytics.averageCTR}%</p>
-        </div>
-        <div className="card">
-          <p className="text-gray-600 text-sm mb-2">Conversiones</p>
-          <p className="text-4xl font-bold text-green-600">{analytics.totalConversions}</p>
-          <p className="text-xs text-gray-500 mt-2">Tasa: 12.9%</p>
-        </div>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="card">
-          <h3 className="text-lg font-bold mb-6">Gasto y ROI</h3>
-          <div className="space-y-4">
-            <div>
-              <p className="text-gray-600 text-sm">Gasto Total</p>
-              <p className="text-3xl font-bold">${analytics.totalSpend.toLocaleString()}</p>
-            </div>
-            <div>
-              <p className="text-gray-600 text-sm">ROI Promedio</p>
-              <p className="text-3xl font-bold text-green-600">{analytics.averageROI.toFixed(1)}x</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="card">
-          <h3 className="text-lg font-bold mb-6">Por Plataforma</h3>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="font-medium">📷 Instagram</span>
-              <span className="text-sm text-gray-600">$850</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="font-medium">f Facebook</span>
-              <span className="text-sm text-gray-600">$750</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="font-medium">🔍 Google</span>
-              <span className="text-sm text-gray-600">$400</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="font-medium">♪ TikTok</span>
-              <span className="text-sm text-gray-600">$150</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-8 p-6 bg-blue-50 border border-blue-200 rounded-lg">
-        <p className="text-blue-900 text-sm">
-          📊 <span className="font-bold">Dato interesante:</span> Tu ROI promedio está 2.3x por encima de la industria. ¡Sigue así!
+    <div className="space-y-8">
+      <section className="rounded-[30px] border border-gray-200 bg-white p-8 shadow-sm">
+        <p className="text-xs uppercase tracking-[0.28em] text-gray-400">Analitica avanzada</p>
+        <h1 className="mt-3 text-3xl font-semibold text-gray-900">Tu rendimiento consolidado en una sola lectura.</h1>
+        <p className="mt-3 text-sm leading-6 text-gray-600">
+          Esta vista usa los datos ya asociados a tus campanas para darte una lectura mas seria del negocio dentro de Nexora.
         </p>
-      </div>
+      </section>
+
+      <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
+        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+          <p className="text-sm text-gray-500">Impresiones</p>
+          <p className="mt-3 text-3xl font-semibold text-gray-900">{metrics.impressions.toLocaleString()}</p>
+        </div>
+        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+          <p className="text-sm text-gray-500">Clicks</p>
+          <p className="mt-3 text-3xl font-semibold text-gray-900">{metrics.clicks.toLocaleString()}</p>
+        </div>
+        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+          <p className="text-sm text-gray-500">Conversiones</p>
+          <p className="mt-3 text-3xl font-semibold text-gray-900">{metrics.conversions.toLocaleString()}</p>
+        </div>
+        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+          <p className="text-sm text-gray-500">CTR</p>
+          <p className="mt-3 text-3xl font-semibold text-gray-900">{metrics.ctr.toFixed(1)}%</p>
+        </div>
+        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+          <p className="text-sm text-gray-500">ROI</p>
+          <p className="mt-3 text-3xl font-semibold text-gray-900">{metrics.roi.toFixed(0)}%</p>
+        </div>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-2">
+        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-semibold text-gray-900">Inversion y retorno</h2>
+          <div className="mt-6 grid gap-4 md:grid-cols-2">
+            <div className="rounded-2xl bg-gray-50 p-5">
+              <p className="text-sm text-gray-500">Gasto total</p>
+              <p className="mt-2 text-3xl font-semibold text-gray-900">${metrics.spend.toFixed(0)}</p>
+            </div>
+            <div className="rounded-2xl bg-gray-50 p-5">
+              <p className="text-sm text-gray-500">Revenue total</p>
+              <p className="mt-2 text-3xl font-semibold text-gray-900">${metrics.revenue.toFixed(0)}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-semibold text-gray-900">Distribucion por plataforma</h2>
+          <div className="mt-6 space-y-4">
+            {metrics.platforms.length === 0 ? (
+              <div className="rounded-2xl bg-gray-50 p-5 text-sm text-gray-600">
+                Aun no hay suficiente gasto asociado a plataformas para mostrar una distribucion real.
+              </div>
+            ) : (
+              metrics.platforms.map(([platform, spend]) => (
+                <div key={platform} className="flex items-center justify-between rounded-2xl bg-gray-50 px-5 py-4">
+                  <span className="text-sm font-semibold capitalize text-gray-900">{platform}</span>
+                  <span className="text-sm text-gray-600">${spend.toFixed(0)}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

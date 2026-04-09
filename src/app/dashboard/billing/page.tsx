@@ -209,6 +209,12 @@ export default function BillingPage() {
                 ))}
               </ul>
 
+              <div className="mt-6 rounded-2xl bg-gray-50 p-4 text-sm text-gray-700">
+                {plan.key === 'starter' && 'Incluye 1 cuenta publicitaria, hasta 3 campanas activas y dashboard base.'}
+                {plan.key === 'professional' && 'Incluye radar creativo, analitica avanzada, 3 cuentas y 12 campanas activas.'}
+                {plan.key === 'enterprise' && 'Incluye mas capacidad, automatizacion sugerida y soporte prioritario.'}
+              </div>
+
               <button
                 onClick={() => handlePlanChange(plan.key, 'monthly')}
                 disabled={isCurrentPlan || !!processingPlan}
@@ -221,14 +227,6 @@ export default function BillingPage() {
             </article>
           );
         })}
-      </div>
-
-      <div className="rounded-2xl border border-blue-200 bg-blue-50 p-6 text-blue-900">
-        Stripe necesita estos datos para quedar totalmente operativo en produccion:
-        `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER_MONTHLY`,
-        `STRIPE_PRICE_STARTER_YEARLY`, `STRIPE_PRICE_PROFESSIONAL_MONTHLY`,
-        `STRIPE_PRICE_PROFESSIONAL_YEARLY`, `STRIPE_PRICE_ENTERPRISE_MONTHLY` y
-        `STRIPE_PRICE_ENTERPRISE_YEARLY`.
       </div>
     </div>
   );

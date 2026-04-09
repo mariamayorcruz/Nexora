@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
 interface TrendInsight {
@@ -37,11 +38,17 @@ interface TrendReport {
   blueprints: CampaignBlueprint[];
 }
 
+interface RadarLockState {
+  marketingLabel?: string;
+  upgradeCta?: string;
+}
+
 export default function RadarPage() {
   const [report, setReport] = useState<TrendReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [lockState, setLockState] = useState<RadarLockState | null>(null);
 
   const fetchRadar = async (background = false) => {
     const token = localStorage.getItem('token');
@@ -66,12 +73,24 @@ export default function RadarPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch radar');
+        const data = await response.json().catch(() => null);
+        if (response.status === 403) {
+          setLockState({
+            marketingLabel: data?.capabilities?.marketingLabel,
+            upgradeCta: data?.capabilities?.upgradeCta,
+          });
+          setReport(null);
+          setError(data?.error || 'Tu plan actual no incluye el radar creativo.');
+          return;
+        }
+
+        throw new Error(data?.error || 'Failed to fetch radar');
       }
 
       const data = await response.json();
       setReport(data.report);
       setError('');
+      setLockState(null);
     } catch (fetchError) {
       console.error('Error fetching trend radar:', fetchError);
       setError('No pudimos cargar el radar creativo. Intenta actualizar de nuevo.');
@@ -116,12 +135,27 @@ export default function RadarPage() {
 
   if (error && !report) {
     return (
-      <div className="rounded-[32px] border border-red-200 bg-red-50 p-8">
-        <h1 className="text-2xl font-bold text-red-900">Radar no disponible</h1>
-        <p className="mt-3 text-red-700">{error}</p>
-        <button onClick={() => fetchRadar()} className="btn-primary mt-6">
-          Intentar otra vez
-        </button>
+      <div className={`rounded-[32px] border p-8 ${lockState ? 'border-gray-200 bg-white' : 'border-red-200 bg-red-50'}`}>
+        <h1 className={`text-2xl font-bold ${lockState ? 'text-gray-900' : 'text-red-900'}`}>
+          {lockState ? 'Radar disponible desde Growth' : 'Radar no disponible'}
+        </h1>
+        <p className={`mt-3 ${lockState ? 'text-gray-700' : 'text-red-700'}`}>{error}</p>
+        {lockState?.upgradeCta && (
+          <div className="mt-5 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+            {lockState.upgradeCta}
+          </div>
+        )}
+        <div className="mt-6 flex gap-3">
+          {lockState ? (
+            <Link href="/dashboard/billing" className="btn-primary">
+              Ver planes
+            </Link>
+          ) : (
+            <button onClick={() => fetchRadar()} className="btn-primary">
+              Intentar otra vez
+            </button>
+          )}
+        </div>
       </div>
     );
   }
