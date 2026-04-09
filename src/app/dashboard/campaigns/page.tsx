@@ -75,7 +75,7 @@ export default function CampaignsPage() {
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
           <div className="inline-block h-12 w-12 animate-spin rounded-full border-b-2 border-b-primary" />
-          <p className="mt-4 text-gray-600">Cargando campanas...</p>
+          <p className="mt-4 text-gray-600">Cargando campañas...</p>
         </div>
       </div>
     );
@@ -87,14 +87,14 @@ export default function CampaignsPage() {
         <div className="flex flex-wrap items-start justify-between gap-6">
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-gray-400">Capacidad por plan</p>
-            <h1 className="mt-3 text-3xl font-semibold text-gray-900">Tus campanas ahora viven con limites reales.</h1>
+            <h1 className="mt-3 text-3xl font-semibold text-gray-900">Tus campañas ahora viven con límites reales.</h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-gray-600">
-              Cada cliente ve cuantas campanas activas puede sostener con su plan actual, y cuando conviene subir de nivel.
+              Cada cliente ve cuántas campañas activas puede sostener con su plan actual, y cuándo conviene subir de nivel.
             </p>
           </div>
 
           <div className="rounded-[24px] bg-slate-950 px-6 py-5 text-white">
-            <p className="text-sm text-slate-300">Campanas activas</p>
+            <p className="text-sm text-slate-300">Campañas activas</p>
             <p className="mt-2 text-4xl font-semibold">
               {campaignUsage?.activeCampaigns || activeCampaigns.length}/{campaignUsage?.activeCampaignsLimit || 3}
             </p>
@@ -107,9 +107,12 @@ export default function CampaignsPage() {
             className="rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={limitReached}
           >
-            {limitReached ? 'Limite de campanas alcanzado' : '+ Nueva campana'}
+            {limitReached ? 'Límite de campañas alcanzado' : '+ Nueva campaña'}
           </button>
-          <Link href="/dashboard/billing" className="rounded-2xl border border-gray-300 px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+          <Link
+            href="/dashboard/billing"
+            className="rounded-2xl border border-gray-300 px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+          >
             Ver upgrade
           </Link>
         </div>
@@ -117,15 +120,17 @@ export default function CampaignsPage() {
         <div className="mt-6 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
           {limitReached
             ? user?.entitlements?.capabilities.upgradeCta
-            : `Te quedan ${campaignUsage?.activeCampaignsRemaining || 0} campanas activas disponibles en ${user?.entitlements?.marketingLabel || 'tu plan actual'}.`}
+            : `Te quedan ${campaignUsage?.activeCampaignsRemaining || 0} campañas activas disponibles en ${
+                user?.entitlements?.marketingLabel || 'tu plan actual'
+              }.`}
         </div>
       </section>
 
       {campaigns.length === 0 ? (
         <section className="rounded-[28px] border border-gray-200 bg-white p-12 text-center shadow-sm">
-          <p className="text-3xl font-semibold text-gray-900">Aun no tienes campanas creadas.</p>
+          <p className="text-3xl font-semibold text-gray-900">Aún no tienes campañas creadas.</p>
           <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-gray-600">
-            El siguiente paso es conectar una cuenta real y bajar una primera campana con una promesa clara y una oferta visible.
+            El siguiente paso es conectar una cuenta real y bajar una primera campaña con una promesa clara y una oferta visible.
           </p>
           <div className="mt-6 flex justify-center gap-3">
             <Link href="/dashboard/connect" className="btn-primary">
@@ -141,7 +146,11 @@ export default function CampaignsPage() {
           {campaigns.map((campaign) => {
             const roi =
               (campaign.analytics?.spend || 0) > 0 && (campaign.analytics?.revenue || 0) > 0
-                ? Math.round((((campaign.analytics?.revenue || 0) - (campaign.analytics?.spend || 0)) / (campaign.analytics?.spend || 1)) * 100)
+                ? Math.round(
+                    (((campaign.analytics?.revenue || 0) - (campaign.analytics?.spend || 0)) /
+                      (campaign.analytics?.spend || 1)) *
+                      100
+                  )
                 : null;
 
             return (
@@ -150,7 +159,9 @@ export default function CampaignsPage() {
                   <div>
                     <h2 className="text-xl font-semibold text-gray-900">{campaign.name}</h2>
                     <p className="mt-2 text-sm text-gray-600">
-                      {campaign.adAccount?.platform || 'plataforma no disponible'} · {campaign.adAccount?.accountName || 'sin cuenta asociada'}
+                      {(campaign.adAccount?.platform || 'plataforma no disponible') +
+                        ' · ' +
+                        (campaign.adAccount?.accountName || 'sin cuenta asociada')}
                     </p>
                   </div>
                   <span
@@ -191,11 +202,11 @@ export default function CampaignsPage() {
 
                 {user?.entitlements?.capabilities.canUseAutomationSuggestions ? (
                   <div className="mt-5 rounded-2xl border border-cyan-200 bg-cyan-50 p-4 text-sm text-cyan-950">
-                    Nexora puede sugerirte automatizaciones y ajustes de campana segun el rendimiento de esta pieza.
+                    Nexora puede sugerirte automatizaciones y ajustes de campaña según el rendimiento de esta pieza.
                   </div>
                 ) : (
                   <div className="mt-5 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
-                    El plan Growth desbloquea sugerencias automaticas y lectura accionable para cada campana.
+                    El plan Growth desbloquea sugerencias automáticas y lectura accionable para cada campaña.
                   </div>
                 )}
               </article>

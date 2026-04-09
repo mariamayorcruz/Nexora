@@ -43,7 +43,7 @@ const PLAN_CAPABILITIES: Record<BillingPlan, Omit<PlanCapabilities, 'marketingLa
     canUseAutomationSuggestions: false,
     canUsePrioritySupport: false,
     refreshAfterMinutes: 240,
-    upgradeCta: 'Sube a Growth para desbloquear radar, analitica avanzada y mas capacidad.',
+    upgradeCta: 'Sube a Growth para desbloquear radar, analítica avanzada y más capacidad.',
   },
   professional: {
     workspaceLimit: 3,
@@ -65,7 +65,7 @@ const PLAN_CAPABILITIES: Record<BillingPlan, Omit<PlanCapabilities, 'marketingLa
     canUseAutomationSuggestions: true,
     canUsePrioritySupport: true,
     refreshAfterMinutes: 45,
-    upgradeCta: 'Tu plan actual ya tiene la capacidad mas completa de Nexora.',
+    upgradeCta: 'Tu plan actual ya tiene la capacidad más completa de Nexora.',
   },
 };
 

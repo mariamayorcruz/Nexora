@@ -64,7 +64,8 @@ export default function AnalyticsPage() {
         accumulator.revenue += campaign.analytics?.revenue || 0;
 
         const platform = campaign.adAccount?.platform || 'sin fuente';
-        accumulator.platformSpend[platform] = (accumulator.platformSpend[platform] || 0) + (campaign.analytics?.spend || 0);
+        accumulator.platformSpend[platform] =
+          (accumulator.platformSpend[platform] || 0) + (campaign.analytics?.spend || 0);
         return accumulator;
       },
       {
@@ -93,7 +94,7 @@ export default function AnalyticsPage() {
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
           <div className="inline-block h-12 w-12 animate-spin rounded-full border-b-2 border-b-primary" />
-          <p className="mt-4 text-gray-600">Preparando analitica...</p>
+          <p className="mt-4 text-gray-600">Preparando analítica...</p>
         </div>
       </div>
     );
@@ -103,7 +104,7 @@ export default function AnalyticsPage() {
     return (
       <div className="space-y-8">
         <section className="rounded-[30px] border border-gray-200 bg-white p-8 shadow-sm">
-          <p className="text-xs uppercase tracking-[0.28em] text-gray-400">Analitica avanzada</p>
+          <p className="text-xs uppercase tracking-[0.28em] text-gray-400">Analítica avanzada</p>
           <h1 className="mt-3 text-3xl font-semibold text-gray-900">Esta vista se desbloquea desde el plan Growth.</h1>
           <p className="mt-4 max-w-2xl text-sm leading-6 text-gray-600">
             Tu plan actual puede ver el resumen del dashboard, pero la lectura consolidada por plataforma y rendimiento profundo vive en el siguiente nivel.
@@ -111,7 +112,10 @@ export default function AnalyticsPage() {
           <div className="mt-6 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
             {user?.entitlements?.capabilities.upgradeCta}
           </div>
-          <Link href="/dashboard/billing" className="mt-6 inline-flex rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90">
+          <Link
+            href="/dashboard/billing"
+            className="mt-6 inline-flex rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+          >
             Ver upgrade
           </Link>
         </section>
@@ -122,10 +126,10 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-8">
       <section className="rounded-[30px] border border-gray-200 bg-white p-8 shadow-sm">
-        <p className="text-xs uppercase tracking-[0.28em] text-gray-400">Analitica avanzada</p>
+        <p className="text-xs uppercase tracking-[0.28em] text-gray-400">Analítica avanzada</p>
         <h1 className="mt-3 text-3xl font-semibold text-gray-900">Tu rendimiento consolidado en una sola lectura.</h1>
         <p className="mt-3 text-sm leading-6 text-gray-600">
-          Esta vista usa los datos ya asociados a tus campanas para darte una lectura mas seria del negocio dentro de Nexora.
+          Esta vista usa los datos ya asociados a tus campañas para darte una lectura más seria del negocio dentro de Nexora.
         </p>
       </section>
 
@@ -154,7 +158,7 @@ export default function AnalyticsPage() {
 
       <section className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-gray-900">Inversion y retorno</h2>
+          <h2 className="text-xl font-semibold text-gray-900">Inversión y retorno</h2>
           <div className="mt-6 grid gap-4 md:grid-cols-2">
             <div className="rounded-2xl bg-gray-50 p-5">
               <p className="text-sm text-gray-500">Gasto total</p>
@@ -168,11 +172,11 @@ export default function AnalyticsPage() {
         </div>
 
         <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-gray-900">Distribucion por plataforma</h2>
+          <h2 className="text-xl font-semibold text-gray-900">Distribución por plataforma</h2>
           <div className="mt-6 space-y-4">
             {metrics.platforms.length === 0 ? (
               <div className="rounded-2xl bg-gray-50 p-5 text-sm text-gray-600">
-                Aun no hay suficiente gasto asociado a plataformas para mostrar una distribucion real.
+                Aún no hay suficiente gasto asociado a plataformas para mostrar una distribución real.
               </div>
             ) : (
               metrics.platforms.map(([platform, spend]) => (

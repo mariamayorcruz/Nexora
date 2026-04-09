@@ -53,7 +53,7 @@ export default function RadarPage() {
   const fetchRadar = async (background = false) => {
     const token = localStorage.getItem('token');
     if (!token) {
-      setError('No encontramos una sesion activa.');
+      setError('No encontramos una sesión activa.');
       setLoading(false);
       return;
     }
@@ -167,11 +167,11 @@ export default function RadarPage() {
           <div>
             <p className="text-xs uppercase tracking-[0.32em] text-cyan-300">Radar creativo Nexora</p>
             <h1 className="mt-4 max-w-3xl text-4xl font-semibold leading-tight">
-              Ideas, ganchos y campanas que se actualizan con el ritmo real de tu negocio.
+              Ideas, ganchos y campañas que se actualizan con el ritmo real de tu negocio.
             </h1>
             <p className="mt-4 max-w-2xl text-sm text-slate-300 sm:text-base">
-              Este panel resume donde conviene poner tu energia comercial ahora mismo y convierte esa lectura en
-              campanas listas para ejecutar.
+              Este panel resume dónde conviene poner tu energía comercial ahora mismo y convierte esa lectura en
+              campañas listas para ejecutar.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               {report?.activePlatforms.map((platform) => (
@@ -190,7 +190,7 @@ export default function RadarPage() {
             <p className="mt-3 text-5xl font-semibold text-white">{report?.momentumScore}</p>
             <p className="mt-4 text-sm text-slate-300">{report?.marketPulse}</p>
             <div className="mt-6 flex items-center justify-between text-xs uppercase tracking-[0.28em] text-slate-400">
-              <span>Ultima lectura</span>
+              <span>Última lectura</span>
               <span>{formattedDate}</span>
             </div>
             <button
@@ -231,9 +231,9 @@ export default function RadarPage() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-gray-400">Tendencias accionables</p>
-            <h2 className="mt-2 text-2xl font-semibold text-gray-900">Que deberia empujar tu creatividad ahora</h2>
+            <h2 className="mt-2 text-2xl font-semibold text-gray-900">Qué debería empujar tu creatividad ahora</h2>
           </div>
-          <p className="text-sm text-gray-500">Refresh automatico cada {report?.refreshAfterMinutes} minutos</p>
+          <p className="text-sm text-gray-500">Refresh automático cada {report?.refreshAfterMinutes} minutos</p>
         </div>
 
         <div className="mt-8 grid gap-5 xl:grid-cols-3">
@@ -289,7 +289,7 @@ export default function RadarPage() {
       <section className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
         <div>
           <p className="text-xs uppercase tracking-[0.28em] text-gray-400">Blueprints</p>
-          <h2 className="mt-2 text-2xl font-semibold text-gray-900">Campanas listas para bajar a ejecucion</h2>
+          <h2 className="mt-2 text-2xl font-semibold text-gray-900">Campañas listas para bajar a ejecución</h2>
         </div>
 
         <div className="mt-8 grid gap-5 xl:grid-cols-3">
@@ -305,7 +305,7 @@ export default function RadarPage() {
                   <span className="font-semibold text-gray-900">Audiencia:</span> {blueprint.audience}
                 </p>
                 <p>
-                  <span className="font-semibold text-gray-900">Angulo:</span> {blueprint.angle}
+                  <span className="font-semibold text-gray-900">Ángulo:</span> {blueprint.angle}
                 </p>
                 <p>
                   <span className="font-semibold text-gray-900">Oferta:</span> {blueprint.offer}

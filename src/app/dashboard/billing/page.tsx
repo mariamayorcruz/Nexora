@@ -58,7 +58,7 @@ export default function BillingPage() {
       if (checkoutStatus === 'cancelled') {
         setCheckoutState({
           type: 'cancelled',
-          message: 'El checkout fue cancelado. Tu suscripcion actual no cambio.',
+          message: 'El checkout fue cancelado. Tu suscripción actual no cambió.',
         });
         return;
       }
@@ -80,13 +80,13 @@ export default function BillingPage() {
         const plan = data.session?.plan || 'tu nuevo plan';
         setCheckoutState({
           type: 'success',
-          message: `Pago confirmado para ${plan}. Stripe termino correctamente el checkout y Nexora esta sincronizando tu suscripcion.`,
+          message: `Pago confirmado para ${plan}. Stripe terminó correctamente el checkout y Nexora está sincronizando tu suscripción.`,
         });
       } catch (error) {
         console.error('Error validating checkout session:', error);
         setCheckoutState({
           type: 'error',
-          message: 'Stripe completo el flujo, pero no pudimos validar la sesion desde el dashboard. Revisa de nuevo en unos segundos.',
+          message: 'Stripe completó el flujo, pero no pudimos validar la sesión desde el dashboard. Revisa de nuevo en unos segundos.',
         });
       }
     };
@@ -177,7 +177,7 @@ export default function BillingPage() {
             </div>
           </div>
         ) : (
-          <p className="mt-4 text-gray-600">Todavia no encontramos una suscripcion asociada.</p>
+          <p className="mt-4 text-gray-600">Todavía no encontramos una suscripción asociada.</p>
         )}
       </div>
 
@@ -210,9 +210,9 @@ export default function BillingPage() {
               </ul>
 
               <div className="mt-6 rounded-2xl bg-gray-50 p-4 text-sm text-gray-700">
-                {plan.key === 'starter' && 'Incluye 1 cuenta publicitaria, hasta 3 campanas activas y dashboard base.'}
-                {plan.key === 'professional' && 'Incluye radar creativo, analitica avanzada, 3 cuentas y 12 campanas activas.'}
-                {plan.key === 'enterprise' && 'Incluye mas capacidad, automatizacion sugerida y soporte prioritario.'}
+                {plan.key === 'starter' && 'Incluye 1 cuenta publicitaria, hasta 3 campañas activas y dashboard base.'}
+                {plan.key === 'professional' && 'Incluye radar creativo, analítica avanzada, 3 cuentas y 12 campañas activas.'}
+                {plan.key === 'enterprise' && 'Incluye más capacidad, automatización sugerida y soporte prioritario.'}
               </div>
 
               <button

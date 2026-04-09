@@ -88,7 +88,7 @@ export function buildAdminAlerts(params: {
     alerts.push({
       id: 'payment-recovery',
       severity: 'high',
-      title: 'Hay pagos que necesitan recuperacion',
+      title: 'Hay pagos que necesitan recuperación',
       detail: `${paymentFailures.length} pagos quedaron abiertos o sin cobrar. Conviene activar seguimiento y revisar Stripe.`,
       actionLabel: 'Ir a pagos',
       actionHref: '/admin/payments',
@@ -119,9 +119,9 @@ export function buildAdminAlerts(params: {
     alerts.push({
       id: 'campaign-inefficiency',
       severity: 'medium',
-      title: 'Hay campanas activas con gasto y sin conversion',
-      detail: `${lowSignalCampaigns.length} campanas necesitan ajuste creativo o redistribucion de presupuesto.`,
-      actionLabel: 'Ver campanas',
+      title: 'Hay campañas activas con gasto y sin conversión',
+      detail: `${lowSignalCampaigns.length} campañas necesitan ajuste creativo o redistribución de presupuesto.`,
+      actionLabel: 'Ver campañas',
       actionHref: '/admin/campaigns',
     });
   }
@@ -130,8 +130,8 @@ export function buildAdminAlerts(params: {
     alerts.push({
       id: 'stripe-not-ready',
       severity: 'high',
-      title: 'Stripe aun no esta listo al 100%',
-      detail: 'Faltan variables o webhook para cerrar la monetizacion real de la plataforma.',
+      title: 'Stripe aún no está listo al 100%',
+      detail: 'Faltan variables o webhook para cerrar la monetización real de la plataforma.',
       actionLabel: 'Configurar pagos',
       actionHref: '/admin/payments',
     });
@@ -141,8 +141,8 @@ export function buildAdminAlerts(params: {
     alerts.push({
       id: 'smtp-not-ready',
       severity: 'medium',
-      title: 'Lifecycle emails aun no pueden salir solos',
-      detail: 'La base de templates existe, pero falta terminar la configuracion SMTP para enviarlos.',
+      title: 'Lifecycle emails aún no pueden salir solos',
+      detail: 'La base de templates existe, pero falta terminar la configuración SMTP para enviarlos.',
       actionLabel: 'Ver email center',
       actionHref: '/admin/emails',
     });
@@ -152,7 +152,7 @@ export function buildAdminAlerts(params: {
     alerts.push({
       id: 'system-healthy',
       severity: 'low',
-      title: 'La operacion se ve saludable',
+      title: 'La operación se ve saludable',
       detail: 'No encontramos bloqueos urgentes. Puedes usar este tiempo para empujar crecimiento y automatizaciones.',
     });
   }
@@ -170,17 +170,17 @@ export function buildAutomationPlays(params: { campaigns: CampaignWithAnalytics[
   const plays: AutomationPlay[] = [
     {
       id: 'creative-rescue',
-      title: 'Creative rescue para campanas sin conversion',
-      summary: `${weakCampaigns.length || 0} campanas pueden entrar en una secuencia de revision de hook, CTA y oferta.`,
+      title: 'Creative rescue para campañas sin conversión',
+      summary: `${weakCampaigns.length || 0} campañas pueden entrar en una secuencia de revisión de hook, CTA y oferta.`,
       trigger: 'Gasto >= 50 USD y conversiones = 0',
-      action: 'Notificar al admin, sugerir nuevo angulo y marcar ajuste prioritario.',
+      action: 'Notificar al admin, sugerir nuevo ángulo y marcar ajuste prioritario.',
       cadence: 'Cada 6 horas',
       priority: weakCampaigns.length > 0 ? 'high' : 'medium',
     },
     {
       id: 'budget-scale',
       title: 'Escalado de presupuesto para ganadoras',
-      summary: `${strongCampaigns.length || 0} campanas muestran senales para subir presupuesto con control.`,
+      summary: `${strongCampaigns.length || 0} campañas muestran señales para subir presupuesto con control.`,
       trigger: 'ROAS > 2 y conversiones sostenidas',
       action: 'Enviar alerta positiva y sugerir aumento progresivo del 10% al 20%.',
       cadence: 'Diario',
@@ -188,10 +188,10 @@ export function buildAutomationPlays(params: { campaigns: CampaignWithAnalytics[
     },
     {
       id: 'retention-save',
-      title: 'Recuperacion de cancelacion',
+      title: 'Recuperación de cancelación',
       summary: `${cancelRisk.length || 0} cuentas quedaron marcadas para fin de periodo.`,
       trigger: 'cancelAtPeriodEnd = true',
-      action: 'Disparar correo de retencion con wins, oferta y propuesta de ayuda.',
+      action: 'Disparar correo de retención con wins, oferta y propuesta de ayuda.',
       cadence: 'Diario',
       priority: cancelRisk.length > 0 ? 'high' : 'medium',
     },
@@ -208,10 +208,10 @@ export function buildEmailCenterSummary(supportEmail: string) {
   const templates: EmailTemplateCard[] = buildLifecycleTemplates(supportEmail || process.env.SUPPORT_EMAIL || '');
 
   const checklist = [
-    smtpReady ? 'SMTP listo para envios transaccionales.' : 'Falta configurar SMTP_HOST, SMTP_PORT, SMTP_USER y SMTP_PASS.',
+    smtpReady ? 'SMTP listo para envíos transaccionales.' : 'Falta configurar SMTP_HOST, SMTP_PORT, SMTP_USER y SMTP_PASS.',
     senderReady ? 'EMAIL_FROM listo para remitente.' : 'Falta definir EMAIL_FROM para los correos salientes.',
-    supportEmailReady ? 'Support email visible para replies y confianza.' : 'Falta SUPPORT_EMAIL para firma y atencion.',
-    'Conviene definir secuencias de bienvenida, post-venta y seguimiento para que el cliente no se enfrie despues de comprar.',
+    supportEmailReady ? 'Support email visible para replies y confianza.' : 'Falta SUPPORT_EMAIL para firma y atención.',
+    'Conviene definir secuencias de bienvenida, post-venta y seguimiento para que el cliente no se enfríe después de comprar.',
   ];
 
   return {
