@@ -1,31 +1,30 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { BarChart3, CreditCard, PlugZap, Settings2 } from 'lucide-react';
+import { BarChart3, CreditCard, Lightbulb, PlugZap, Settings2, Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 interface DashboardUser {
   id: string;
-  name?: string;
+  name?: string | null;
   email: string;
+  founderAccess?: boolean;
   subscription?: {
-    plan: string;
-    status: string;
-  };
+    plan?: string | null;
+    status?: string | null;
+  } | null;
 }
 
-export default function Dashboard() {
-  const router = useRouter();
+export default function DashboardPage() {
   const [user, setUser] = useState<DashboardUser | null>(null);
-  const [loading, setLoading] = useState(true);
   const [adAccounts, setAdAccounts] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
-      router.push('/auth/login');
+      window.location.href = '/auth/login';
       return;
     }
 
@@ -45,135 +44,162 @@ export default function Dashboard() {
         setCampaigns(data.campaigns || []);
       } catch (error) {
         console.error('Error fetching user:', error);
-        router.push('/auth/login');
+        window.location.href = '/auth/login';
       } finally {
         setLoading(false);
       }
     };
 
     fetchUserData();
-  }, [router]);
+  }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    router.push('/');
-  };
+  const activeCampaigns = campaigns.filter((campaign) => campaign.status === 'active');
+  const totalSpend = campaigns.reduce((sum, campaign) => sum + (campaign.analytics?.spend || 0), 0);
+  const totalRevenue = campaigns.reduce((sum, campaign) => sum + (campaign.analytics?.revenue || 0), 0);
+  const roi = totalSpend > 0 ? Math.round(((totalRevenue - totalSpend) / totalSpend) * 100) : 0;
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
-          <div className="inline-block h-12 w-12 animate-spin rounded-full border-b-2 border-primary" />
-          <p className="mt-4 text-gray-600">Cargando...</p>
+          <div className="inline-block h-12 w-12 animate-spin rounded-full border-b-2 border-b-primary" />
+          <p className="mt-4 text-gray-600">Cargando panel...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="border-b border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex items-center space-x-2">
-            <div className="h-8 w-8 rounded-lg bg-gradient-primary" />
-            <span className="text-xl font-bold text-gray-900">Nexora</span>
+    <div className="space-y-8">
+      <section className="rounded-[32px] bg-slate-950 px-8 py-10 text-white shadow-2xl shadow-slate-950/20">
+        <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
+          <div>
+            <p className="text-xs uppercase tracking-[0.32em] text-cyan-300">Panel de control</p>
+            <h1 className="mt-4 text-4xl font-semibold leading-tight">
+              Bienvenida, {user?.name || user?.email}. Vamos a convertir creatividad en crecimiento real.
+            </h1>
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
+              Nexora concentra tus cuentas, campanas y una lectura estrategica del mercado para que puedas decidir
+              mas rapido y vender mejor.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <span className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm">
+                Plan {user?.subscription?.plan || 'starter'}
+              </span>
+              {user?.founderAccess && (
+                <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-sm text-emerald-200">
+                  Modo fundadora activo
+                </span>
+              )}
+            </div>
           </div>
-          <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-600">{user?.email}</span>
-            <button
-              onClick={handleLogout}
-              className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
+
+          <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
+            <p className="text-sm text-slate-300">Siguiente mejor accion</p>
+            <p className="mt-3 text-2xl font-semibold text-white">Activar el radar creativo y bajar una campana nueva.</p>
+            <p className="mt-4 text-sm leading-6 text-slate-300">
+              El radar traduce cuentas, rendimiento y contexto comercial en hooks, angulos y rutas de ejecucion para
+              que no dependas de intuiciones aisladas.
+            </p>
+            <Link
+              href="/dashboard/radar"
+              className="mt-6 inline-flex items-center rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200"
             >
-              Cerrar sesión
-            </button>
+              Abrir radar creativo
+            </Link>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="mb-12">
-          <h1 className="mb-2 text-3xl font-bold text-gray-900">Bienvenido, {user?.name || user?.email}</h1>
-          <p className="text-gray-600">
-            Plan actual: <span className="font-semibold uppercase">{user?.subscription?.plan}</span>
-          </p>
+      <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+          <p className="text-sm text-gray-500">Cuentas conectadas</p>
+          <p className="mt-3 text-4xl font-semibold text-gray-900">{adAccounts.length}</p>
+        </div>
+        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+          <p className="text-sm text-gray-500">Campanas activas</p>
+          <p className="mt-3 text-4xl font-semibold text-gray-900">{activeCampaigns.length}</p>
+        </div>
+        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+          <p className="text-sm text-gray-500">Gasto registrado</p>
+          <p className="mt-3 text-4xl font-semibold text-gray-900">${totalSpend.toFixed(0)}</p>
+        </div>
+        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+          <p className="text-sm text-gray-500">ROI estimado</p>
+          <p className="mt-3 text-4xl font-semibold text-gray-900">{roi}%</p>
+        </div>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-2">
+        <Link href="/dashboard/radar" className="group block">
+          <div className="h-full rounded-[30px] border border-cyan-200 bg-gradient-to-br from-cyan-50 via-white to-emerald-50 p-8 transition group-hover:-translate-y-1 group-hover:shadow-xl">
+            <Sparkles className="h-12 w-12 text-cyan-600" />
+            <h2 className="mt-6 text-2xl font-semibold text-gray-900">Radar creativo auto-actualizable</h2>
+            <p className="mt-3 text-sm leading-6 text-gray-600">
+              Lee el momento comercial y devuelve hooks, formatos y campanas listas para lanzar con mas claridad.
+            </p>
+          </div>
+        </Link>
+
+        <Link href="/dashboard/connect" className="group block">
+          <div className="h-full rounded-[30px] border border-gray-200 bg-white p-8 transition group-hover:-translate-y-1 group-hover:shadow-xl">
+            <PlugZap className="h-12 w-12 text-orange-500" />
+            <h2 className="mt-6 text-2xl font-semibold text-gray-900">Conectar nuevas cuentas</h2>
+            <p className="mt-3 text-sm leading-6 text-gray-600">
+              Suma Instagram, Facebook, Google o TikTok para que Nexora lea mejor donde conviene invertir energia.
+            </p>
+          </div>
+        </Link>
+      </section>
+
+      <section className="grid gap-5 md:grid-cols-3">
+        <Link href="/dashboard/campaigns" className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
+          <BarChart3 className="h-10 w-10 text-cyan-600" />
+          <p className="mt-4 text-lg font-semibold text-gray-900">Campanas</p>
+          <p className="mt-2 text-sm leading-6 text-gray-600">Revisa ejecucion, presupuesto y resultados desde un solo lugar.</p>
+        </Link>
+        <Link href="/dashboard/billing" className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
+          <CreditCard className="h-10 w-10 text-gray-800" />
+          <p className="mt-4 text-lg font-semibold text-gray-900">Facturacion</p>
+          <p className="mt-2 text-sm leading-6 text-gray-600">Mantiene control sobre plan, pagos y expansion de la operacion.</p>
+        </Link>
+        <Link href="/dashboard/settings" className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
+          <Settings2 className="h-10 w-10 text-gray-800" />
+          <p className="mt-4 text-lg font-semibold text-gray-900">Configuracion</p>
+          <p className="mt-2 text-sm leading-6 text-gray-600">Ajusta integraciones, preferencias y estructura de la cuenta.</p>
+        </Link>
+      </section>
+
+      <section className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center gap-3">
+          <Lightbulb className="h-8 w-8 text-amber-500" />
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">Lectura rapida del sistema</h2>
+            <p className="text-sm text-gray-500">Una vista util para saber que empujar primero.</p>
+          </div>
         </div>
 
-        <div className="mb-12 grid gap-6 md:grid-cols-4">
-          <div className="card">
-            <p className="text-sm text-gray-600">Cuentas conectadas</p>
-            <p className="text-3xl font-bold text-gray-900">{adAccounts.length}</p>
+        <div className="mt-6 grid gap-4 md:grid-cols-3">
+          <div className="rounded-2xl bg-gray-50 p-4">
+            <p className="text-sm font-semibold text-gray-900">Si tienes pocas cuentas conectadas</p>
+            <p className="mt-2 text-sm leading-6 text-gray-600">
+              Prioriza conectar las plataformas que ya te generan interaccion o demanda para que el radar lea mejor tus oportunidades.
+            </p>
           </div>
-          <div className="card">
-            <p className="text-sm text-gray-600">Campañas activas</p>
-            <p className="text-3xl font-bold text-gray-900">{campaigns.filter((campaign: any) => campaign.status === 'active').length}</p>
+          <div className="rounded-2xl bg-gray-50 p-4">
+            <p className="text-sm font-semibold text-gray-900">Si el ROI todavia es bajo</p>
+            <p className="mt-2 text-sm leading-6 text-gray-600">
+              Ajusta el mensaje antes que aumentar presupuesto. Nexora ya te sugiere hooks y angulos para eso en el radar.
+            </p>
           </div>
-          <div className="card">
-            <p className="text-sm text-gray-600">Gasto total del mes</p>
-            <p className="text-3xl font-bold text-gray-900">$0</p>
-          </div>
-          <div className="card">
-            <p className="text-sm text-gray-600">ROI promedio</p>
-            <p className="text-3xl font-bold text-gray-900">0%</p>
+          <div className="rounded-2xl bg-gray-50 p-4">
+            <p className="text-sm font-semibold text-gray-900">Si quieres vender mas rapido</p>
+            <p className="mt-2 text-sm leading-6 text-gray-600">
+              Lanza una campana corta con una sola promesa fuerte, prueba visible y un CTA directo hacia demo o contacto.
+            </p>
           </div>
         </div>
-
-        <div className="mb-12 grid gap-6 md:grid-cols-2">
-          <Link href="/dashboard/connect" className="block">
-            <div className="card cursor-pointer py-12 text-center transition hover:shadow-xl">
-              <PlugZap className="mx-auto mb-4 h-12 w-12 text-orange-500" />
-              <h3 className="mb-2 text-xl font-bold">Conectar red publicitaria</h3>
-              <p className="text-gray-600">Agrega tus cuentas de Instagram, Facebook, Google o TikTok.</p>
-            </div>
-          </Link>
-          <Link href="/dashboard/campaigns" className="block">
-            <div className="card cursor-pointer py-12 text-center transition hover:shadow-xl">
-              <BarChart3 className="mx-auto mb-4 h-12 w-12 text-cyan-500" />
-              <h3 className="mb-2 text-xl font-bold">Crear campaña</h3>
-              <p className="text-gray-600">Configura y revisa tus campañas desde un flujo más ordenado.</p>
-            </div>
-          </Link>
-        </div>
-
-        {adAccounts.length > 0 && (
-          <div className="mb-12">
-            <h2 className="mb-6 text-2xl font-bold">Tus cuentas conectadas</h2>
-            <div className="grid gap-6">
-              {adAccounts.map((account) => (
-                <div key={account.id} className="card flex items-start justify-between">
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-900">{account.accountName}</h3>
-                    <p className="text-sm capitalize text-gray-600">
-                      {account.platform} • {account.accountId}
-                    </p>
-                  </div>
-                  <div
-                    className={`rounded-full px-3 py-1 text-sm font-semibold ${
-                      account.connected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                    }`}
-                  >
-                    {account.connected ? 'Conectada' : 'Desconectada'}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="grid gap-6 md:grid-cols-3">
-          <Link href="/dashboard/settings" className="card cursor-pointer text-center transition hover:shadow-lg">
-            <Settings2 className="mx-auto mb-2 h-10 w-10 text-gray-700" />
-            <p className="font-semibold text-gray-900">Configuración</p>
-          </Link>
-          <Link href="/dashboard/billing" className="card cursor-pointer text-center transition hover:shadow-lg">
-            <CreditCard className="mx-auto mb-2 h-10 w-10 text-gray-700" />
-            <p className="font-semibold text-gray-900">Facturación</p>
-          </Link>
-          <Link href="/dashboard/analytics" className="card cursor-pointer text-center transition hover:shadow-lg">
-            <BarChart3 className="mx-auto mb-2 h-10 w-10 text-gray-700" />
-            <p className="font-semibold text-gray-900">Analítica</p>
-          </Link>
-        </div>
-      </div>
+      </section>
     </div>
   );
 }
