@@ -30,6 +30,7 @@ model User {
   adAccounts        AdAccount[]
   campaigns         Campaign[]
   crmLeads          CrmLead[]
+  crmSettings       CrmWorkspaceSettings?
   invoices          Invoice[]
 }
 
@@ -134,6 +135,21 @@ model CrmLead {
   lastContactedAt DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+model CrmWorkspaceSettings {
+  id                     String   @id @default(cuid())
+  userId                 String   @unique
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailAutomationEnabled Boolean  @default(true)
+  whatsappEnabled        Boolean  @default(false)
+  phoneEnabled           Boolean  @default(false)
+  externalCrmEnabled     Boolean  @default(false)
+  externalCrmName        String?
+  autoFollowUpEnabled    Boolean  @default(true)
+  defaultCadence         String   @default("48h")
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 }
 
 model VerificationToken {

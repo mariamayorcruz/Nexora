@@ -19,6 +19,16 @@ interface CrmLead {
   updatedAt: string;
 }
 
+interface CrmSettings {
+  emailAutomationEnabled: boolean;
+  whatsappEnabled: boolean;
+  phoneEnabled: boolean;
+  externalCrmEnabled: boolean;
+  externalCrmName?: string | null;
+  autoFollowUpEnabled: boolean;
+  defaultCadence: string;
+}
+
 const STAGES = [
   { key: 'lead', label: 'Lead' },
   { key: 'contacted', label: 'Contactado' },
@@ -40,39 +50,63 @@ const EMPTY_FORM = {
   notes: '',
 };
 
+const DEFAULT_SETTINGS: CrmSettings = {
+  emailAutomationEnabled: true,
+  whatsappEnabled: false,
+  phoneEnabled: false,
+  externalCrmEnabled: false,
+  externalCrmName: '',
+  autoFollowUpEnabled: true,
+  defaultCadence: '48h',
+};
+
 export default function DashboardCrmPage() {
   const [leads, setLeads] = useState<CrmLead[]>([]);
+  const [settings, setSettings] = useState<CrmSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
   const [message, setMessage] = useState('');
   const [form, setForm] = useState(EMPTY_FORM);
 
-  const fetchLeads = async () => {
+  const fetchCrm = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/crm/leads', {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: 'no-store',
-      });
-      const data = await response.json();
-      setLeads(data.leads || []);
+      const [leadsResponse, settingsResponse] = await Promise.all([
+        fetch('/api/crm/leads', {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        }),
+        fetch('/api/crm/settings', {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        }),
+      ]);
+
+      const leadsData = await leadsResponse.json();
+      const settingsData = await settingsResponse.json();
+      setLeads(leadsData.leads || []);
+      setSettings(settingsData.settings || DEFAULT_SETTINGS);
     } catch (error) {
-      console.error('Error fetching CRM leads:', error);
+      console.error('Error fetching CRM data:', error);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    void fetchLeads();
+    void fetchCrm();
   }, []);
 
   const metrics = useMemo(() => {
-    const totalPipeline = leads
-      .filter((lead) => lead.stage !== 'won')
-      .reduce((sum, lead) => sum + lead.value, 0);
+    const totalPipeline = leads.filter((lead) => lead.stage !== 'won').reduce((sum, lead) => sum + lead.value, 0);
     const forecast = leads.reduce((sum, lead) => sum + lead.value * (lead.confidence / 100), 0);
     const wonRevenue = leads.filter((lead) => lead.stage === 'won').reduce((sum, lead) => sum + lead.value, 0);
+    const overdueFollowUps = leads.filter((lead) => lead.stage !== 'won' && lead.nextAction).length;
+    const outreachReady = leads.filter(
+      (lead) => lead.stage !== 'won' && ((settings.emailAutomationEnabled && lead.email) || (settings.whatsappEnabled && lead.phone))
+    );
+
     const byStage = STAGES.map((stage) => ({
       ...stage,
       items: leads.filter((lead) => lead.stage === stage.key),
@@ -82,9 +116,11 @@ export default function DashboardCrmPage() {
       totalPipeline,
       forecast,
       wonRevenue,
+      overdueFollowUps,
+      outreachReady,
       byStage,
     };
-  }, [leads]);
+  }, [leads, settings]);
 
   const createLead = async () => {
     setSaving(true);
@@ -108,7 +144,7 @@ export default function DashboardCrmPage() {
 
       setForm(EMPTY_FORM);
       setMessage('Contacto agregado al CRM.');
-      await fetchLeads();
+      await fetchCrm();
     } catch (error) {
       console.error('Error creating CRM lead:', error);
       setMessage(error instanceof Error ? error.message : 'No se pudo crear el contacto.');
@@ -136,10 +172,40 @@ export default function DashboardCrmPage() {
         throw new Error('No se pudo mover el contacto.');
       }
 
-      await fetchLeads();
+      await fetchCrm();
     } catch (error) {
       console.error('Error moving CRM lead:', error);
       setMessage('No pudimos actualizar el contacto.');
+    }
+  };
+
+  const saveSettings = async () => {
+    setSavingSettings(true);
+    setMessage('');
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/crm/settings', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(settings),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'No se pudo guardar la configuración del CRM.');
+      }
+
+      setSettings(data.settings || settings);
+      setMessage('Automatización comercial guardada.');
+    } catch (error) {
+      console.error('Error saving CRM settings:', error);
+      setMessage(error instanceof Error ? error.message : 'No pudimos guardar la configuración.');
+    } finally {
+      setSavingSettings(false);
     }
   };
 
@@ -162,11 +228,11 @@ export default function DashboardCrmPage() {
             <p className="text-xs uppercase tracking-[0.32em] text-violet-200">CRM comercial</p>
             <h1 className="mt-4 text-4xl font-semibold leading-tight">Tus contactos, oportunidades y cierres en un solo lugar.</h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-              Nexora ahora conecta campañas, funnel y seguimiento comercial para que tus clientes puedan vender cualquier servicio con más control y menos dispersión.
+              Nexora conecta campañas, funnel, CRM y seguimiento comercial para que tus clientes puedan vender cualquier servicio con más control, mejor visibilidad y una operación más elegante.
             </p>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-1">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1">
             <div className="rounded-[26px] border border-white/10 bg-white/5 p-5">
               <p className="text-sm text-slate-300">Pipeline abierto</p>
               <p className="mt-3 text-4xl font-semibold">${metrics.totalPipeline.toLocaleString()}</p>
@@ -189,6 +255,156 @@ export default function DashboardCrmPage() {
         </div>
       )}
 
+      <section className="grid gap-5 md:grid-cols-3">
+        <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-sm text-slate-500">Seguimientos listos</p>
+          <p className="mt-3 text-3xl font-semibold text-slate-900">{metrics.outreachReady.length}</p>
+          <p className="mt-2 text-sm text-slate-500">Contactos que ya pueden recibir una acción comercial.</p>
+        </div>
+        <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-sm text-slate-500">Próximas acciones</p>
+          <p className="mt-3 text-3xl font-semibold text-slate-900">{metrics.overdueFollowUps}</p>
+          <p className="mt-2 text-sm text-slate-500">Oportunidades con siguiente acción definida.</p>
+        </div>
+        <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-sm text-slate-500">Cadencia base</p>
+          <p className="mt-3 text-3xl font-semibold text-slate-900">{settings.defaultCadence}</p>
+          <p className="mt-2 text-sm text-slate-500">Ritmo sugerido para seguimiento comercial.</p>
+        </div>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-[0.92fr_1.08fr]">
+        <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Orquestación comercial</p>
+          <h2 className="mt-2 text-2xl font-semibold text-slate-900">Canales y sincronización</h2>
+
+          <div className="mt-6 space-y-4">
+            {[
+              {
+                key: 'emailAutomationEnabled',
+                label: 'Seguimiento por email',
+                help: 'Usa emails para retomar leads, enviar propuestas y reforzar el cierre.',
+              },
+              {
+                key: 'whatsappEnabled',
+                label: 'WhatsApp opcional',
+                help: 'Activa contacto por WhatsApp cuando el cliente lo permita.',
+              },
+              {
+                key: 'phoneEnabled',
+                label: 'Llamadas o telefonía',
+                help: 'Prepara seguimiento telefónico para oportunidades calientes.',
+              },
+              {
+                key: 'autoFollowUpEnabled',
+                label: 'Automatización de seguimiento',
+                help: 'Marca contactos listos para la siguiente acción sin esperar trabajo manual.',
+              },
+              {
+                key: 'externalCrmEnabled',
+                label: 'Sincronización con CRM externo',
+                help: 'Prepara la conexión futura con HubSpot, Pipedrive o tu stack comercial.',
+              },
+            ].map((toggle) => (
+              <label key={toggle.key} className="flex items-start justify-between gap-4 rounded-2xl border border-slate-200 p-4">
+                <div>
+                  <p className="font-semibold text-slate-900">{toggle.label}</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">{toggle.help}</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={Boolean(settings[toggle.key as keyof CrmSettings])}
+                  onChange={(event) =>
+                    setSettings((current) => ({
+                      ...current,
+                      [toggle.key]: event.target.checked,
+                    }))
+                  }
+                  className="mt-1 h-5 w-5"
+                />
+              </label>
+            ))}
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-700">CRM externo</span>
+                <input
+                  value={settings.externalCrmName || ''}
+                  onChange={(event) => setSettings((current) => ({ ...current, externalCrmName: event.target.value }))}
+                  className="input-field"
+                  placeholder="HubSpot, Pipedrive, Salesforce..."
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-700">Cadencia base</span>
+                <input
+                  value={settings.defaultCadence}
+                  onChange={(event) => setSettings((current) => ({ ...current, defaultCadence: event.target.value }))}
+                  className="input-field"
+                  placeholder="24h, 48h, semanal..."
+                />
+              </label>
+            </div>
+          </div>
+
+          <button onClick={saveSettings} disabled={savingSettings} className="mt-6 btn-primary">
+            {savingSettings ? 'Guardando...' : 'Guardar automatización'}
+          </button>
+        </div>
+
+        <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Cola comercial</p>
+          <h2 className="mt-2 text-2xl font-semibold text-slate-900">Contactos listos para siguiente paso</h2>
+
+          <div className="mt-6 space-y-4">
+            {metrics.outreachReady.length === 0 ? (
+              <div className="rounded-2xl bg-slate-50 p-5 text-sm text-slate-600">
+                Aún no hay contactos listos para orquestación. Agrega leads con email o teléfono y define su siguiente acción.
+              </div>
+            ) : (
+              metrics.outreachReady.slice(0, 6).map((lead) => (
+                <article key={lead.id} className="rounded-2xl border border-slate-200 p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="font-semibold text-slate-900">{lead.name}</p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {lead.company || 'Sin empresa'} · {lead.source}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-violet-700">
+                      {lead.stage}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 md:grid-cols-3">
+                    <div className="rounded-2xl bg-slate-50 p-4">
+                      <p className="text-sm text-slate-500">Valor</p>
+                      <p className="mt-2 text-xl font-semibold text-slate-900">${lead.value.toLocaleString()}</p>
+                    </div>
+                    <div className="rounded-2xl bg-slate-50 p-4">
+                      <p className="text-sm text-slate-500">Canal ideal</p>
+                      <p className="mt-2 text-xl font-semibold text-slate-900">
+                        {settings.whatsappEnabled && lead.phone
+                          ? 'WhatsApp'
+                          : settings.emailAutomationEnabled && lead.email
+                            ? 'Email'
+                            : settings.phoneEnabled && lead.phone
+                              ? 'Llamada'
+                              : 'Manual'}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl bg-slate-50 p-4">
+                      <p className="text-sm text-slate-500">Siguiente acción</p>
+                      <p className="mt-2 text-sm font-semibold text-slate-900">{lead.nextAction || 'Definir seguimiento'}</p>
+                    </div>
+                  </div>
+                </article>
+              ))
+            )}
+          </div>
+        </div>
+      </section>
+
       <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
         <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
           <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Nuevo contacto</p>
@@ -197,87 +413,39 @@ export default function DashboardCrmPage() {
           <div className="mt-6 grid gap-4 md:grid-cols-2">
             <label className="block md:col-span-2">
               <span className="mb-2 block text-sm font-medium text-slate-700">Nombre</span>
-              <input
-                value={form.name}
-                onChange={(event) => setForm({ ...form, name: event.target.value })}
-                className="input-field"
-                placeholder="Nombre del contacto"
-              />
+              <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className="input-field" placeholder="Nombre del contacto" />
             </label>
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-slate-700">Email</span>
-              <input
-                value={form.email}
-                onChange={(event) => setForm({ ...form, email: event.target.value })}
-                className="input-field"
-                placeholder="correo@empresa.com"
-              />
+              <input value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} className="input-field" placeholder="correo@empresa.com" />
             </label>
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-slate-700">Teléfono</span>
-              <input
-                value={form.phone}
-                onChange={(event) => setForm({ ...form, phone: event.target.value })}
-                className="input-field"
-                placeholder="+1..."
-              />
+              <input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} className="input-field" placeholder="+1..." />
             </label>
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-slate-700">Empresa</span>
-              <input
-                value={form.company}
-                onChange={(event) => setForm({ ...form, company: event.target.value })}
-                className="input-field"
-                placeholder="Empresa o marca"
-              />
+              <input value={form.company} onChange={(event) => setForm({ ...form, company: event.target.value })} className="input-field" placeholder="Empresa o marca" />
             </label>
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-slate-700">Fuente</span>
-              <input
-                value={form.source}
-                onChange={(event) => setForm({ ...form, source: event.target.value })}
-                className="input-field"
-                placeholder="Meta, Google, referido..."
-              />
+              <input value={form.source} onChange={(event) => setForm({ ...form, source: event.target.value })} className="input-field" placeholder="Meta, Google, referido..." />
             </label>
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-slate-700">Valor estimado</span>
-              <input
-                type="number"
-                min={0}
-                value={form.value}
-                onChange={(event) => setForm({ ...form, value: Number(event.target.value || 0) })}
-                className="input-field"
-              />
+              <input type="number" min={0} value={form.value} onChange={(event) => setForm({ ...form, value: Number(event.target.value || 0) })} className="input-field" />
             </label>
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-slate-700">Confianza %</span>
-              <input
-                type="number"
-                min={0}
-                max={100}
-                value={form.confidence}
-                onChange={(event) => setForm({ ...form, confidence: Number(event.target.value || 0) })}
-                className="input-field"
-              />
+              <input type="number" min={0} max={100} value={form.confidence} onChange={(event) => setForm({ ...form, confidence: Number(event.target.value || 0) })} className="input-field" />
             </label>
             <label className="block md:col-span-2">
               <span className="mb-2 block text-sm font-medium text-slate-700">Siguiente acción</span>
-              <input
-                value={form.nextAction}
-                onChange={(event) => setForm({ ...form, nextAction: event.target.value })}
-                className="input-field"
-                placeholder="Llamar mañana, enviar propuesta, agendar demo..."
-              />
+              <input value={form.nextAction} onChange={(event) => setForm({ ...form, nextAction: event.target.value })} className="input-field" placeholder="Llamar mañana, enviar propuesta, agendar demo..." />
             </label>
             <label className="block md:col-span-2">
               <span className="mb-2 block text-sm font-medium text-slate-700">Notas</span>
-              <textarea
-                value={form.notes}
-                onChange={(event) => setForm({ ...form, notes: event.target.value })}
-                className="input-field min-h-[120px]"
-                placeholder="Resumen del contacto, objeciones y oportunidad"
-              />
+              <textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} className="input-field min-h-[120px]" placeholder="Resumen del contacto, objeciones y oportunidad" />
             </label>
           </div>
 
@@ -295,29 +463,21 @@ export default function DashboardCrmPage() {
               <div key={stage.key} className="rounded-2xl border border-slate-200 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="text-lg font-semibold text-slate-900">{stage.label}</h3>
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                    {stage.items.length}
-                  </span>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{stage.items.length}</span>
                 </div>
 
                 <div className="mt-4 space-y-3">
                   {stage.items.length === 0 ? (
-                    <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">
-                      Sin oportunidades en esta etapa.
-                    </div>
+                    <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">Sin oportunidades en esta etapa.</div>
                   ) : (
                     stage.items.map((lead) => (
                       <article key={lead.id} className="rounded-2xl bg-slate-50 p-4">
                         <div className="flex items-start justify-between gap-4">
                           <div>
                             <p className="font-semibold text-slate-900">{lead.name}</p>
-                            <p className="text-sm text-slate-500">
-                              {lead.company || 'Sin empresa'} · {lead.source}
-                            </p>
+                            <p className="text-sm text-slate-500">{lead.company || 'Sin empresa'} · {lead.source}</p>
                           </div>
-                          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">
-                            ${lead.value.toLocaleString()}
-                          </span>
+                          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">${lead.value.toLocaleString()}</span>
                         </div>
 
                         <p className="mt-3 text-sm text-slate-600">
