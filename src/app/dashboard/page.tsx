@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { BarChart3, CreditCard, Lightbulb, PlugZap, Settings2, Sparkles, Target } from 'lucide-react';
+import { BarChart3, CreditCard, Lightbulb, PlugZap, Settings2, Sparkles, Target, Users2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 interface DashboardUser {
@@ -203,6 +203,34 @@ export default function DashboardPage() {
             </p>
           </div>
         </Link>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-2">
+        <Link href="/dashboard/crm" className="group block">
+          <div className="h-full rounded-[32px] border border-violet-200 bg-[linear-gradient(180deg,#f5f3ff_0%,#ffffff_60%,#f8fafc_100%)] p-8 shadow-[0_18px_60px_rgba(124,58,237,0.08)] transition group-hover:-translate-y-1 group-hover:shadow-[0_26px_70px_rgba(124,58,237,0.12)]">
+            <Users2 className="h-12 w-12 text-violet-600" />
+            <h2 className="mt-6 text-2xl font-semibold text-slate-900">CRM para seguimiento y cierre</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Guarda contactos, muévelos por etapa, asigna valor y sigue oportunidades desde un pipeline comercial pensado para vender cualquier servicio.
+            </p>
+          </div>
+        </Link>
+
+        <div className="rounded-[32px] border border-slate-200 bg-white p-8 shadow-[0_18px_60px_rgba(15,23,42,0.06)]">
+          <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Sistema comercial</p>
+          <h2 className="mt-3 text-2xl font-semibold text-slate-900">Conecta campañas, funnel y CRM en una sola operación</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            El objetivo es que tus clientes no solo atraigan leads, sino que además los trabajen, los conviertan en propuestas y los cierren sin salir de Nexora.
+          </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link href="/dashboard/crm" className="btn-primary">
+              Abrir CRM
+            </Link>
+            <Link href="/dashboard/funnel" className="btn-secondary">
+              Ver forecast
+            </Link>
+          </div>
+        </div>
       </section>
 
       <section className="grid gap-5 xl:grid-cols-4">

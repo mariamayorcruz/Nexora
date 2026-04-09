@@ -67,6 +67,7 @@ export default function DashboardLayout({
     { label: 'Dashboard', href: '/dashboard', icon: 'DA' },
     { label: 'Conectar redes', href: '/dashboard/connect', icon: 'CR' },
     { label: 'Funnel', href: '/dashboard/funnel', icon: 'FU' },
+    { label: 'CRM', href: '/dashboard/crm', icon: 'CM' },
     { label: 'Campañas', href: '/dashboard/campaigns', icon: 'CA' },
     { label: 'Soporte', href: '/dashboard/support', icon: 'SP' },
     { label: 'Facturación', href: '/dashboard/billing', icon: 'FA' },
