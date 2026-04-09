@@ -36,24 +36,24 @@ export default function BillingPage() {
 
   const currentPlanLabel = useMemo(() => getBillingPlanLabel(subscription?.plan), [subscription?.plan]);
 
-  useEffect(() => {
-    const fetchSubscription = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const response = await fetch('/api/users/me', {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: 'no-store',
-        });
-        const data = await response.json();
-        setSubscription(data.user.subscription);
-      } catch (error) {
-        console.error('Error fetching subscription:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchSubscription = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/users/me', {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store',
+      });
+      const data = await response.json();
+      setSubscription(data.user.subscription);
+    } catch (error) {
+      console.error('Error fetching subscription:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchSubscription();
+  useEffect(() => {
+    void fetchSubscription();
   }, []);
 
   useEffect(() => {
@@ -123,6 +123,8 @@ export default function BillingPage() {
           type: 'success',
           message: `Pago confirmado para ${plan}. Stripe terminó correctamente el checkout y Nexora está sincronizando tu suscripción.`,
         });
+
+        await fetchSubscription();
       } catch (error) {
         console.error('Error validating checkout session:', error);
         setCheckoutState({
@@ -132,7 +134,7 @@ export default function BillingPage() {
       }
     };
 
-    verifyCheckout();
+    void verifyCheckout();
   }, [checkoutStatus, sessionId]);
 
   const handlePlanChange = async (plan: BillingPlan, cycle: BillingCycle) => {
@@ -181,7 +183,8 @@ export default function BillingPage() {
     }
 
     const alreadySubscribedToRequestedPlan =
-      Boolean(subscription?.stripeSubId) && subscription?.plan === requestedPlan;
+      subscription?.plan === requestedPlan &&
+      ['active', 'trialing'].includes((subscription?.status || '').toLowerCase());
 
     if (alreadySubscribedToRequestedPlan) {
       return;
@@ -253,7 +256,9 @@ export default function BillingPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         {(Object.keys(BILLING_PLANS) as BillingPlan[]).map((planKey) => {
           const plan = BILLING_PLANS[planKey];
-          const isCurrentPlan = Boolean(subscription?.stripeSubId) && subscription?.plan === plan.key;
+          const isCurrentPlan =
+            subscription?.plan === plan.key &&
+            ['active', 'trialing'].includes((subscription?.status || '').toLowerCase());
           const isProcessing = processingPlan === `${plan.key}-monthly`;
 
           return (
