@@ -147,14 +147,16 @@ export default function DashboardLayout({
           <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
             <p className="text-sm font-medium text-gray-900">{user?.email}</p>
             <p className="mt-1 text-xs uppercase tracking-[0.24em] text-gray-400">
-              Plan: {user?.entitlements?.marketingLabel || user?.founderPlan || user?.subscription?.plan || 'starter'}
+              {user?.founderAccess
+                ? 'Plan fundador'
+                : `Plan ${user?.entitlements?.marketingLabel || user?.founderPlan || user?.subscription?.plan || 'starter'}`}
             </p>
             {user?.isAdmin && (
-              <p className="mt-3 text-xs font-semibold text-primary">Acceso administrador habilitado</p>
+              <p className="mt-3 text-xs font-semibold text-primary">Acceso total al centro de control</p>
             )}
             {user?.founderAccess && (
               <p className="mt-2 text-xs font-semibold text-emerald-600">
-                Cuenta fundadora con radar creativo de actualizacion rapida
+                Cuenta fundadora con prioridad creativa y ventajas exclusivas activas
               </p>
             )}
           </div>
