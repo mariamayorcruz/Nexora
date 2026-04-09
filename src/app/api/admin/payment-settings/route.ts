@@ -4,25 +4,31 @@ import { verifyAdmin } from '@/lib/admin';
 
 export const dynamic = 'force-dynamic';
 
+async function getOrCreatePaymentSettings() {
+  const existingSettings = await prisma.paymentSettings.findFirst({
+    orderBy: { createdAt: 'asc' },
+  });
+
+  if (existingSettings) {
+    return existingSettings;
+  }
+
+  return prisma.paymentSettings.create({
+    data: {
+      commissionRate: 2.9,
+      minimumPayout: 25,
+    },
+  });
+}
+
 export async function GET(request: NextRequest) {
   const adminCheck = await verifyAdmin(request);
   if (adminCheck instanceof NextResponse) return adminCheck;
 
   try {
-    let settings = await prisma.paymentSettings.findFirst();
-
-    if (!settings) {
-      // Create default settings
-      settings = await prisma.paymentSettings.create({
-        data: {
-          commissionRate: 2.9,
-          minimumPayout: 25.0,
-        },
-      });
-    }
-
+    const settings = await getOrCreatePaymentSettings();
     return NextResponse.json({ settings });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching payment settings:', error);
     return NextResponse.json(
       { error: 'Error fetching payment settings' },
@@ -37,18 +43,11 @@ export async function PUT(request: NextRequest) {
 
   try {
     const data = await request.json();
+    const existingSettings = await getOrCreatePaymentSettings();
 
-    const settings = await prisma.paymentSettings.upsert({
-      where: { id: 'default' },
-      update: {
-        stripeWebhookSecret: data.stripeWebhookSecret,
-        bankAccount: data.bankAccount,
-        paypalEmail: data.paypalEmail,
-        commissionRate: data.commissionRate,
-        minimumPayout: data.minimumPayout,
-      },
-      create: {
-        id: 'default',
+    const settings = await prisma.paymentSettings.update({
+      where: { id: existingSettings.id },
+      data: {
         stripeWebhookSecret: data.stripeWebhookSecret,
         bankAccount: data.bankAccount,
         paypalEmail: data.paypalEmail,
@@ -58,7 +57,7 @@ export async function PUT(request: NextRequest) {
     });
 
     return NextResponse.json({ settings });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error updating payment settings:', error);
     return NextResponse.json(
       { error: 'Error updating payment settings' },

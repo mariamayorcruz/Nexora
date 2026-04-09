@@ -1,34 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Stripe from 'stripe';
-import { prisma } from '@/lib/prisma';
 import jwt from 'jsonwebtoken';
+import { BillingCycle, BillingPlan, getBillingPlan, getStripePriceId } from '@/lib/billing';
+import { prisma } from '@/lib/prisma';
+import { getStripeClient } from '@/lib/stripe';
 
 export const dynamic = 'force-dynamic';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2023-10-16',
-});
-
-const PLANS = {
-  starter: {
-    monthlyPrice: 30,
-    yearlyPrice: 300,
-    stripePriceIdMonthly: process.env.STRIPE_PRICE_STARTER_MONTHLY,
-    stripePriceIdYearly: process.env.STRIPE_PRICE_STARTER_YEARLY,
-  },
-  professional: {
-    monthlyPrice: 79,
-    yearlyPrice: 790,
-    stripePriceIdMonthly: process.env.STRIPE_PRICE_PROFESSIONAL_MONTHLY,
-    stripePriceIdYearly: process.env.STRIPE_PRICE_PROFESSIONAL_YEARLY,
-  },
-  enterprise: {
-    monthlyPrice: 199,
-    yearlyPrice: 1990,
-    stripePriceIdMonthly: process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY,
-    stripePriceIdYearly: process.env.STRIPE_PRICE_ENTERPRISE_YEARLY,
-  },
-};
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,14 +14,27 @@ export async function POST(request: NextRequest) {
     }
 
     const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret-key') as any;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret-key') as { userId: string };
 
-    const { plan, billingCycle } = await request.json();
+    const { plan, billingCycle } = (await request.json()) as {
+      plan?: BillingPlan;
+      billingCycle?: BillingCycle;
+    };
 
     if (!plan || !billingCycle || !['monthly', 'yearly'].includes(billingCycle)) {
+      return NextResponse.json({ error: 'Plan o ciclo invalido.' }, { status: 400 });
+    }
+
+    const planConfig = getBillingPlan(plan);
+    if (!planConfig) {
+      return NextResponse.json({ error: 'Plan invalido.' }, { status: 400 });
+    }
+
+    const priceId = getStripePriceId(plan, billingCycle);
+    if (!priceId) {
       return NextResponse.json(
-        { error: 'Invalid plan or billing cycle' },
-        { status: 400 }
+        { error: 'Stripe aun no esta configurado para este plan. Falta el price id correspondiente.' },
+        { status: 500 }
       );
     }
 
@@ -58,68 +47,76 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const selectedPlan = PLANS[plan as keyof typeof PLANS];
-    if (!selectedPlan) {
-      return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
+    const stripe = getStripeClient();
+    let stripeCustomerId = user.subscription?.stripeCustomerId || null;
+
+    if (stripeCustomerId) {
+      const existingCustomer = await stripe.customers.retrieve(stripeCustomerId);
+      if ('deleted' in existingCustomer && existingCustomer.deleted) {
+        stripeCustomerId = null;
+      }
     }
 
-    const priceId = billingCycle === 'monthly' 
-      ? selectedPlan.stripePriceIdMonthly 
-      : selectedPlan.stripePriceIdYearly;
-
-    if (!priceId) {
-      return NextResponse.json(
-        { error: 'Plan not configured' },
-        { status: 500 }
-      );
-    }
-
-    let customer = null;
-    if (user.subscription?.stripeCustomerId) {
-      customer = await stripe.customers.retrieve(user.subscription.stripeCustomerId);
-    } else {
-      customer = await stripe.customers.create({
+    if (!stripeCustomerId) {
+      const createdCustomer = await stripe.customers.create({
         email: user.email,
         name: user.name || undefined,
+        metadata: { userId: user.id },
       });
+
+      stripeCustomerId = createdCustomer.id;
 
       await prisma.subscription.upsert({
         where: { userId: user.id },
-        update: { stripeCustomerId: customer.id },
+        update: { stripeCustomerId },
         create: {
           userId: user.id,
-          plan: 'starter',
-          status: 'active',
-          stripeCustomerId: customer.id,
-          currentPeriodStart: new Date(),
-          currentPeriodEnd: new Date(),
+          plan: user.subscription?.plan || 'starter',
+          status: user.subscription?.status || 'active',
+          stripeCustomerId,
+          currentPeriodStart: user.subscription?.currentPeriodStart || new Date(),
+          currentPeriodEnd: user.subscription?.currentPeriodEnd || new Date(),
         },
       });
     }
 
     const session = await stripe.checkout.sessions.create({
-      customer: customer.id,
-      payment_method_types: ['card'],
       mode: 'subscription',
+      customer: stripeCustomerId,
+      client_reference_id: user.id,
+      payment_method_types: ['card'],
       line_items: [
         {
           price: priceId,
           quantity: 1,
         },
       ],
-      success_url: `${process.env.NEXTAUTH_URL}/dashboard/billing?session={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXTAUTH_URL}/dashboard/billing`,
+      allow_promotion_codes: true,
+      success_url: `${process.env.NEXTAUTH_URL}/dashboard/billing?session_id={CHECKOUT_SESSION_ID}&checkout=success`,
+      cancel_url: `${process.env.NEXTAUTH_URL}/dashboard/billing?checkout=cancelled`,
       metadata: {
         userId: user.id,
         plan,
+        billingCycle,
+      },
+      subscription_data: {
+        metadata: {
+          userId: user.id,
+          plan,
+          billingCycle,
+        },
       },
     });
 
-    return NextResponse.json({ sessionId: session.id, url: session.url });
-  } catch (error: any) {
+    return NextResponse.json({
+      sessionId: session.id,
+      url: session.url,
+      plan: planConfig.marketingLabel,
+    });
+  } catch (error) {
     console.error('Stripe checkout error:', error);
     return NextResponse.json(
-      { error: 'Error creating checkout session' },
+      { error: 'No se pudo crear la sesion de pago en este momento.' },
       { status: 500 }
     );
   }
