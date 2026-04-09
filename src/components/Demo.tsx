@@ -313,13 +313,6 @@ export default function Demo() {
               </button>
             ))}
 
-            <div className="rounded-[1.75rem] border border-cyan-400/20 bg-cyan-400/10 p-6">
-              <p className="text-sm font-medium uppercase tracking-[0.2em] text-cyan-200">Para producción</p>
-              <p className="mt-3 text-sm leading-7 text-cyan-50">
-                Cuando tengas un MP4 o URL real del video comercial, solo agrega `NEXT_PUBLIC_DEMO_VIDEO_URL` y este mismo
-                bloque mostrará el video final sin tocar el diseño.
-              </p>
-            </div>
           </div>
         </div>
       </div>
