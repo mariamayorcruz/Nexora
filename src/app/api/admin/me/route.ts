@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdmin } from '@/lib/admin';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   const adminCheck = await verifyAdmin(request);
   if (adminCheck instanceof NextResponse) return adminCheck;
