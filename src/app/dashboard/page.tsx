@@ -91,7 +91,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <section className="rounded-[32px] bg-slate-950 px-8 py-10 text-white shadow-2xl shadow-slate-950/20">
+      <section className="overflow-hidden rounded-[36px] bg-[linear-gradient(135deg,#0f172a_0%,#111827_54%,#0c4a6e_100%)] px-8 py-10 text-white shadow-[0_35px_120px_rgba(15,23,42,0.22)]">
         <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
           <div>
             <p className="text-xs uppercase tracking-[0.32em] text-cyan-300">Panel de control</p>
@@ -99,22 +99,21 @@ export default function DashboardPage() {
               Bienvenida, {user?.name || user?.email}. Vamos a convertir creatividad en crecimiento real.
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-              Nexora concentra tus cuentas, campañas y una lectura estratégica del mercado para que puedas decidir
-              más rápido y vender mejor.
+              Nexora concentra tus cuentas, campañas y una lectura estratégica del mercado para que puedas decidir más rápido y vender mejor.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <span className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm">
                 Plan {entitlements?.marketingLabel || user?.subscription?.plan || 'starter'}
               </span>
               {user?.founderAccess && (
-                <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-sm text-emerald-200">
+                <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-4 py-2 text-sm text-emerald-200">
                   Modo fundadora activo
                 </span>
               )}
             </div>
           </div>
 
-          <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
+          <div className="rounded-[30px] border border-white/10 bg-white/5 p-6 backdrop-blur">
             <p className="text-sm text-slate-300">Siguiente mejor acción</p>
             <p className="mt-3 text-2xl font-semibold text-white">
               {entitlements?.capabilities?.canUseRadar
@@ -137,127 +136,136 @@ export default function DashboardPage() {
       </section>
 
       <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-gray-500">Cuentas conectadas</p>
-          <p className="mt-3 text-4xl font-semibold text-gray-900">{adAccounts.length}</p>
-          <p className="mt-2 text-xs uppercase tracking-[0.22em] text-gray-400">
+        <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_16px_55px_rgba(15,23,42,0.06)]">
+          <p className="text-sm text-slate-500">Cuentas conectadas</p>
+          <p className="mt-3 text-4xl font-semibold text-slate-900">{adAccounts.length}</p>
+          <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-400">
             de {entitlements?.usage.adAccountsLimit || 1} disponibles
           </p>
         </div>
-        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-gray-500">Campañas activas</p>
-          <p className="mt-3 text-4xl font-semibold text-gray-900">{activeCampaigns.length}</p>
-          <p className="mt-2 text-xs uppercase tracking-[0.22em] text-gray-400">
+        <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_16px_55px_rgba(15,23,42,0.06)]">
+          <p className="text-sm text-slate-500">Campañas activas</p>
+          <p className="mt-3 text-4xl font-semibold text-slate-900">{activeCampaigns.length}</p>
+          <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-400">
             de {entitlements?.usage.activeCampaignsLimit || 3} disponibles
           </p>
         </div>
-        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-gray-500">Gasto registrado</p>
-          <p className="mt-3 text-4xl font-semibold text-gray-900">${totalSpend.toFixed(0)}</p>
+        <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_16px_55px_rgba(15,23,42,0.06)]">
+          <p className="text-sm text-slate-500">Gasto registrado</p>
+          <p className="mt-3 text-4xl font-semibold text-slate-900">${totalSpend.toFixed(0)}</p>
         </div>
-        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-gray-500">ROI estimado</p>
-          <p className="mt-3 text-4xl font-semibold text-gray-900">{roi}%</p>
+        <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_16px_55px_rgba(15,23,42,0.06)]">
+          <p className="text-sm text-slate-500">ROI estimado</p>
+          <p className="mt-3 text-4xl font-semibold text-slate-900">{roi}%</p>
         </div>
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
         <Link href={entitlements?.capabilities?.canUseRadar ? '/dashboard/radar' : '/dashboard/billing'} className="group block">
-          <div className="h-full rounded-[30px] border border-cyan-200 bg-gradient-to-br from-cyan-50 via-white to-emerald-50 p-8 transition group-hover:-translate-y-1 group-hover:shadow-xl">
+          <div className="h-full rounded-[32px] border border-cyan-200 bg-[linear-gradient(180deg,#f0fdfa_0%,#ffffff_58%,#eff6ff_100%)] p-8 shadow-[0_18px_60px_rgba(34,211,238,0.08)] transition group-hover:-translate-y-1 group-hover:shadow-[0_26px_70px_rgba(34,211,238,0.12)]">
             <Sparkles className="h-12 w-12 text-cyan-600" />
-            <h2 className="mt-6 text-2xl font-semibold text-gray-900">
-              {entitlements?.capabilities?.canUseRadar ? 'Radar creativo auto-actualizable' : 'Desbloquea el radar creativo'}
+            <h2 className="mt-6 text-2xl font-semibold text-slate-900">
+              {entitlements?.capabilities?.canUseRadar ? 'Radar creativo autoactualizable' : 'Desbloquea el radar creativo'}
             </h2>
-            <p className="mt-3 text-sm leading-6 text-gray-600">
+            <p className="mt-3 text-sm leading-6 text-slate-600">
               {entitlements?.capabilities?.canUseRadar
-                ? 'Lee el momento comercial y devuelve hooks, formatos y campanas listas para lanzar con mas claridad.'
+                ? 'Lee el momento comercial y devuelve hooks, formatos y campañas listas para lanzar con más claridad.'
                 : 'Growth y Scale activan insights, hooks y sugerencias accionables para acelerar decisiones.'}
             </p>
           </div>
         </Link>
 
         <Link href="/dashboard/connect" className="group block">
-          <div className="h-full rounded-[30px] border border-gray-200 bg-white p-8 transition group-hover:-translate-y-1 group-hover:shadow-xl">
+          <div className="h-full rounded-[32px] border border-slate-200 bg-white p-8 shadow-[0_18px_60px_rgba(15,23,42,0.06)] transition group-hover:-translate-y-1 group-hover:shadow-[0_26px_70px_rgba(15,23,42,0.1)]">
             <PlugZap className="h-12 w-12 text-orange-500" />
-            <h2 className="mt-6 text-2xl font-semibold text-gray-900">Conectar nuevas cuentas</h2>
-            <p className="mt-3 text-sm leading-6 text-gray-600">
-              Suma Instagram, Facebook, Google o TikTok para que Nexora lea mejor donde conviene invertir energia.
+            <h2 className="mt-6 text-2xl font-semibold text-slate-900">Conectar nuevas cuentas</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Suma Instagram, Facebook, Google o TikTok para que Nexora lea mejor dónde conviene invertir energía.
             </p>
           </div>
         </Link>
       </section>
 
       <section className="grid gap-5 xl:grid-cols-4">
-        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-gray-500">Workspace</p>
-          <p className="mt-3 text-2xl font-semibold text-gray-900">
+        <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_16px_55px_rgba(15,23,42,0.06)]">
+          <p className="text-sm text-slate-500">Workspace</p>
+          <p className="mt-3 text-2xl font-semibold text-slate-900">
             {entitlements?.capabilities.workspaceLimit || 1} incluidos
           </p>
         </div>
-        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-gray-500">Analítica avanzada</p>
-          <p className="mt-3 text-2xl font-semibold text-gray-900">
+        <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_16px_55px_rgba(15,23,42,0.06)]">
+          <p className="text-sm text-slate-500">Analítica avanzada</p>
+          <p className="mt-3 text-2xl font-semibold text-slate-900">
             {entitlements?.capabilities.canUseAdvancedAnalytics ? 'Activa' : 'Bloqueada'}
           </p>
         </div>
-        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-gray-500">Automatizaciones</p>
-          <p className="mt-3 text-2xl font-semibold text-gray-900">
+        <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_16px_55px_rgba(15,23,42,0.06)]">
+          <p className="text-sm text-slate-500">Automatizaciones</p>
+          <p className="mt-3 text-2xl font-semibold text-slate-900">
             {entitlements?.capabilities.canUseAutomationSuggestions ? 'Activas' : 'Upgrade'}
           </p>
         </div>
-        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-gray-500">Soporte</p>
-          <p className="mt-3 text-2xl font-semibold text-gray-900">
+        <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_16px_55px_rgba(15,23,42,0.06)]">
+          <p className="text-sm text-slate-500">Soporte</p>
+          <p className="mt-3 text-2xl font-semibold text-slate-900">
             {entitlements?.capabilities.canUsePrioritySupport ? 'Prioritario' : 'Email'}
           </p>
         </div>
       </section>
 
       <section className="grid gap-5 md:grid-cols-3">
-        <Link href="/dashboard/campaigns" className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
+        <Link
+          href="/dashboard/campaigns"
+          className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_16px_55px_rgba(15,23,42,0.06)] transition hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(15,23,42,0.1)]"
+        >
           <BarChart3 className="h-10 w-10 text-cyan-600" />
-          <p className="mt-4 text-lg font-semibold text-gray-900">Campañas</p>
-          <p className="mt-2 text-sm leading-6 text-gray-600">Revisa ejecución, presupuesto y resultados desde un solo lugar.</p>
+          <p className="mt-4 text-lg font-semibold text-slate-900">Campañas</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Revisa ejecución, presupuesto y resultados desde un solo lugar.</p>
         </Link>
-        <Link href="/dashboard/billing" className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
-          <CreditCard className="h-10 w-10 text-gray-800" />
-          <p className="mt-4 text-lg font-semibold text-gray-900">Facturación</p>
-          <p className="mt-2 text-sm leading-6 text-gray-600">Mantiene control sobre plan, pagos y expansion de la operacion.</p>
+        <Link
+          href="/dashboard/billing"
+          className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_16px_55px_rgba(15,23,42,0.06)] transition hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(15,23,42,0.1)]"
+        >
+          <CreditCard className="h-10 w-10 text-slate-800" />
+          <p className="mt-4 text-lg font-semibold text-slate-900">Facturación</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Mantén control sobre plan, pagos y expansión de la operación.</p>
         </Link>
-        <Link href="/dashboard/settings" className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
-          <Settings2 className="h-10 w-10 text-gray-800" />
-          <p className="mt-4 text-lg font-semibold text-gray-900">Configuración</p>
-          <p className="mt-2 text-sm leading-6 text-gray-600">Ajusta integraciones, preferencias y estructura de la cuenta.</p>
+        <Link
+          href="/dashboard/settings"
+          className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_16px_55px_rgba(15,23,42,0.06)] transition hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(15,23,42,0.1)]"
+        >
+          <Settings2 className="h-10 w-10 text-slate-800" />
+          <p className="mt-4 text-lg font-semibold text-slate-900">Configuración</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Ajusta integraciones, preferencias y estructura de la cuenta.</p>
         </Link>
       </section>
 
-      <section className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+      <section className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_16px_55px_rgba(15,23,42,0.06)]">
         <div className="flex items-center gap-3">
           <Lightbulb className="h-8 w-8 text-amber-500" />
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">Lectura rápida del sistema</h2>
-            <p className="text-sm text-gray-500">Una vista util para saber que empujar primero.</p>
+            <h2 className="text-xl font-semibold text-slate-900">Lectura rápida del sistema</h2>
+            <p className="text-sm text-slate-500">Una vista útil para saber qué empujar primero.</p>
           </div>
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl bg-gray-50 p-4">
-            <p className="text-sm font-semibold text-gray-900">Si tienes pocas cuentas conectadas</p>
-            <p className="mt-2 text-sm leading-6 text-gray-600">
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <p className="text-sm font-semibold text-slate-900">Si tienes pocas cuentas conectadas</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
               Prioriza conectar las plataformas que ya te generan interacción o demanda para que el radar lea mejor tus oportunidades.
             </p>
           </div>
-          <div className="rounded-2xl bg-gray-50 p-4">
-            <p className="text-sm font-semibold text-gray-900">Si el ROI todavía es bajo</p>
-            <p className="mt-2 text-sm leading-6 text-gray-600">
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <p className="text-sm font-semibold text-slate-900">Si el ROI todavía es bajo</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
               Ajusta el mensaje antes que aumentar presupuesto. Nexora ya te sugiere hooks y ángulos para eso en el radar.
             </p>
           </div>
-          <div className="rounded-2xl bg-gray-50 p-4">
-            <p className="text-sm font-semibold text-gray-900">Si quieres vender mas rapido</p>
-            <p className="mt-2 text-sm leading-6 text-gray-600">
-              Lanza una campana corta con una sola promesa fuerte, prueba visible y un CTA directo hacia demo o contacto.
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <p className="text-sm font-semibold text-slate-900">Si quieres vender más rápido</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Lanza una campaña corta con una sola promesa fuerte, prueba visible y un CTA directo hacia demo o contacto.
             </p>
           </div>
         </div>

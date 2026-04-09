@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import DashboardChatbot from '@/components/DashboardChatbot';
 
 interface DashboardUser {
   email: string;
@@ -104,20 +105,20 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(251,146,60,0.08),transparent_24%),radial-gradient(circle_at_80%_0%,rgba(56,189,248,0.08),transparent_20%),#f8fafc]">
       <aside
-        className={`fixed z-40 h-screen w-72 overflow-y-auto border-r border-gray-200 bg-white transition-transform lg:relative ${
+        className={`fixed z-40 h-screen w-72 overflow-y-auto border-r border-slate-200/80 bg-white/95 backdrop-blur transition-transform lg:relative ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
-        <div className="border-b border-gray-200 p-6">
+        <div className="border-b border-slate-200/80 p-6">
           <Link href="/dashboard" className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-primary text-sm font-semibold text-white">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-400 via-amber-300 to-cyan-400 text-sm font-semibold text-slate-950 shadow-[0_10px_35px_rgba(56,189,248,0.22)]">
               NX
             </div>
             <div>
-              <p className="text-lg font-bold text-gray-900">Nexora</p>
-              <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Growth OS</p>
+              <p className="text-lg font-bold text-slate-900">Nexora</p>
+              <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Growth OS</p>
             </div>
           </Link>
         </div>
@@ -128,12 +129,14 @@ export default function DashboardLayout({
               key={item.href}
               href={item.href}
               className={`flex items-center gap-3 rounded-2xl px-4 py-3 transition ${
-                pathname === item.href ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-gray-700 hover:bg-gray-100'
+                pathname === item.href
+                  ? 'bg-slate-950 text-white shadow-[0_18px_50px_rgba(15,23,42,0.18)]'
+                  : 'text-slate-700 hover:bg-slate-100'
               }`}
             >
               <span
                 className={`flex h-9 w-9 items-center justify-center rounded-xl text-xs font-semibold ${
-                  pathname === item.href ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'
+                  pathname === item.href ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-500'
                 }`}
               >
                 {item.icon}
@@ -143,10 +146,10 @@ export default function DashboardLayout({
           ))}
         </nav>
 
-        <div className="border-t border-gray-200 p-4">
-          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-            <p className="text-sm font-medium text-gray-900">{user?.email}</p>
-            <p className="mt-1 text-xs uppercase tracking-[0.24em] text-gray-400">
+        <div className="border-t border-slate-200/80 p-4">
+          <div className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-4 shadow-[0_12px_35px_rgba(15,23,42,0.06)]">
+            <p className="text-sm font-medium text-slate-900">{user?.email}</p>
+            <p className="mt-1 text-xs uppercase tracking-[0.24em] text-slate-400">
               {user?.founderAccess
                 ? 'Plan fundador'
                 : `Plan ${user?.entitlements?.marketingLabel || user?.founderPlan || user?.subscription?.plan || 'starter'}`}
@@ -163,7 +166,7 @@ export default function DashboardLayout({
 
           <button
             onClick={handleLogout}
-            className="mt-4 w-full rounded-2xl px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
+            className="mt-4 w-full rounded-2xl px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
           >
             Cerrar sesión
           </button>
@@ -171,22 +174,26 @@ export default function DashboardLayout({
       </aside>
 
       <div className="flex flex-1 flex-col">
-        <div className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4 lg:hidden">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-white/95 px-6 py-4 backdrop-blur lg:hidden">
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="flex flex-col gap-1">
-            <span className="block h-0.5 w-6 bg-gray-900" />
-            <span className="block h-0.5 w-6 bg-gray-900" />
-            <span className="block h-0.5 w-6 bg-gray-900" />
+            <span className="block h-0.5 w-6 bg-slate-900" />
+            <span className="block h-0.5 w-6 bg-slate-900" />
+            <span className="block h-0.5 w-6 bg-slate-900" />
           </button>
-          <span className="text-lg font-bold text-gray-900">Nexora</span>
+          <span className="text-lg font-bold text-slate-900">Nexora</span>
           <div className="w-6" />
         </div>
 
-        <main className="flex-1 overflow-y-auto px-6 py-8">{children}</main>
+        <main className="flex-1 overflow-y-auto px-6 py-8">
+          <div className="mx-auto w-full max-w-[1440px]">{children}</div>
+        </main>
       </div>
 
       {sidebarOpen && (
         <div className="fixed inset-0 z-30 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
+
+      <DashboardChatbot />
     </div>
   );
 }
