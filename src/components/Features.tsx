@@ -74,8 +74,8 @@ export default function Features() {
               Si el sistema se siente improvisado, la conversión también.
             </h2>
             <p className="mt-5 max-w-xl text-lg leading-8 text-slate-600">
-              Saleads.ai funciona por una cosa muy clara: habla de dolor real, muestra un flujo simple y deja ver producto.
-              Aquí estamos llevando Nexora en esa dirección, con una narrativa más directa y una capa visual mucho más sólida.
+              Las mejores landings de software funcionan cuando hablan de dolor real, muestran un flujo simple y dejan ver
+              producto. Aquí llevamos Nexora hacia esa dirección, con una narrativa más directa y una capa visual mucho más sólida.
             </p>
           </div>
 
