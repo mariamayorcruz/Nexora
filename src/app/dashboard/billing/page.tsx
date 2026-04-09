@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { BILLING_PLANS, BillingCycle, BillingPlan, getBillingPlanLabel } from '@/lib/billing';
 
@@ -9,6 +9,7 @@ interface SubscriptionState {
   status: string;
   currentPeriodEnd: string;
   cancelAtPeriodEnd?: boolean;
+  stripeSubId?: string | null;
 }
 
 interface CheckoutState {
@@ -22,14 +23,15 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true);
   const [processingPlan, setProcessingPlan] = useState<string | null>(null);
   const [checkoutState, setCheckoutState] = useState<CheckoutState | null>(null);
+  const autoCheckoutStarted = useRef(false);
 
   const sessionId = searchParams.get('session_id');
   const checkoutStatus = searchParams.get('checkout');
+  const requestedPlan = searchParams.get('plan') as BillingPlan | null;
+  const requestedBilling = (searchParams.get('billing') as BillingCycle | null) || 'monthly';
+  const shouldAutostart = searchParams.get('autostart') === '1';
 
-  const currentPlanLabel = useMemo(
-    () => getBillingPlanLabel(subscription?.plan),
-    [subscription?.plan]
-  );
+  const currentPlanLabel = useMemo(() => getBillingPlanLabel(subscription?.plan), [subscription?.plan]);
 
   useEffect(() => {
     const fetchSubscription = async () => {
@@ -128,6 +130,27 @@ export default function BillingPage() {
     }
   };
 
+  useEffect(() => {
+    if (loading || !shouldAutostart || !requestedPlan || autoCheckoutStarted.current) {
+      return;
+    }
+
+    const planExists = Object.prototype.hasOwnProperty.call(BILLING_PLANS, requestedPlan);
+    if (!planExists) {
+      return;
+    }
+
+    const alreadySubscribedToRequestedPlan =
+      Boolean(subscription?.stripeSubId) && subscription?.plan === requestedPlan;
+
+    if (alreadySubscribedToRequestedPlan) {
+      return;
+    }
+
+    autoCheckoutStarted.current = true;
+    void handlePlanChange(requestedPlan, requestedBilling);
+  }, [loading, requestedPlan, requestedBilling, shouldAutostart, subscription]);
+
   if (loading) {
     return (
       <div className="py-12 text-center">
@@ -139,9 +162,15 @@ export default function BillingPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="mb-2 text-3xl font-bold text-gray-900">Facturacion y suscripcion</h2>
+        <h2 className="mb-2 text-3xl font-bold text-gray-900">Facturación y suscripción</h2>
         <p className="text-gray-600">Gestiona tu plan, ejecuta upgrades y valida el estado real de Stripe.</p>
       </div>
+
+      {shouldAutostart && requestedPlan && !checkoutState && (
+        <div className="rounded-2xl border border-orange-200 bg-orange-50 p-5 text-sm text-orange-900">
+          Estamos preparando tu checkout para el plan {BILLING_PLANS[requestedPlan]?.marketingLabel || requestedPlan}.
+        </div>
+      )}
 
       {checkoutState && (
         <div
@@ -170,7 +199,7 @@ export default function BillingPage() {
               <p className="mt-2 text-2xl font-semibold text-gray-900">{subscription.status}</p>
             </div>
             <div className="rounded-2xl bg-gray-50 p-5">
-              <p className="text-sm text-gray-500">Proximo corte</p>
+              <p className="text-sm text-gray-500">Próximo corte</p>
               <p className="mt-2 text-2xl font-semibold text-gray-900">
                 {new Date(subscription.currentPeriodEnd).toLocaleDateString('es-ES')}
               </p>
@@ -184,7 +213,7 @@ export default function BillingPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         {(Object.keys(BILLING_PLANS) as BillingPlan[]).map((planKey) => {
           const plan = BILLING_PLANS[planKey];
-          const isCurrentPlan = subscription?.plan === plan.key;
+          const isCurrentPlan = Boolean(subscription?.stripeSubId) && subscription?.plan === plan.key;
           const isProcessing = processingPlan === `${plan.key}-monthly`;
 
           return (

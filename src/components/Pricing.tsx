@@ -20,7 +20,7 @@ export default function Pricing() {
               Planes claros, consistentes con Stripe y listos para convertir.
             </h2>
             <p className="mt-5 text-lg leading-8 text-slate-600">
-              Alineamos lo que ve el cliente en la landing con lo que realmente compra y gestiona despues dentro de Nexora.
+              Alineamos lo que ve el cliente en la landing con lo que realmente compra y gestiona después dentro de Nexora.
             </p>
           </div>
 
@@ -64,7 +64,7 @@ export default function Pricing() {
                 {featured && (
                   <div className="absolute right-6 top-6 inline-flex items-center gap-2 rounded-full bg-orange-400 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-950">
                     <Sparkles className="h-3.5 w-3.5" />
-                    Mas recomendado
+                    Más recomendado
                   </div>
                 )}
 
@@ -84,7 +84,7 @@ export default function Pricing() {
                     <span className={`pb-2 text-sm ${featured ? 'text-slate-300' : 'text-slate-500'}`}>/ mes</span>
                   </div>
                   <p className={`mt-3 text-sm ${featured ? 'text-orange-200' : 'text-slate-500'}`}>
-                    {billing === 'yearly' ? 'Facturacion anual con mejor margen' : 'Facturacion mensual flexible'}
+                    {billing === 'yearly' ? 'Facturación anual con mejor margen' : 'Facturación mensual flexible'}
                   </p>
                 </div>
 
@@ -104,7 +104,10 @@ export default function Pricing() {
                 </ul>
 
                 <div className="mt-10">
-                  <Link href="/auth/signup" className={featured ? 'btn-primary w-full text-center' : 'btn-secondary w-full text-center'}>
+                  <Link
+                    href={`/auth/signup?plan=${plan.key}&billing=${billing}`}
+                    className={featured ? 'btn-primary w-full text-center' : 'btn-secondary w-full text-center'}
+                  >
                     Elegir {plan.marketingLabel}
                   </Link>
                 </div>

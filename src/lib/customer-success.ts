@@ -180,6 +180,16 @@ export function buildLifecycleTemplates(supportEmail: string) {
       replyTo,
     },
     {
+      id: 'lead-nurture-daily',
+      name: 'Seguimiento diario para no compradores',
+      audience: 'Registros sin suscripción activa',
+      trigger: 'Cada 24 horas mientras haya consentimiento y no exista checkout exitoso',
+      subject: 'Lo que ya podrías estar centralizando con Nexora hoy',
+      preview: 'Email consultivo con valor, prueba y un siguiente paso claro para retomar la compra sin fricción.',
+      cta: 'Activar mi plan en Nexora',
+      replyTo,
+    },
+    {
       id: 'post-sale-welcome',
       name: 'Post-venta inmediata',
       audience: 'Clientes que acaban de pagar',

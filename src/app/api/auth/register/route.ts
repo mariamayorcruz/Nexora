@@ -9,9 +9,10 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, email, password } = await request.json();
+    const { name, email, password, marketingOptIn } = await request.json();
     const cleanName = (name || '').trim();
     const cleanEmail = (email || '').trim().toLowerCase();
+    const optedInToMarketing = Boolean(marketingOptIn);
 
     // Validar datos
     if (!cleanEmail || !password || !cleanName) {
@@ -62,6 +63,10 @@ export async function POST(request: NextRequest) {
           name: cleanName,
           email: cleanEmail,
           password: hashedPassword,
+          marketingOptIn: optedInToMarketing,
+          marketingOptInAt: optedInToMarketing ? new Date() : null,
+          nurtureStatus: optedInToMarketing ? 'eligible' : 'not-consented',
+          nextNurtureSendAt: optedInToMarketing ? new Date(Date.now() + 24 * 60 * 60 * 1000) : null,
         },
       });
 
