@@ -1,9 +1,12 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import Navbar from '@/components/Navbar';
+
+const inputClassName =
+  'w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-base text-gray-900 placeholder:text-gray-400 outline-none transition focus:border-transparent focus:ring-2 focus:ring-primary';
 
 export default function Signup() {
   const router = useRouter();
@@ -17,17 +20,17 @@ export default function Signup() {
     terms: false,
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setError('');
 
     if (formData.password !== formData.confirmPassword) {
-      setError('Las contraseñas no coinciden');
+      setError('Las contrasenas no coinciden.');
       return;
     }
 
     if (!formData.terms) {
-      setError('Debes aceptar los términos y condiciones');
+      setError('Debes aceptar los terminos y condiciones.');
       return;
     }
 
@@ -38,8 +41,8 @@ export default function Signup() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
+          name: formData.name.trim(),
+          email: formData.email.trim().toLowerCase(),
           password: formData.password,
         }),
       });
@@ -47,14 +50,15 @@ export default function Signup() {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || 'Error al registrarse');
+        setError(data.error || 'No pudimos crear tu cuenta.');
         return;
       }
 
       localStorage.setItem('token', data.token);
       router.push('/dashboard');
-    } catch (err) {
-      setError('Error de conexión. Intenta de nuevo.');
+    } catch (requestError) {
+      console.error('Signup request error:', requestError);
+      setError('Error de conexion. Intenta de nuevo.');
     } finally {
       setLoading(false);
     }
@@ -63,88 +67,93 @@ export default function Signup() {
   return (
     <>
       <Navbar />
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 sm:px-6 lg:px-8 pt-20">
-        <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8">
-          <h2 className="text-3xl font-bold text-center mb-2 text-gray-900">Crea tu cuenta</h2>
-          <p className="text-center text-gray-600 mb-8">Únete a miles de empresarios que usan Nexora</p>
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 pb-10 pt-28 sm:px-6 lg:px-8">
+        <div className="w-full max-w-md rounded-[28px] border border-gray-200 bg-white p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+          <h2 className="mb-2 text-center text-3xl font-bold text-gray-900">Crea tu cuenta</h2>
+          <p className="mb-8 text-center text-gray-600">Empieza a gestionar crecimiento, creatividad y campanas desde un solo lugar.</p>
 
           {error && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
               {error}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Nombre completo</label>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Nombre completo</label>
               <input
                 type="text"
                 value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                onChange={(event) => setFormData({ ...formData, name: event.target.value })}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition"
-                placeholder="Juan García"
+                autoComplete="name"
+                className={inputClassName}
+                placeholder="Tu nombre"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Email</label>
               <input
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData({...formData, email: e.target.value})}
+                onChange={(event) => setFormData({ ...formData, email: event.target.value })}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition"
+                autoComplete="email"
+                spellCheck={false}
+                className={inputClassName}
                 placeholder="tu@email.com"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Contraseña</label>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Contrasena</label>
               <input
                 type="password"
                 value={formData.password}
-                onChange={(e) => setFormData({...formData, password: e.target.value})}
+                onChange={(event) => setFormData({ ...formData, password: event.target.value })}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition"
-                placeholder="Mínimo 8 caracteres"
+                autoComplete="new-password"
+                className={inputClassName}
+                placeholder="Minimo 8 caracteres"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Confirmar contraseña</label>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Confirmar contrasena</label>
               <input
                 type="password"
                 value={formData.confirmPassword}
-                onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
+                onChange={(event) => setFormData({ ...formData, confirmPassword: event.target.value })}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition"
-                placeholder="Repite tu contraseña"
+                autoComplete="new-password"
+                className={inputClassName}
+                placeholder="Repite tu contrasena"
               />
             </div>
 
-            <div className="flex items-start">
+            <label className="flex items-start gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
               <input
                 type="checkbox"
-                id="terms"
                 checked={formData.terms}
-                onChange={(e) => setFormData({...formData, terms: e.target.checked})}
-                className="mt-1"
+                onChange={(event) => setFormData({ ...formData, terms: event.target.checked })}
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
               />
-              <label htmlFor="terms" className="ml-2 text-sm text-gray-600">
-                Acepto los <Link href="#" className="text-primary hover:underline">términos de servicio</Link> y la <Link href="#" className="text-primary hover:underline">política de privacidad</Link>
-              </label>
-            </div>
+              <span className="text-sm leading-6 text-gray-600">
+                Acepto los <Link href="#" className="font-medium text-primary hover:underline">terminos de servicio</Link> y la{' '}
+                <Link href="#" className="font-medium text-primary hover:underline">politica de privacidad</Link>.
+              </span>
+            </label>
 
             <button type="submit" disabled={loading} className="w-full btn-primary disabled:opacity-50">
-              {loading ? 'Registrando...' : 'Crear Cuenta'}
+              {loading ? 'Creando cuenta...' : 'Crear cuenta'}
             </button>
           </form>
 
-          <p className="text-center mt-6 text-gray-600">
-            ¿Ya tienes cuenta?{' '}
-            <Link href="/auth/login" className="text-primary font-semibold hover:underline">
-              Inicia sesión
+          <p className="mt-6 text-center text-gray-600">
+            Ya tienes cuenta?{' '}
+            <Link href="/auth/login" className="font-semibold text-primary hover:underline">
+              Inicia sesion
             </Link>
           </p>
         </div>
