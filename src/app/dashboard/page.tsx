@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { BarChart3, CreditCard, Lightbulb, PlugZap, Settings2, Sparkles } from 'lucide-react';
+import { BarChart3, CreditCard, Lightbulb, PlugZap, Settings2, Sparkles, Target } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 interface DashboardUser {
@@ -69,13 +69,17 @@ export default function DashboardPage() {
       }
     };
 
-    fetchUserData();
+    void fetchUserData();
   }, []);
 
   const activeCampaigns = campaigns.filter((campaign) => campaign.status === 'active');
   const totalSpend = campaigns.reduce((sum, campaign) => sum + (campaign.analytics?.spend || 0), 0);
   const totalRevenue = campaigns.reduce((sum, campaign) => sum + (campaign.analytics?.revenue || 0), 0);
+  const totalClicks = campaigns.reduce((sum, campaign) => sum + (campaign.analytics?.clicks || 0), 0);
+  const totalConversions = campaigns.reduce((sum, campaign) => sum + (campaign.analytics?.conversions || 0), 0);
   const roi = totalSpend > 0 ? Math.round(((totalRevenue - totalSpend) / totalSpend) * 100) : 0;
+  const estimatedLeads = totalConversions > 0 ? totalConversions : Math.max(1, Math.round(totalClicks * 0.08));
+  const estimatedWins = Math.max(0, Math.round(estimatedLeads * 0.18));
   const entitlements = user?.entitlements;
 
   if (loading) {
@@ -116,20 +120,20 @@ export default function DashboardPage() {
           <div className="rounded-[30px] border border-white/10 bg-white/5 p-6 backdrop-blur">
             <p className="text-sm text-slate-300">Siguiente mejor acción</p>
             <p className="mt-3 text-2xl font-semibold text-white">
-              {entitlements?.capabilities?.canUseRadar
-                ? 'Activar el radar creativo y bajar una campaña nueva.'
+              {entitlements?.capabilities?.canUseAdvancedAnalytics
+                ? 'Abrir el funnel y priorizar los contactos con más valor probable.'
                 : 'Conectar tu primera cuenta y desbloquear el siguiente nivel del panel.'}
             </p>
             <p className="mt-4 text-sm leading-6 text-slate-300">
-              {entitlements?.capabilities?.canUseRadar
-                ? 'El radar traduce cuentas, rendimiento y contexto comercial en hooks, ángulos y rutas de ejecución para que no dependas de intuiciones aisladas.'
+              {entitlements?.capabilities?.canUseAdvancedAnalytics
+                ? 'El funnel comercial traduce tráfico, leads y conversiones en oportunidades, forecast y siguientes acciones de cierre.'
                 : entitlements?.capabilities?.upgradeCta}
             </p>
             <Link
-              href={entitlements?.capabilities?.canUseRadar ? '/dashboard/radar' : '/dashboard/billing'}
+              href={entitlements?.capabilities?.canUseAdvancedAnalytics ? '/dashboard/funnel' : '/dashboard/billing'}
               className="mt-6 inline-flex items-center rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200"
             >
-              {entitlements?.capabilities?.canUseRadar ? 'Abrir radar creativo' : 'Ver opciones de plan'}
+              {entitlements?.capabilities?.canUseAdvancedAnalytics ? 'Abrir funnel comercial' : 'Ver opciones de plan'}
             </Link>
           </div>
         </div>
@@ -151,8 +155,9 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_16px_55px_rgba(15,23,42,0.06)]">
-          <p className="text-sm text-slate-500">Gasto registrado</p>
-          <p className="mt-3 text-4xl font-semibold text-slate-900">${totalSpend.toFixed(0)}</p>
+          <p className="text-sm text-slate-500">Leads estimados</p>
+          <p className="mt-3 text-4xl font-semibold text-slate-900">{estimatedLeads}</p>
+          <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-400">Basados en clicks y conversiones</p>
         </div>
         <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_16px_55px_rgba(15,23,42,0.06)]">
           <p className="text-sm text-slate-500">ROI estimado</p>
@@ -160,7 +165,31 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-2">
+      <section className="grid gap-6 lg:grid-cols-3">
+        <Link href="/dashboard/funnel" className="group block lg:col-span-2">
+          <div className="h-full rounded-[32px] border border-indigo-200 bg-[linear-gradient(180deg,#eef2ff_0%,#ffffff_58%,#f8fafc_100%)] p-8 shadow-[0_18px_60px_rgba(79,70,229,0.08)] transition group-hover:-translate-y-1 group-hover:shadow-[0_26px_70px_rgba(79,70,229,0.12)]">
+            <Target className="h-12 w-12 text-indigo-600" />
+            <h2 className="mt-6 text-2xl font-semibold text-slate-900">Funnel comercial y forecast</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Mira cuántas ventas probables puedes cerrar con tus contactos actuales, dónde se cae el embudo y qué fuentes traen las oportunidades más valiosas.
+            </p>
+            <div className="mt-6 grid gap-4 md:grid-cols-3">
+              <div className="rounded-2xl bg-white p-4">
+                <p className="text-sm text-slate-500">Leads con potencial</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">{estimatedLeads}</p>
+              </div>
+              <div className="rounded-2xl bg-white p-4">
+                <p className="text-sm text-slate-500">Ventas probables</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">{estimatedWins}</p>
+              </div>
+              <div className="rounded-2xl bg-white p-4">
+                <p className="text-sm text-slate-500">Revenue observado</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">${totalRevenue.toFixed(0)}</p>
+              </div>
+            </div>
+          </div>
+        </Link>
+
         <Link href={entitlements?.capabilities?.canUseRadar ? '/dashboard/radar' : '/dashboard/billing'} className="group block">
           <div className="h-full rounded-[32px] border border-cyan-200 bg-[linear-gradient(180deg,#f0fdfa_0%,#ffffff_58%,#eff6ff_100%)] p-8 shadow-[0_18px_60px_rgba(34,211,238,0.08)] transition group-hover:-translate-y-1 group-hover:shadow-[0_26px_70px_rgba(34,211,238,0.12)]">
             <Sparkles className="h-12 w-12 text-cyan-600" />
@@ -174,24 +203,12 @@ export default function DashboardPage() {
             </p>
           </div>
         </Link>
-
-        <Link href="/dashboard/connect" className="group block">
-          <div className="h-full rounded-[32px] border border-slate-200 bg-white p-8 shadow-[0_18px_60px_rgba(15,23,42,0.06)] transition group-hover:-translate-y-1 group-hover:shadow-[0_26px_70px_rgba(15,23,42,0.1)]">
-            <PlugZap className="h-12 w-12 text-orange-500" />
-            <h2 className="mt-6 text-2xl font-semibold text-slate-900">Conectar nuevas cuentas</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-600">
-              Suma Instagram, Facebook, Google o TikTok para que Nexora lea mejor dónde conviene invertir energía.
-            </p>
-          </div>
-        </Link>
       </section>
 
       <section className="grid gap-5 xl:grid-cols-4">
         <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_16px_55px_rgba(15,23,42,0.06)]">
           <p className="text-sm text-slate-500">Workspace</p>
-          <p className="mt-3 text-2xl font-semibold text-slate-900">
-            {entitlements?.capabilities.workspaceLimit || 1} incluidos
-          </p>
+          <p className="mt-3 text-2xl font-semibold text-slate-900">{entitlements?.capabilities.workspaceLimit || 1} incluidos</p>
         </div>
         <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_16px_55px_rgba(15,23,42,0.06)]">
           <p className="text-sm text-slate-500">Analítica avanzada</p>
@@ -213,7 +230,15 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-5 md:grid-cols-3">
+      <section className="grid gap-5 md:grid-cols-4">
+        <Link
+          href="/dashboard/connect"
+          className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_16px_55px_rgba(15,23,42,0.06)] transition hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(15,23,42,0.1)]"
+        >
+          <PlugZap className="h-10 w-10 text-orange-500" />
+          <p className="mt-4 text-lg font-semibold text-slate-900">Conectar redes</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Suma Instagram, Facebook, Google o TikTok para leer mejor tus oportunidades.</p>
+        </Link>
         <Link
           href="/dashboard/campaigns"
           className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_16px_55px_rgba(15,23,42,0.06)] transition hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(15,23,42,0.1)]"
@@ -253,7 +278,7 @@ export default function DashboardPage() {
           <div className="rounded-2xl bg-slate-50 p-4">
             <p className="text-sm font-semibold text-slate-900">Si tienes pocas cuentas conectadas</p>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Prioriza conectar las plataformas que ya te generan interacción o demanda para que el radar lea mejor tus oportunidades.
+              Prioriza conectar las plataformas que ya te generan interacción o demanda para que el radar y el funnel lean mejor tus oportunidades.
             </p>
           </div>
           <div className="rounded-2xl bg-slate-50 p-4">
@@ -265,7 +290,7 @@ export default function DashboardPage() {
           <div className="rounded-2xl bg-slate-50 p-4">
             <p className="text-sm font-semibold text-slate-900">Si quieres vender más rápido</p>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Lanza una campaña corta con una sola promesa fuerte, prueba visible y un CTA directo hacia demo o contacto.
+              Abre el funnel comercial, identifica las oportunidades con más valor y crea seguimiento directo para cerrar antes.
             </p>
           </div>
         </div>

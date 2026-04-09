@@ -60,12 +60,13 @@ export default function DashboardLayout({
       }
     };
 
-    fetchUser();
+    void fetchUser();
   }, [router]);
 
   const menuItems = [
     { label: 'Dashboard', href: '/dashboard', icon: 'DA' },
     { label: 'Conectar redes', href: '/dashboard/connect', icon: 'CR' },
+    { label: 'Funnel', href: '/dashboard/funnel', icon: 'FU' },
     { label: 'Campañas', href: '/dashboard/campaigns', icon: 'CA' },
     { label: 'Soporte', href: '/dashboard/support', icon: 'SP' },
     { label: 'Facturación', href: '/dashboard/billing', icon: 'FA' },
@@ -77,7 +78,7 @@ export default function DashboardLayout({
   }
 
   if (user?.entitlements?.capabilities?.canUseAdvancedAnalytics) {
-    menuItems.splice(user?.entitlements?.capabilities?.canUseRadar ? 4 : 3, 0, {
+    menuItems.splice(user?.entitlements?.capabilities?.canUseRadar ? 5 : 4, 0, {
       label: 'Analítica',
       href: '/dashboard/analytics',
       icon: 'AN',
