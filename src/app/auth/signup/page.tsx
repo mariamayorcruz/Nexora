@@ -25,12 +25,12 @@ export default function Signup() {
     setError('');
 
     if (formData.password !== formData.confirmPassword) {
-      setError('Las contrasenas no coinciden.');
+      setError('Las contraseñas no coinciden.');
       return;
     }
 
     if (!formData.terms) {
-      setError('Debes aceptar los terminos y condiciones.');
+      setError('Debes aceptar los términos y condiciones.');
       return;
     }
 
@@ -58,7 +58,7 @@ export default function Signup() {
       router.push('/dashboard');
     } catch (requestError) {
       console.error('Signup request error:', requestError);
-      setError('Error de conexion. Intenta de nuevo.');
+      setError('Error de conexión. Intenta de nuevo.');
     } finally {
       setLoading(false);
     }
@@ -70,7 +70,7 @@ export default function Signup() {
       <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 pb-10 pt-28 sm:px-6 lg:px-8">
         <div className="w-full max-w-md rounded-[28px] border border-gray-200 bg-white p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
           <h2 className="mb-2 text-center text-3xl font-bold text-gray-900">Crea tu cuenta</h2>
-          <p className="mb-8 text-center text-gray-600">Empieza a gestionar crecimiento, creatividad y campanas desde un solo lugar.</p>
+          <p className="mb-8 text-center text-gray-600">Empieza a gestionar crecimiento, creatividad y campañas desde un solo lugar.</p>
 
           {error && (
             <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -107,7 +107,7 @@ export default function Signup() {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">Contrasena</label>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Contraseña</label>
               <input
                 type="password"
                 value={formData.password}
@@ -120,7 +120,7 @@ export default function Signup() {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">Confirmar contrasena</label>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Confirmar contraseña</label>
               <input
                 type="password"
                 value={formData.confirmPassword}
@@ -128,7 +128,7 @@ export default function Signup() {
                 required
                 autoComplete="new-password"
                 className={inputClassName}
-                placeholder="Repite tu contrasena"
+                placeholder="Repite tu contraseña"
               />
             </div>
 
@@ -140,8 +140,8 @@ export default function Signup() {
                 className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
               />
               <span className="text-sm leading-6 text-gray-600">
-                Acepto los <Link href="#" className="font-medium text-primary hover:underline">terminos de servicio</Link> y la{' '}
-                <Link href="#" className="font-medium text-primary hover:underline">politica de privacidad</Link>.
+                Acepto los <Link href="#" className="font-medium text-primary hover:underline">términos de servicio</Link> y la{' '}
+                <Link href="#" className="font-medium text-primary hover:underline">política de privacidad</Link>.
               </span>
             </label>
 
@@ -151,9 +151,9 @@ export default function Signup() {
           </form>
 
           <p className="mt-6 text-center text-gray-600">
-            Ya tienes cuenta?{' '}
+            ¿Ya tienes cuenta?{' '}
             <Link href="/auth/login" className="font-semibold text-primary hover:underline">
-              Inicia sesion
+              Inicia sesión
             </Link>
           </p>
         </div>

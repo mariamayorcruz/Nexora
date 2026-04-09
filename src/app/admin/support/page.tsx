@@ -72,7 +72,7 @@ export default function AdminSupportPage() {
         <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Post-sale & support center</p>
         <h1 className="mt-2 text-3xl font-bold text-gray-900">Servicio post-venta, soporte IA y seguimiento del cliente</h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-gray-600">
-          Este panel organiza lo que pasa despues de vender: onboarding, post-venta, ayuda tecnica y seguimiento para retencion.
+          Este panel organiza lo que pasa después de vender: onboarding, postventa, ayuda técnica y seguimiento para retención.
         </p>
       </div>
 

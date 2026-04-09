@@ -63,9 +63,9 @@ export default function AdminEmailsPage() {
     <div className="space-y-8">
       <div>
         <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Lifecycle email center</p>
-        <h1 className="mt-2 text-3xl font-bold text-gray-900">Base de emails transaccionales y de retencion</h1>
+        <h1 className="mt-2 text-3xl font-bold text-gray-900">Base de emails transaccionales y de retención</h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-gray-600">
-          Aqui puedes ver si la infraestructura de envio esta lista y que correos deberian existir para mover activacion, cobro y retencion.
+          Aquí puedes ver si la infraestructura de envío está lista y qué correos deberían existir para mover activación, cobro y retención.
         </p>
       </div>
 
@@ -82,7 +82,7 @@ export default function AdminEmailsPage() {
         </div>
 
         <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-          <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Estado tecnico</p>
+          <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Estado técnico</p>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
             {readinessItems.map((item) => (
               <div key={item.label} className="rounded-2xl bg-gray-50 p-5 text-center">

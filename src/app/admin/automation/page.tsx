@@ -56,7 +56,7 @@ export default function AdminAutomationPage() {
         <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Automation center</p>
         <h1 className="mt-2 text-3xl font-bold text-gray-900">Automatizaciones inteligentes para operar mejor</h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-gray-600">
-          Esta capa no solo reporta. Tambien traduce senales de campanas, suscripciones y pagos en acciones que se pueden automatizar.
+          Esta capa no solo reporta. También traduce señales de campañas, suscripciones y pagos en acciones que se pueden automatizar.
         </p>
       </div>
 
@@ -118,7 +118,7 @@ export default function AdminAutomationPage() {
             <p className="mt-4 text-sm leading-6 text-gray-600">{play.summary}</p>
             <div className="mt-5 space-y-3 text-sm text-gray-600">
               <p><span className="font-semibold text-gray-900">Trigger:</span> {play.trigger}</p>
-              <p><span className="font-semibold text-gray-900">Accion:</span> {play.action}</p>
+                <p><span className="font-semibold text-gray-900">Acción:</span> {play.action}</p>
               <p><span className="font-semibold text-gray-900">Cadencia:</span> {play.cadence}</p>
             </div>
           </article>

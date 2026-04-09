@@ -45,7 +45,7 @@ export default function Login() {
       router.push('/dashboard');
     } catch (requestError) {
       console.error('Login request error:', requestError);
-      setError('Error de conexion. Intenta de nuevo.');
+        setError('Error de conexión. Intenta de nuevo.');
     } finally {
       setLoading(false);
     }
@@ -54,7 +54,7 @@ export default function Login() {
   const handleSocialClick = (provider: 'Google' | 'GitHub') => {
     setError('');
     setSocialMessage(
-      `El acceso con ${provider} todavia no esta configurado en Nexora. Por ahora entra con email y contrasena para no frenar tu acceso.`
+        `El acceso con ${provider} todavía no está configurado en Nexora. Por ahora entra con email y contraseña para no frenar tu acceso.`
     );
   };
 
@@ -63,7 +63,7 @@ export default function Login() {
       <Navbar />
       <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 pb-10 pt-28 sm:px-6 lg:px-8">
         <div className="w-full max-w-md rounded-[28px] border border-gray-200 bg-white p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
-          <h2 className="mb-8 text-center text-3xl font-bold text-gray-900">Inicia Sesion</h2>
+          <h2 className="mb-8 text-center text-3xl font-bold text-gray-900">Inicia sesión</h2>
 
           {error && (
             <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -93,7 +93,7 @@ export default function Login() {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">Contrasena</label>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Contraseña</label>
               <input
                 type="password"
                 value={formData.password}
@@ -101,17 +101,17 @@ export default function Login() {
                 required
                 autoComplete="current-password"
                 className={inputClassName}
-                placeholder="Escribe tu contrasena"
+                placeholder="Escribe tu contraseña"
               />
             </div>
 
             <button type="submit" disabled={loading} className="w-full btn-primary disabled:opacity-50">
-              {loading ? 'Entrando...' : 'Inicia Sesion'}
+              {loading ? 'Entrando...' : 'Inicia sesión'}
             </button>
           </form>
 
           <p className="mt-6 text-center text-gray-600">
-            No tienes cuenta?{' '}
+            ¿No tienes cuenta?{' '}
             <Link href="/auth/signup" className="font-semibold text-primary hover:underline">
               Registrate aqui
             </Link>

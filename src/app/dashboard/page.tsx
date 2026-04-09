@@ -99,8 +99,8 @@ export default function DashboardPage() {
               Bienvenida, {user?.name || user?.email}. Vamos a convertir creatividad en crecimiento real.
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-              Nexora concentra tus cuentas, campanas y una lectura estrategica del mercado para que puedas decidir
-              mas rapido y vender mejor.
+              Nexora concentra tus cuentas, campañas y una lectura estratégica del mercado para que puedas decidir
+              más rápido y vender mejor.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <span className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm">
@@ -115,15 +115,15 @@ export default function DashboardPage() {
           </div>
 
           <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
-            <p className="text-sm text-slate-300">Siguiente mejor accion</p>
+            <p className="text-sm text-slate-300">Siguiente mejor acción</p>
             <p className="mt-3 text-2xl font-semibold text-white">
               {entitlements?.capabilities?.canUseRadar
-                ? 'Activar el radar creativo y bajar una campana nueva.'
+                ? 'Activar el radar creativo y bajar una campaña nueva.'
                 : 'Conectar tu primera cuenta y desbloquear el siguiente nivel del panel.'}
             </p>
             <p className="mt-4 text-sm leading-6 text-slate-300">
               {entitlements?.capabilities?.canUseRadar
-                ? 'El radar traduce cuentas, rendimiento y contexto comercial en hooks, angulos y rutas de ejecucion para que no dependas de intuiciones aisladas.'
+                ? 'El radar traduce cuentas, rendimiento y contexto comercial en hooks, ángulos y rutas de ejecución para que no dependas de intuiciones aisladas.'
                 : entitlements?.capabilities?.upgradeCta}
             </p>
             <Link
@@ -145,7 +145,7 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-gray-500">Campanas activas</p>
+          <p className="text-sm text-gray-500">Campañas activas</p>
           <p className="mt-3 text-4xl font-semibold text-gray-900">{activeCampaigns.length}</p>
           <p className="mt-2 text-xs uppercase tracking-[0.22em] text-gray-400">
             de {entitlements?.usage.activeCampaignsLimit || 3} disponibles
@@ -195,7 +195,7 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-gray-500">Analitica avanzada</p>
+          <p className="text-sm text-gray-500">Analítica avanzada</p>
           <p className="mt-3 text-2xl font-semibold text-gray-900">
             {entitlements?.capabilities.canUseAdvancedAnalytics ? 'Activa' : 'Bloqueada'}
           </p>
@@ -217,17 +217,17 @@ export default function DashboardPage() {
       <section className="grid gap-5 md:grid-cols-3">
         <Link href="/dashboard/campaigns" className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
           <BarChart3 className="h-10 w-10 text-cyan-600" />
-          <p className="mt-4 text-lg font-semibold text-gray-900">Campanas</p>
-          <p className="mt-2 text-sm leading-6 text-gray-600">Revisa ejecucion, presupuesto y resultados desde un solo lugar.</p>
+          <p className="mt-4 text-lg font-semibold text-gray-900">Campañas</p>
+          <p className="mt-2 text-sm leading-6 text-gray-600">Revisa ejecución, presupuesto y resultados desde un solo lugar.</p>
         </Link>
         <Link href="/dashboard/billing" className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
           <CreditCard className="h-10 w-10 text-gray-800" />
-          <p className="mt-4 text-lg font-semibold text-gray-900">Facturacion</p>
+          <p className="mt-4 text-lg font-semibold text-gray-900">Facturación</p>
           <p className="mt-2 text-sm leading-6 text-gray-600">Mantiene control sobre plan, pagos y expansion de la operacion.</p>
         </Link>
         <Link href="/dashboard/settings" className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
           <Settings2 className="h-10 w-10 text-gray-800" />
-          <p className="mt-4 text-lg font-semibold text-gray-900">Configuracion</p>
+          <p className="mt-4 text-lg font-semibold text-gray-900">Configuración</p>
           <p className="mt-2 text-sm leading-6 text-gray-600">Ajusta integraciones, preferencias y estructura de la cuenta.</p>
         </Link>
       </section>
@@ -236,7 +236,7 @@ export default function DashboardPage() {
         <div className="flex items-center gap-3">
           <Lightbulb className="h-8 w-8 text-amber-500" />
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">Lectura rapida del sistema</h2>
+            <h2 className="text-xl font-semibold text-gray-900">Lectura rápida del sistema</h2>
             <p className="text-sm text-gray-500">Una vista util para saber que empujar primero.</p>
           </div>
         </div>
@@ -245,13 +245,13 @@ export default function DashboardPage() {
           <div className="rounded-2xl bg-gray-50 p-4">
             <p className="text-sm font-semibold text-gray-900">Si tienes pocas cuentas conectadas</p>
             <p className="mt-2 text-sm leading-6 text-gray-600">
-              Prioriza conectar las plataformas que ya te generan interaccion o demanda para que el radar lea mejor tus oportunidades.
+              Prioriza conectar las plataformas que ya te generan interacción o demanda para que el radar lea mejor tus oportunidades.
             </p>
           </div>
           <div className="rounded-2xl bg-gray-50 p-4">
-            <p className="text-sm font-semibold text-gray-900">Si el ROI todavia es bajo</p>
+            <p className="text-sm font-semibold text-gray-900">Si el ROI todavía es bajo</p>
             <p className="mt-2 text-sm leading-6 text-gray-600">
-              Ajusta el mensaje antes que aumentar presupuesto. Nexora ya te sugiere hooks y angulos para eso en el radar.
+              Ajusta el mensaje antes que aumentar presupuesto. Nexora ya te sugiere hooks y ángulos para eso en el radar.
             </p>
           </div>
           <div className="rounded-2xl bg-gray-50 p-4">

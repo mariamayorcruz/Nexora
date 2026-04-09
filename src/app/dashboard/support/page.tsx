@@ -80,9 +80,9 @@ export default function SupportPage() {
     <div className="space-y-8">
       <section className="rounded-[30px] border border-gray-200 bg-white p-8 shadow-sm">
         <p className="text-xs uppercase tracking-[0.28em] text-gray-400">Post-venta y soporte</p>
-        <h1 className="mt-3 text-3xl font-semibold text-gray-900">Soporte tecnico con IA y seguimiento despues de la compra.</h1>
+        <h1 className="mt-3 text-3xl font-semibold text-gray-900">Soporte técnico con IA y seguimiento después de la compra.</h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-gray-600">
-          Este centro acompaña al cliente despues de vender: onboarding, dudas tecnicas, friccion de campañas y escalado a soporte humano cuando haga falta.
+          Este centro acompaña al cliente después de vender: onboarding, dudas técnicas, fricción de campañas y escalado a soporte humano cuando haga falta.
         </p>
 
         <div className="mt-6 grid gap-4 md:grid-cols-3">
@@ -138,7 +138,7 @@ export default function SupportPage() {
             </div>
           ) : (
             <div className="mt-5 rounded-2xl bg-gray-50 p-5 text-sm leading-6 text-gray-600">
-              Aun no hay consulta. Cuando escribas una duda, aqui apareceran diagnostico y pasos recomendados.
+              Aún no hay consulta. Cuando escribas una duda, aquí aparecerán diagnóstico y pasos recomendados.
             </div>
           )}
 

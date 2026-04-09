@@ -65,10 +65,10 @@ export default function DashboardLayout({
   const menuItems = [
     { label: 'Dashboard', href: '/dashboard', icon: 'DA' },
     { label: 'Conectar redes', href: '/dashboard/connect', icon: 'CR' },
-    { label: 'Campanas', href: '/dashboard/campaigns', icon: 'CA' },
+    { label: 'Campañas', href: '/dashboard/campaigns', icon: 'CA' },
     { label: 'Soporte', href: '/dashboard/support', icon: 'SP' },
-    { label: 'Facturacion', href: '/dashboard/billing', icon: 'FA' },
-    { label: 'Configuracion', href: '/dashboard/settings', icon: 'CO' },
+    { label: 'Facturación', href: '/dashboard/billing', icon: 'FA' },
+    { label: 'Configuración', href: '/dashboard/settings', icon: 'CO' },
   ];
 
   if (user?.entitlements?.capabilities?.canUseRadar) {
@@ -77,7 +77,7 @@ export default function DashboardLayout({
 
   if (user?.entitlements?.capabilities?.canUseAdvancedAnalytics) {
     menuItems.splice(user?.entitlements?.capabilities?.canUseRadar ? 4 : 3, 0, {
-      label: 'Analitica',
+      label: 'Analítica',
       href: '/dashboard/analytics',
       icon: 'AN',
     });
@@ -165,7 +165,7 @@ export default function DashboardLayout({
             onClick={handleLogout}
             className="mt-4 w-full rounded-2xl px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
           >
-            Cerrar sesion
+            Cerrar sesión
           </button>
         </div>
       </aside>

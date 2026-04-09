@@ -53,13 +53,13 @@ export default function AdminLayout({
     { label: 'Dashboard', href: '/admin', icon: 'DA' },
     { label: 'Usuarios', href: '/admin/users', icon: 'US' },
     { label: 'Suscripciones', href: '/admin/subscriptions', icon: 'SU' },
-    { label: 'Campanas', href: '/admin/campaigns', icon: 'CA' },
-    { label: 'Analiticas', href: '/admin/analytics', icon: 'AN' },
+    { label: 'Campañas', href: '/admin/campaigns', icon: 'CA' },
+    { label: 'Analíticas', href: '/admin/analytics', icon: 'AN' },
     { label: 'Automatizacion', href: '/admin/automation', icon: 'AU' },
     { label: 'Soporte', href: '/admin/support', icon: 'SO' },
     { label: 'Emails', href: '/admin/emails', icon: 'EM' },
     { label: 'Pagos', href: '/admin/payments', icon: 'PA' },
-    { label: 'Configuracion', href: '/admin/settings', icon: 'CO' },
+    { label: 'Configuración', href: '/admin/settings', icon: 'CO' },
   ];
 
   const handleLogout = () => {
@@ -129,7 +129,7 @@ export default function AdminLayout({
             onClick={handleLogout}
             className="mt-4 w-full rounded-2xl px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
           >
-            Cerrar sesion
+            Cerrar sesión
           </button>
         </div>
       </aside>
