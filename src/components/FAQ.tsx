@@ -1,64 +1,70 @@
 'use client';
 
+import { ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 
-export default function FAQ() {
-  const [open, setOpen] = useState<number | null>(0);
+const faqs = [
+  {
+    question: '¿Qué cambió en esta nueva versión de la landing?',
+    answer:
+      'La propuesta visual, el copy y la jerarquía completa. La página ahora vende mejor, se siente más premium y explica el producto con mucha más claridad.',
+  },
+  {
+    question: '¿El demo ya puede hablar sin tener un video grabado?',
+    answer:
+      'Sí. El bloque de demo usa la voz del navegador para narrar un recorrido comercial del producto. Cuando tengas un video real, puedes conectarlo con una variable pública sin rehacer el frontend.',
+  },
+  {
+    question: '¿La página está preparada para Vercel?',
+    answer:
+      'Sí. El proyecto sigue siendo Next.js y la mejora está hecha para convivir bien con el flujo habitual de Vercel, VS Code y GitHub.',
+  },
+  {
+    question: '¿Qué partes del producto están representadas en la landing?',
+    answer:
+      'Autenticación, dashboard, campañas, analítica, suscripciones, cobros y panel admin. Ajusté el discurso para alinearlo mejor con lo que realmente existe hoy en el repo.',
+  },
+  {
+    question: '¿Se puede seguir evolucionando hacia una experiencia tipo Saleads?',
+    answer:
+      'Sí. Esta versión deja una base mucho más fuerte para luego sumar branding, casos de uso, logos, testimonios reales, video comercial definitivo y assets de producto.',
+  },
+];
 
-  const faqs = [
-    {
-      question: '¿Cuál es la diferencia entre los planes?',
-      answer: 'El plan Starter es ideal para pequeños negocios con pocas cuentas de publicidad. Professional es perfecto para agencias con múltiples clientes. Enterprise te da acceso ilimitado con soporte prioritario y automatizaciones avanzadas.',
-    },
-    {
-      question: '¿Puedo cambiar de plan en cualquier momento?',
-      answer: 'Sí, puedes actualizar o cambiar de plan en cualquier momento. Los cambios se aplicarán en tu próximo ciclo de facturación y los ajustes se prorratearán según corresponda.',
-    },
-    {
-      question: '¿Es segura la conexión de mis cuentas publicitarias?',
-      answer: 'Completamente segura. Usamos OAuth 2.0 y encriptación de extremo a extremo. Nunca almacenamos tus contraseñas; solo los tokens de acceso cifrados que necesitamos para sincronizar tus datos.',
-    },
-    {
-      question: '¿Hay período de prueba?',
-      answer: 'Sí, ofrecemos 7 días de prueba gratuita con acceso completo a todas las características. No necesitas tarjeta de crédito para comenzar.',
-    },
-    {
-      question: '¿Puedo integrar más de una cuenta por plataforma?',
-      answer: 'Depende de tu plan. Starter permite 3 cuentas totales, Professional 10, y Enterprise es ilimitado. Puedes tener múltiples cuentas del mismo o diferentes provedores.',
-    },
-    {
-      question: '¿Qué soporte ofrecen?',
-      answer: 'Starter incluye soporte por email. Professional incluye soporte prioritario por email y chat. Enterprise incluye soporte VIP 24/7 con un account manager dedicado.',
-    },
-  ];
+export default function FAQ() {
+  const [openIndex, setOpenIndex] = useState<number>(0);
 
   return (
-    <section id="faq" className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
-      <div className="max-w-3xl mx-auto">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold mb-4">Preguntas Frecuentes</h2>
-          <p className="text-xl text-gray-600">Respuestas a las preguntas más comunes</p>
+    <section id="faq" className="bg-slate-950 px-4 py-24 text-white sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-4xl">
+        <div className="text-center">
+          <span className="section-tag section-tag-dark">FAQ</span>
+          <h2 className="mt-6 text-4xl font-semibold md:text-5xl">Respuestas claras para cerrar objeciones rápido.</h2>
+          <p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-slate-300">
+            Una landing que convierte necesita resolver dudas antes de que el usuario tenga que buscarlas.
+          </p>
         </div>
 
-        <div className="space-y-4">
-          {faqs.map((faq, idx) => (
-            <div key={idx} className="border border-gray-200 rounded-lg overflow-hidden hover:border-primary transition">
-              <button
-                onClick={() => setOpen(open === idx ? null : idx)}
-                className="w-full px-6 py-4 flex justify-between items-center bg-white hover:bg-gray-50 transition"
-              >
-                <span className="font-semibold text-left">{faq.question}</span>
-                <span className={`text-2xl text-primary transition-transform ${open === idx ? 'rotate-180' : ''}`}>
-                  ▼
-                </span>
-              </button>
-              {open === idx && (
-                <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
-                  <p className="text-gray-600">{faq.answer}</p>
-                </div>
-              )}
-            </div>
-          ))}
+        <div className="mt-12 space-y-4">
+          {faqs.map((faq, index) => {
+            const isOpen = openIndex === index;
+
+            return (
+              <div key={faq.question} className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-white/[0.04]">
+                <button
+                  type="button"
+                  onClick={() => setOpenIndex(isOpen ? -1 : index)}
+                  className="flex w-full items-center justify-between gap-6 px-6 py-5 text-left"
+                >
+                  <span className="text-lg font-semibold text-white">{faq.question}</span>
+                  <ChevronDown className={`h-5 w-5 shrink-0 text-slate-400 transition ${isOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {isOpen && (
+                  <div className="border-t border-white/10 px-6 py-5 text-sm leading-7 text-slate-300">{faq.answer}</div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>

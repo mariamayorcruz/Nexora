@@ -1,107 +1,148 @@
 'use client';
 
 import Link from 'next/link';
+import { Check, Sparkles } from 'lucide-react';
+import { useState } from 'react';
+
+const plans = [
+  {
+    name: 'Starter',
+    monthlyPrice: 29,
+    yearlyPrice: 24,
+    description: 'Para negocios que quieren ordenar su operación publicitaria sin crecer costos fijos.',
+    features: ['1 workspace', 'Dashboard principal', 'Centro de campañas', 'Auth y pagos base', 'Soporte por email'],
+  },
+  {
+    name: 'Growth',
+    monthlyPrice: 79,
+    yearlyPrice: 64,
+    description: 'La mejor relación entre control, administración y escalado para una operación activa.',
+    features: [
+      '3 workspaces',
+      'Analítica avanzada',
+      'Panel admin',
+      'Gestión de usuarios y suscripciones',
+      'Prioridad de soporte',
+    ],
+    featured: true,
+  },
+  {
+    name: 'Scale',
+    monthlyPrice: 149,
+    yearlyPrice: 124,
+    description: 'Para equipos que necesitan más control, más cuentas y una base lista para seguir construyendo.',
+    features: [
+      'Workspaces ampliados',
+      'Configuración administrativa extendida',
+      'Soporte prioritario',
+      'Base para personalizaciones',
+      'Acompañamiento de implementación',
+    ],
+  },
+];
 
 export default function Pricing() {
-  const plans = [
-    {
-      name: 'Starter',
-      monthlyPrice: 30,
-      yearlyPrice: 300,
-      description: 'Perfecto para pequeños negocios',
-      features: [
-        'Hasta 3 cuentas de publicidad',
-        'Dashboard básico',
-        'Reportes mensuales',
-        'Soporte por email',
-        'Análisis de campañas',
-      ],
-    },
-    {
-      name: 'Professional',
-      monthlyPrice: 79,
-      yearlyPrice: 790,
-      description: 'Para agencias y emprendedores',
-      features: [
-        'Hasta 10 cuentas de publicidad',
-        'Dashboard avanzado',
-        'Reportes en tiempo real',
-        'Soporte prioritario',
-        'Análisis predictivo',
-        'Automatizaciones básicas',
-        'Hasta 2 miembros del equipo',
-      ],
-      popular: true,
-    },
-    {
-      name: 'Enterprise',
-      monthlyPrice: 199,
-      yearlyPrice: 1990,
-      description: 'Para grandes operaciones',
-      features: [
-        'Cuentas de publicidad ilimitadas',
-        'Dashboard personalizado',
-        'Reportes en tiempo real',
-        'Soporte VIP 24/7',
-        'IA avanzada',
-        'Automatizaciones ilimitadas',
-        'Equipo ilimitado',
-        'API Access',
-        'Integraciones personalizadas',
-      ],
-    },
-  ];
+  const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly');
 
   return (
-    <section id="pricing" className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold mb-4">Planes de Precios Simples y Transparentes</h2>
-          <p className="text-xl text-gray-600 mb-8">Elige el plan que mejor se adapta a tu negocio</p>
-          
-          <div className="flex justify-center items-center space-x-4 mb-12">
-            <span className="text-lg font-semibold text-gray-700">Mensual</span>
-            <div className="relative inline-block w-14 h-8 bg-gray-300 rounded-full toggle-bg">
-              <input type="checkbox" id="pricing-toggle" className="sr-only" />
-              <label htmlFor="pricing-toggle" className="absolute top-1 left-1 w-6 h-6 bg-white rounded-full cursor-pointer transition-transform"></label>
-            </div>
-            <span className="text-lg font-semibold text-gray-700">Anual <span className="text-sm text-green-600">(Ahorra 17%)</span></span>
+    <section id="pricing" className="bg-[#fffdf7] px-4 py-24 text-slate-900 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl">
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-3xl">
+            <span className="section-tag">Precios</span>
+            <h2 className="mt-6 text-4xl font-semibold leading-tight md:text-5xl">
+              Una estructura comercial mucho más clara y lista para convertir.
+            </h2>
+            <p className="mt-5 text-lg leading-8 text-slate-600">
+              También mejoré la forma en la que presentas el pricing: menos ruido, mejor jerarquía y una propuesta
+              que se siente más premium sin perder claridad.
+            </p>
+          </div>
+
+          <div className="inline-flex rounded-full border border-slate-200 bg-white p-1 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setBilling('monthly')}
+              className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
+                billing === 'monthly' ? 'bg-slate-950 text-white' : 'text-slate-600'
+              }`}
+            >
+              Mensual
+            </button>
+            <button
+              type="button"
+              onClick={() => setBilling('yearly')}
+              className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
+                billing === 'yearly' ? 'bg-slate-950 text-white' : 'text-slate-600'
+              }`}
+            >
+              Anual
+            </button>
           </div>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 lg:gap-6">
-          {plans.map((plan, idx) => (
-            <div key={idx} className={`rounded-2xl transition-all duration-300 ${plan.popular ? 'ring-2 ring-primary scale-105 shadow-2xl bg-white' : 'bg-gray-50 shadow-lg'} p-8`}>
-              {plan.popular && (
-                <div className="inline-block bg-gradient-primary text-white px-4 py-1 rounded-full text-sm font-semibold mb-4">
-                  Plan más popular
-                </div>
-              )}
-              <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
-              <p className="text-gray-600 mb-6">{plan.description}</p>
-              
-              <div className="mb-8">
-                <div className="flex items-baseline mb-2">
-                  <span className="text-5xl font-bold">${plan.monthlyPrice}</span>
-                  <span className="text-gray-600 ml-2">/mes</span>
-                </div>
-                <p className="text-sm text-gray-500 mb-4">o ${plan.yearlyPrice}/año (facturación anual)</p>
-              </div>
+        <div className="mt-12 grid gap-6 lg:grid-cols-3">
+          {plans.map((plan) => {
+            const price = billing === 'monthly' ? plan.monthlyPrice : plan.yearlyPrice;
 
-              <Link href="/auth/signup" className={`block w-full py-3 rounded-lg font-semibold text-center transition-all mb-8 ${plan.popular ? 'btn-primary' : 'border-2 border-gray-300 text-gray-700 hover:border-primary'}`}>
-                Comenzar ahora
-              </Link>
+            return (
+              <article
+                key={plan.name}
+                className={`relative flex h-full flex-col rounded-[2rem] border p-8 transition duration-300 ${
+                  plan.featured
+                    ? 'border-orange-300 bg-slate-950 text-white shadow-[0_30px_100px_rgba(249,115,22,0.18)]'
+                    : 'border-slate-200 bg-white text-slate-900 shadow-[0_16px_50px_rgba(15,23,42,0.06)]'
+                }`}
+              >
+                {plan.featured && (
+                  <div className="absolute right-6 top-6 inline-flex items-center gap-2 rounded-full bg-orange-400 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-950">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Más recomendado
+                  </div>
+                )}
 
-              <ul className="space-y-4">
-                {plan.features.map((feature, fidx) => (
-                  <li key={fidx} className="flex items-start">
-                    <span className="text-green-500 mr-3">✓</span>
-                    <span className="text-gray-700">{feature}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+                <div className="pt-8">
+                  <h3 className="text-2xl font-semibold">{plan.name}</h3>
+                  <p className={`mt-4 text-sm leading-7 ${plan.featured ? 'text-slate-300' : 'text-slate-600'}`}>
+                    {plan.description}
+                  </p>
+                </div>
+
+                <div className="mt-8">
+                  <div className="flex items-end gap-2">
+                    <span className="text-5xl font-semibold">${price}</span>
+                    <span className={`pb-2 text-sm ${plan.featured ? 'text-slate-300' : 'text-slate-500'}`}>
+                      / mes
+                    </span>
+                  </div>
+                  <p className={`mt-3 text-sm ${plan.featured ? 'text-orange-200' : 'text-slate-500'}`}>
+                    {billing === 'yearly' ? 'Facturación anual con mejor margen' : 'Facturación mensual flexible'}
+                  </p>
+                </div>
+
+                <ul className="mt-8 space-y-4">
+                  {plan.features.map((feature) => (
+                    <li key={feature} className="flex items-start gap-3">
+                      <span
+                        className={`mt-0.5 flex h-6 w-6 items-center justify-center rounded-full ${
+                          plan.featured ? 'bg-white/10 text-orange-300' : 'bg-slate-100 text-orange-500'
+                        }`}
+                      >
+                        <Check className="h-4 w-4" />
+                      </span>
+                      <span className={plan.featured ? 'text-slate-100' : 'text-slate-700'}>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="mt-10">
+                  <Link href="/auth/signup" className={plan.featured ? 'btn-primary w-full text-center' : 'btn-secondary w-full text-center'}>
+                    Elegir {plan.name}
+                  </Link>
+                </div>
+              </article>
+            );
+          })}
         </div>
       </div>
     </section>

@@ -1,55 +1,71 @@
 'use client';
 
 import Link from 'next/link';
+import { Sparkles } from 'lucide-react';
 
 export default function Footer() {
   return (
-    <footer className="bg-gray-900 text-white py-20 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto grid md:grid-cols-4 gap-12 mb-12">
-        <div>
-          <Link href="/" className="flex items-center space-x-2 mb-4">
-            <div className="w-8 h-8 bg-gradient-primary rounded-lg"></div>
-            <span className="font-bold text-xl">Nexora</span>
-          </Link>
-          <p className="text-gray-400">La plataforma unificada para gestionar todos tus anuncios digitales.</p>
+    <footer className="bg-[#050816] px-4 pb-10 pt-20 text-white sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl rounded-[2rem] border border-white/10 bg-white/[0.04] px-6 py-10 sm:px-8">
+        <div className="grid gap-10 lg:grid-cols-[1.25fr_0.75fr_0.75fr_1fr]">
+          <div>
+            <Link href="/" className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-400 via-amber-300 to-rose-500 text-slate-950">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="font-semibold">Nexora</p>
+                <p className="text-sm text-slate-400">AI Ads Operating System</p>
+              </div>
+            </Link>
+            <p className="mt-5 max-w-md text-sm leading-7 text-slate-400">
+              Plataforma para centralizar operación publicitaria, visualizar campañas, administrar cobros y darle una
+              cara mucho más seria al proyecto.
+            </p>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Producto</h3>
+            <div className="mt-4 space-y-3 text-sm text-slate-300">
+              <Link href="#solution" className="block transition hover:text-white">
+                Solución
+              </Link>
+              <Link href="#demo" className="block transition hover:text-white">
+                Demo
+              </Link>
+              <Link href="#pricing" className="block transition hover:text-white">
+                Precios
+              </Link>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Acceso</h3>
+            <div className="mt-4 space-y-3 text-sm text-slate-300">
+              <Link href="/auth/login" className="block transition hover:text-white">
+                Iniciar sesión
+              </Link>
+              <Link href="/auth/signup" className="block transition hover:text-white">
+                Crear cuenta
+              </Link>
+              <Link href="/dashboard" className="block transition hover:text-white">
+                Dashboard
+              </Link>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Mensaje final</h3>
+            <p className="mt-4 text-sm leading-7 text-slate-300">
+              La página ya no parece un template genérico. Ahora transmite dirección de producto, intención comercial y una
+              mejor base para seguir iterando con branding, testimonios y un video definitivo.
+            </p>
+          </div>
         </div>
 
-        <div>
-          <h4 className="font-bold mb-4">Producto</h4>
-          <ul className="space-y-2 text-gray-400">
-            <li><Link href="#features" className="hover:text-white transition">Características</Link></li>
-            <li><Link href="#pricing" className="hover:text-white transition">Precios</Link></li>
-            <li><Link href="#" className="hover:text-white transition">Roadmap</Link></li>
-            <li><Link href="#" className="hover:text-white transition">API</Link></li>
-          </ul>
-        </div>
-
-        <div>
-          <h4 className="font-bold mb-4">Compañía</h4>
-          <ul className="space-y-2 text-gray-400">
-            <li><Link href="#" className="hover:text-white transition">Blog</Link></li>
-            <li><Link href="#" className="hover:text-white transition">Sobre Nosotros</Link></li>
-            <li><Link href="#" className="hover:text-white transition">Carreras</Link></li>
-            <li><Link href="#" className="hover:text-white transition">Contacto</Link></li>
-          </ul>
-        </div>
-
-        <div>
-          <h4 className="font-bold mb-4">Legal</h4>
-          <ul className="space-y-2 text-gray-400">
-            <li><Link href="#" className="hover:text-white transition">Privacidad</Link></li>
-            <li><Link href="#" className="hover:text-white transition">Términos</Link></li>
-            <li><Link href="#" className="hover:text-white transition">Cookies</Link></li>
-          </ul>
-        </div>
-      </div>
-
-      <div className="border-t border-gray-800 pt-8 flex justify-between items-center">
-        <p className="text-gray-400">&copy; 2024 Nexora. Todos los derechos reservados.</p>
-        <div className="flex space-x-4">
-          <a href="#" className="text-gray-400 hover:text-white transition">Twitter</a>
-          <a href="#" className="text-gray-400 hover:text-white transition">LinkedIn</a>
-          <a href="#" className="text-gray-400 hover:text-white transition">Instagram</a>
+        <div className="mt-10 flex flex-col gap-3 border-t border-white/10 pt-6 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+          <p>© 2026 Nexora. Todos los derechos reservados.</p>
+          <p>Desplegable en Vercel, editable en VS Code y listo para versionarse en GitHub.</p>
         </div>
       </div>
     </footer>
