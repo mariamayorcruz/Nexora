@@ -1,6 +1,26 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+
+interface AdminAlert {
+  id: string;
+  severity: 'high' | 'medium' | 'low';
+  title: string;
+  detail: string;
+  actionLabel?: string;
+  actionHref?: string;
+}
+
+interface AutomationPlay {
+  id: string;
+  title: string;
+  summary: string;
+  trigger: string;
+  action: string;
+  cadence: string;
+  priority: 'high' | 'medium' | 'low';
+}
 
 interface AdminStats {
   totalUsers: number;
@@ -9,22 +29,35 @@ interface AdminStats {
   monthlyRevenue: number;
   totalCampaigns: number;
   activeCampaigns: number;
-  recentUsers: any[];
-  recentPayments: any[];
+  recentUsers: Array<{ id: string; email: string; name?: string | null; createdAt: string }>;
+  recentPayments: Array<{ id: string; amount: number; createdAt: string; userId: string }>;
+  mrr: number;
+  healthScore: number;
+  alerts: AdminAlert[];
+  automationPlays: AutomationPlay[];
+  paymentReadiness: {
+    stripe: boolean;
+    webhookStored: boolean;
+  };
+  emailReadiness: {
+    smtpReady: boolean;
+    senderReady: boolean;
+    supportEmailReady: boolean;
+  };
 }
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState<AdminStats>({
-    totalUsers: 0,
-    activeSubscriptions: 0,
-    totalRevenue: 0,
-    monthlyRevenue: 0,
-    totalCampaigns: 0,
-    activeCampaigns: 0,
-    recentUsers: [],
-    recentPayments: [],
-  });
+  const [stats, setStats] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const readinessItems: Array<{ label: string; value: boolean }> = stats
+    ? [
+        { label: 'Stripe', value: stats.paymentReadiness.stripe },
+        { label: 'Webhook guardado', value: stats.paymentReadiness.webhookStored },
+        { label: 'SMTP', value: stats.emailReadiness.smtpReady },
+        { label: 'Sender email', value: stats.emailReadiness.senderReady },
+        { label: 'Support email', value: stats.emailReadiness.supportEmailReady },
+      ]
+    : [];
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -47,140 +80,158 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="text-center py-12">
-        <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="py-12 text-center">
+        <div className="inline-block h-12 w-12 animate-spin rounded-full border-b-2 border-primary" />
       </div>
     );
   }
 
+  if (!stats) {
+    return <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-700">No pudimos cargar el panel admin.</div>;
+  }
+
   return (
-    <div>
-      <h2 className="text-3xl font-bold mb-2">Dashboard Administrador</h2>
-      <p className="text-gray-600 mb-8">Vista general de tu plataforma Nexora</p>
-
-      {/* Stats Grid */}
-      <div className="grid md:grid-cols-4 gap-6 mb-12">
-        <div className="card">
-          <p className="text-gray-600 text-sm">Total Usuarios</p>
-          <p className="text-4xl font-bold text-primary">{stats.totalUsers}</p>
-          <p className="text-xs text-gray-500 mt-2">↑ 12% vs. mes anterior</p>
-        </div>
-        <div className="card">
-          <p className="text-gray-600 text-sm">Suscripciones Activas</p>
-          <p className="text-4xl font-bold text-green-600">{stats.activeSubscriptions}</p>
-          <p className="text-xs text-gray-500 mt-2">↑ 8% vs. mes anterior</p>
-        </div>
-        <div className="card">
-          <p className="text-gray-600 text-sm">Ingresos Totales</p>
-          <p className="text-4xl font-bold text-blue-600">${stats.totalRevenue.toLocaleString()}</p>
-          <p className="text-xs text-gray-500 mt-2">↑ 15% vs. mes anterior</p>
-        </div>
-        <div className="card">
-          <p className="text-gray-600 text-sm">Ingresos Mensuales</p>
-          <p className="text-4xl font-bold text-purple-600">${stats.monthlyRevenue.toLocaleString()}</p>
-          <p className="text-xs text-gray-500 mt-2">↑ 22% vs. mes anterior</p>
-        </div>
-      </div>
-
-      {/* Campaigns Stats */}
-      <div className="grid md:grid-cols-2 gap-6 mb-12">
-        <div className="card">
-          <h3 className="text-lg font-bold mb-6">Campañas</h3>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="font-medium">Total de Campañas</span>
-              <span className="text-2xl font-bold text-primary">{stats.totalCampaigns}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="font-medium">Campañas Activas</span>
-              <span className="text-2xl font-bold text-green-600">{stats.activeCampaigns}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="font-medium">Campañas Pausadas</span>
-              <span className="text-2xl font-bold text-yellow-600">{stats.totalCampaigns - stats.activeCampaigns}</span>
+    <div className="space-y-8">
+      <section className="rounded-[32px] bg-slate-950 p-8 text-white shadow-2xl shadow-slate-950/15">
+        <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
+          <div>
+            <p className="text-xs uppercase tracking-[0.32em] text-cyan-300">Admin control center</p>
+            <h1 className="mt-4 text-4xl font-semibold leading-tight">La operacion de Nexora en una sola lectura.</h1>
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
+              Aqui puedes ver salud de negocio, monetizacion, automatizaciones y lifecycle sin saltar entre modulos.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link href="/admin/automation" className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950">
+                Ver automatizacion
+              </Link>
+              <Link href="/admin/emails" className="rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white">
+                Ver email center
+              </Link>
             </div>
           </div>
-        </div>
 
-        <div className="card">
-          <h3 className="text-lg font-bold mb-6">Distribución por Plataforma</h3>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="font-medium">📷 Instagram</span>
-              <span className="text-sm text-gray-600">45%</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="font-medium">f Facebook</span>
-              <span className="text-sm text-gray-600">32%</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="font-medium">🔍 Google</span>
-              <span className="text-sm text-gray-600">18%</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="font-medium">♪ TikTok</span>
-              <span className="text-sm text-gray-600">5%</span>
-            </div>
+          <div className="rounded-[28px] border border-white/10 bg-white/5 p-6">
+            <p className="text-sm text-slate-300">Health score</p>
+            <p className="mt-3 text-5xl font-semibold text-white">{stats.healthScore}</p>
+            <p className="mt-4 text-sm text-slate-300">
+              MRR estimado: ${stats.mrr.toLocaleString()} y {stats.alerts.length} alertas activas para revisar.
+            </p>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Recent Activity */}
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="card">
-          <h3 className="text-lg font-bold mb-6">Usuarios Recientes</h3>
-          <div className="space-y-4">
-            {stats.recentUsers.slice(0, 5).map((user: any) => (
-              <div key={user.id} className="flex justify-between items-center">
-                <div>
-                  <p className="font-medium">{user.name || user.email}</p>
-                  <p className="text-sm text-gray-500">{user.email}</p>
+      <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
+        {[
+          ['Usuarios', stats.totalUsers],
+          ['Suscripciones activas', stats.activeSubscriptions],
+          ['MRR', `$${stats.mrr}`],
+          ['Revenue total', `$${stats.totalRevenue}`],
+          ['Campanas activas', stats.activeCampaigns],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+            <p className="text-sm text-gray-500">{label}</p>
+            <p className="mt-3 text-3xl font-semibold text-gray-900">{value}</p>
+          </div>
+        ))}
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Alertas</p>
+              <h2 className="mt-2 text-2xl font-semibold text-gray-900">Lo que requiere atencion</h2>
+            </div>
+            <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+              {stats.alerts.length} activas
+            </span>
+          </div>
+
+          <div className="mt-6 space-y-4">
+            {stats.alerts.map((alert) => (
+              <div key={alert.id} className="rounded-2xl border border-gray-200 p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">{alert.title}</p>
+                    <p className="mt-2 text-sm leading-6 text-gray-600">{alert.detail}</p>
+                  </div>
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-semibold uppercase ${
+                      alert.severity === 'high'
+                        ? 'bg-red-50 text-red-600'
+                        : alert.severity === 'medium'
+                          ? 'bg-amber-50 text-amber-600'
+                          : 'bg-emerald-50 text-emerald-600'
+                    }`}
+                  >
+                    {alert.severity}
+                  </span>
                 </div>
-                <span className="text-xs text-gray-400">
-                  {new Date(user.createdAt).toLocaleDateString('es-ES')}
-                </span>
+                {alert.actionHref && alert.actionLabel && (
+                  <Link href={alert.actionHref} className="mt-4 inline-flex text-sm font-semibold text-primary">
+                    {alert.actionLabel}
+                  </Link>
+                )}
               </div>
             ))}
           </div>
         </div>
 
-        <div className="card">
-          <h3 className="text-lg font-bold mb-6">Pagos Recientes</h3>
-          <div className="space-y-4">
-            {stats.recentPayments.slice(0, 5).map((payment: any) => (
-              <div key={payment.id} className="flex justify-between items-center">
-                <div>
-                  <p className="font-medium">${payment.amount}</p>
-                  <p className="text-sm text-gray-500">{payment.user?.email}</p>
-                </div>
-                <span className="text-xs text-gray-400">
-                  {new Date(payment.createdAt).toLocaleDateString('es-ES')}
+        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+          <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Readiness</p>
+          <h2 className="mt-2 text-2xl font-semibold text-gray-900">Piezas criticas de la operacion</h2>
+
+          <div className="mt-6 space-y-4">
+            {readinessItems.map((item) => (
+              <div key={item.label} className="flex items-center justify-between rounded-2xl bg-gray-50 px-4 py-4">
+                <span className="font-medium text-gray-800">{item.label}</span>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold uppercase ${
+                    item.value ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600'
+                  }`}
+                >
+                  {item.value ? 'listo' : 'pendiente'}
                 </span>
               </div>
             ))}
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Quick Actions */}
-      <div className="mt-12 grid md:grid-cols-4 gap-6">
-        <div className="card text-center hover:shadow-lg transition cursor-pointer">
-          <p className="text-3xl mb-2">👥</p>
-          <p className="font-semibold text-gray-900">Gestionar Usuarios</p>
+      <section className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Automatizacion</p>
+            <h2 className="mt-2 text-2xl font-semibold text-gray-900">Playbooks inteligentes listos para operar</h2>
+          </div>
+          <Link href="/admin/automation" className="text-sm font-semibold text-primary">
+            Abrir centro
+          </Link>
         </div>
-        <div className="card text-center hover:shadow-lg transition cursor-pointer">
-          <p className="text-3xl mb-2">💳</p>
-          <p className="font-semibold text-gray-900">Ver Suscripciones</p>
+
+        <div className="mt-6 grid gap-4 xl:grid-cols-3">
+          {stats.automationPlays.map((play) => (
+            <article key={play.id} className="rounded-2xl bg-gray-50 p-5">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-lg font-semibold text-gray-900">{play.title}</h3>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold uppercase ${
+                    play.priority === 'high'
+                      ? 'bg-red-50 text-red-600'
+                      : play.priority === 'medium'
+                        ? 'bg-amber-50 text-amber-600'
+                        : 'bg-gray-200 text-gray-600'
+                  }`}
+                >
+                  {play.priority}
+                </span>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-gray-600">{play.summary}</p>
+              <p className="mt-4 text-sm text-gray-500">Trigger: {play.trigger}</p>
+            </article>
+          ))}
         </div>
-        <div className="card text-center hover:shadow-lg transition cursor-pointer">
-          <p className="text-3xl mb-2">💰</p>
-          <p className="font-semibold text-gray-900">Configurar Pagos</p>
-        </div>
-        <div className="card text-center hover:shadow-lg transition cursor-pointer">
-          <p className="text-3xl mb-2">📊</p>
-          <p className="font-semibold text-gray-900">Ver Reportes</p>
-        </div>
-      </div>
+      </section>
     </div>
   );
 }

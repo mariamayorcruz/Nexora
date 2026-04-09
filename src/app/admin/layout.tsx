@@ -2,7 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+
+interface AdminProfile {
+  email: string;
+  name?: string | null;
+}
 
 export default function AdminLayout({
   children,
@@ -11,7 +16,7 @@ export default function AdminLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [admin, setAdmin] = useState<any>(null);
+  const [admin, setAdmin] = useState<AdminProfile | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -27,7 +32,10 @@ export default function AdminLayout({
         const response = await fetch('/api/admin/me', {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (!response.ok) throw new Error('Failed to fetch admin');
+        if (!response.ok) {
+          throw new Error('Failed to fetch admin');
+        }
+
         const data = await response.json();
         setAdmin(data.admin);
       } catch (error) {
@@ -42,14 +50,15 @@ export default function AdminLayout({
   }, [router]);
 
   const menuItems = [
-    { label: 'Dashboard', href: '/admin', icon: '📊' },
-    { label: 'Usuarios', href: '/admin/users', icon: '👥' },
-    { label: 'Suscripciones', href: '/admin/subscriptions', icon: '💳' },
-    { label: 'Campañas', href: '/admin/campaigns', icon: '🎯' },
-    { label: 'Analíticas', href: '/admin/analytics', icon: '📈' },
-    { label: 'Pagos', href: '/admin/payments', icon: '💰' },
-    { label: 'Configuración', href: '/admin/settings', icon: '⚙️' },
-    { label: 'Analytics', href: '/admin/analytics', icon: '📈' },
+    { label: 'Dashboard', href: '/admin', icon: 'DA' },
+    { label: 'Usuarios', href: '/admin/users', icon: 'US' },
+    { label: 'Suscripciones', href: '/admin/subscriptions', icon: 'SU' },
+    { label: 'Campanas', href: '/admin/campaigns', icon: 'CA' },
+    { label: 'Analiticas', href: '/admin/analytics', icon: 'AN' },
+    { label: 'Automatizacion', href: '/admin/automation', icon: 'AU' },
+    { label: 'Emails', href: '/admin/emails', icon: 'EM' },
+    { label: 'Pagos', href: '/admin/payments', icon: 'PA' },
+    { label: 'Configuracion', href: '/admin/settings', icon: 'CO' },
   ];
 
   const handleLogout = () => {
@@ -59,86 +68,87 @@ export default function AdminLayout({
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <p className="mt-4 text-gray-600">Cargando panel de administrador...</p>
+          <div className="inline-block h-12 w-12 animate-spin rounded-full border-b-2 border-b-primary" />
+          <p className="mt-4 text-gray-600">Cargando panel admin...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Sidebar */}
-      <div className={`w-64 bg-white border-r border-gray-200 fixed lg:relative h-screen overflow-y-auto transition-transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} z-40`}>
-        <div className="p-6 border-b border-gray-200">
-          <Link href="/admin" className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-gradient-primary rounded-lg"></div>
-            <span className="font-bold text-xl text-gray-900">Nexora Admin</span>
+    <div className="flex min-h-screen bg-gray-50">
+      <aside
+        className={`fixed z-40 h-screen w-72 overflow-y-auto border-r border-gray-200 bg-white transition-transform lg:relative ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
+      >
+        <div className="border-b border-gray-200 p-6">
+          <Link href="/admin" className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-950 text-sm font-semibold text-white">
+              AD
+            </div>
+            <div>
+              <p className="text-lg font-bold text-gray-900">Nexora Admin</p>
+              <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Control Center</p>
+            </div>
           </Link>
-          <p className="text-xs text-gray-500 mt-1">Panel de Administración</p>
         </div>
 
-        <nav className="p-4 space-y-2">
+        <nav className="space-y-2 p-4">
           {menuItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition ${
-                pathname === item.href
-                  ? 'bg-primary text-white'
-                  : 'text-gray-700 hover:bg-gray-100'
+              className={`flex items-center gap-3 rounded-2xl px-4 py-3 transition ${
+                pathname === item.href ? 'bg-slate-950 text-white shadow-lg shadow-slate-950/10' : 'text-gray-700 hover:bg-gray-100'
               }`}
             >
-              <span className="text-xl">{item.icon}</span>
+              <span
+                className={`flex h-9 w-9 items-center justify-center rounded-xl text-xs font-semibold ${
+                  pathname === item.href ? 'bg-white/10 text-white' : 'bg-gray-100 text-gray-500'
+                }`}
+              >
+                {item.icon}
+              </span>
               <span className="font-medium">{item.label}</span>
             </Link>
           ))}
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-white">
-          <div className="mb-4 pb-4 border-b border-gray-200">
-            <p className="text-sm text-gray-600">{admin?.email}</p>
-            <p className="text-xs text-gray-400 mt-1">Administrador</p>
+        <div className="border-t border-gray-200 p-4">
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+            <p className="text-sm font-medium text-gray-900">{admin?.name || 'Admin principal'}</p>
+            <p className="mt-1 text-sm text-gray-500">{admin?.email}</p>
+            <p className="mt-2 text-xs font-semibold uppercase tracking-[0.24em] text-primary">Acceso total</p>
           </div>
+
           <button
             onClick={handleLogout}
-            className="w-full px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition"
+            className="mt-4 w-full rounded-2xl px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
           >
-            Cerrar sesión
+            Cerrar sesion
           </button>
         </div>
-      </div>
+      </aside>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        {/* Top Bar */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center lg:hidden">
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="flex flex-col space-y-1"
-          >
-            <span className="block w-6 h-0.5 bg-gray-900"></span>
-            <span className="block w-6 h-0.5 bg-gray-900"></span>
-            <span className="block w-6 h-0.5 bg-gray-900"></span>
+      <div className="flex flex-1 flex-col">
+        <div className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4 lg:hidden">
+          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="flex flex-col gap-1">
+            <span className="block h-0.5 w-6 bg-gray-900" />
+            <span className="block h-0.5 w-6 bg-gray-900" />
+            <span className="block h-0.5 w-6 bg-gray-900" />
           </button>
-          <span className="font-bold text-lg">Nexora Admin</span>
-          <div className="w-6"></div>
+          <span className="text-lg font-bold text-gray-900">Nexora Admin</span>
+          <div className="w-6" />
         </div>
 
-        {/* Content */}
-        <main className="flex-1 px-6 py-8 overflow-y-auto">
-          {children}
-        </main>
+        <main className="flex-1 overflow-y-auto px-6 py-8">{children}</main>
       </div>
 
-      {/* Overlay for mobile */}
       {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 lg:hidden z-30"
-          onClick={() => setSidebarOpen(false)}
-        ></div>
+        <div className="fixed inset-0 z-30 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
     </div>
   );
