@@ -23,7 +23,11 @@ interface EmailData {
 
 export default function AdminEmailsPage() {
   const [data, setData] = useState<EmailData | null>(null);
+  const [templates, setTemplates] = useState<EmailTemplateCard[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+
   const readinessItems: Array<{ label: string; value: boolean }> = data
     ? [
         { label: 'SMTP', value: data.smtpReady },
@@ -41,6 +45,7 @@ export default function AdminEmailsPage() {
         });
         const payload = await response.json();
         setData(payload.emails);
+        setTemplates(payload.emails.templates || []);
       } catch (error) {
         console.error('Error fetching email center:', error);
       } finally {
@@ -50,6 +55,33 @@ export default function AdminEmailsPage() {
 
     fetchData();
   }, []);
+
+  const saveTemplates = async () => {
+    setSaving(true);
+    setMessage('');
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/admin/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ templates }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'No se pudo guardar');
+      setData(payload.emails);
+      setTemplates(payload.emails.templates || []);
+      setMessage('Plantillas guardadas.');
+    } catch (error) {
+      console.error('Error saving email center:', error);
+      setMessage('No pudimos guardar las plantillas.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading) {
     return <div className="py-12 text-center">Cargando email center...</div>;
@@ -61,13 +93,20 @@ export default function AdminEmailsPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Lifecycle email center</p>
-        <h1 className="mt-2 text-3xl font-bold text-gray-900">Base de emails transaccionales y de retención</h1>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-gray-600">
-          Aquí puedes ver si la infraestructura de envío está lista y qué correos deberían existir para mover activación, cobro y retención.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Lifecycle email center</p>
+          <h1 className="mt-2 text-3xl font-bold text-gray-900">Emails transaccionales, seguimiento y postventa editables</h1>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-gray-600">
+            Aquí puedes editar asuntos, previews, CTA y reply-to de los correos clave para bienvenida, activación, soporte y retención.
+          </p>
+        </div>
+        <button onClick={saveTemplates} className="btn-primary" disabled={saving}>
+          {saving ? 'Guardando...' : 'Guardar emails'}
+        </button>
       </div>
+
+      {message && <div className="rounded-2xl border border-gray-200 bg-white p-4 text-sm text-gray-700">{message}</div>}
 
       <section className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
@@ -97,7 +136,7 @@ export default function AdminEmailsPage() {
       </section>
 
       <section className="grid gap-5 xl:grid-cols-2">
-        {data.templates.map((template) => (
+        {templates.map((template, index) => (
           <article key={template.id} className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between gap-4">
               <div>
@@ -107,22 +146,60 @@ export default function AdminEmailsPage() {
               <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">{template.trigger}</span>
             </div>
 
-            <div className="mt-5 rounded-2xl bg-gray-50 p-4">
-              <p className="text-xs uppercase tracking-[0.22em] text-gray-400">Subject</p>
-              <p className="mt-2 text-sm font-semibold text-gray-900">{template.subject}</p>
-            </div>
+            <div className="mt-5 space-y-4">
+              <label className="block">
+                <span className="mb-2 block text-xs uppercase tracking-[0.22em] text-gray-400">Subject</span>
+                <input
+                  value={template.subject}
+                  onChange={(event) => {
+                    const next = [...templates];
+                    next[index] = { ...template, subject: event.target.value };
+                    setTemplates(next);
+                  }}
+                  className="input-field"
+                />
+              </label>
 
-            <div className="mt-4 rounded-2xl border border-gray-200 p-4">
-              <p className="text-xs uppercase tracking-[0.22em] text-gray-400">Preview</p>
-              <p className="mt-2 text-sm leading-6 text-gray-600">{template.preview}</p>
-            </div>
+              <label className="block">
+                <span className="mb-2 block text-xs uppercase tracking-[0.22em] text-gray-400">Preview</span>
+                <textarea
+                  value={template.preview}
+                  onChange={(event) => {
+                    const next = [...templates];
+                    next[index] = { ...template, preview: event.target.value };
+                    setTemplates(next);
+                  }}
+                  className="input-field min-h-[100px]"
+                />
+              </label>
 
-            {(template.cta || template.replyTo) && (
-              <div className="mt-4 flex flex-wrap gap-3 text-xs uppercase tracking-[0.22em] text-gray-400">
-                {template.cta && <span>CTA: {template.cta}</span>}
-                {template.replyTo && <span>Reply-to: {template.replyTo}</span>}
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="block">
+                  <span className="mb-2 block text-xs uppercase tracking-[0.22em] text-gray-400">CTA</span>
+                  <input
+                    value={template.cta || ''}
+                    onChange={(event) => {
+                      const next = [...templates];
+                      next[index] = { ...template, cta: event.target.value };
+                      setTemplates(next);
+                    }}
+                    className="input-field"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-xs uppercase tracking-[0.22em] text-gray-400">Reply-to</span>
+                  <input
+                    value={template.replyTo || ''}
+                    onChange={(event) => {
+                      const next = [...templates];
+                      next[index] = { ...template, replyTo: event.target.value };
+                      setTemplates(next);
+                    }}
+                    className="input-field"
+                  />
+                </label>
               </div>
-            )}
+            </div>
           </article>
         ))}
       </section>

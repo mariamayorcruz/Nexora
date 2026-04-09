@@ -51,11 +51,12 @@ export default function AdminLayout({
 
   const menuItems = [
     { label: 'Dashboard', href: '/admin', icon: 'DA' },
+    { label: 'Funnel', href: '/admin/funnel', icon: 'FU' },
     { label: 'Usuarios', href: '/admin/users', icon: 'US' },
     { label: 'Suscripciones', href: '/admin/subscriptions', icon: 'SU' },
     { label: 'Campañas', href: '/admin/campaigns', icon: 'CA' },
     { label: 'Analíticas', href: '/admin/analytics', icon: 'AN' },
-    { label: 'Automatizacion', href: '/admin/automation', icon: 'AU' },
+    { label: 'Automatización', href: '/admin/automation', icon: 'AU' },
     { label: 'Soporte', href: '/admin/support', icon: 'SO' },
     { label: 'Emails', href: '/admin/emails', icon: 'EM' },
     { label: 'Pagos', href: '/admin/payments', icon: 'PA' },

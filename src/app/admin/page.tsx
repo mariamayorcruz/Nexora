@@ -49,6 +49,7 @@ interface AdminStats {
 export default function AdminDashboard() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
+
   const readinessItems: Array<{ label: string; value: boolean }> = stats
     ? [
         { label: 'Stripe', value: stats.paymentReadiness.stripe },
@@ -96,13 +97,16 @@ export default function AdminDashboard() {
         <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
           <div>
             <p className="text-xs uppercase tracking-[0.32em] text-cyan-300">Admin control center</p>
-            <h1 className="mt-4 text-4xl font-semibold leading-tight">La operacion de Nexora en una sola lectura.</h1>
+            <h1 className="mt-4 text-4xl font-semibold leading-tight">La operación de Nexora en una sola lectura.</h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-              Aqui puedes ver salud de negocio, monetizacion, automatizaciones y lifecycle sin saltar entre modulos.
+              Aquí puedes ver salud de negocio, monetización, funnel, automatizaciones y lifecycle sin saltar entre módulos.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link href="/admin/automation" className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950">
-                Ver automatizacion
+              <Link href="/admin/funnel" className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950">
+                Ver funnel
+              </Link>
+              <Link href="/admin/automation" className="rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white">
+                Ver automatización
               </Link>
               <Link href="/admin/emails" className="rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white">
                 Ver email center
@@ -126,7 +130,7 @@ export default function AdminDashboard() {
           ['Suscripciones activas', stats.activeSubscriptions],
           ['MRR', `$${stats.mrr}`],
           ['Revenue total', `$${stats.totalRevenue}`],
-          ['Campanas activas', stats.activeCampaigns],
+          ['Campañas activas', stats.activeCampaigns],
         ].map(([label, value]) => (
           <div key={label} className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
             <p className="text-sm text-gray-500">{label}</p>
@@ -140,7 +144,7 @@ export default function AdminDashboard() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Alertas</p>
-              <h2 className="mt-2 text-2xl font-semibold text-gray-900">Lo que requiere atencion</h2>
+              <h2 className="mt-2 text-2xl font-semibold text-gray-900">Lo que requiere atención</h2>
             </div>
             <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
               {stats.alerts.length} activas
@@ -179,7 +183,7 @@ export default function AdminDashboard() {
 
         <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
           <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Readiness</p>
-          <h2 className="mt-2 text-2xl font-semibold text-gray-900">Piezas criticas de la operacion</h2>
+          <h2 className="mt-2 text-2xl font-semibold text-gray-900">Piezas críticas de la operación</h2>
 
           <div className="mt-6 space-y-4">
             {readinessItems.map((item) => (
@@ -201,7 +205,7 @@ export default function AdminDashboard() {
       <section className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Automatizacion</p>
+            <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Automatización</p>
             <h2 className="mt-2 text-2xl font-semibold text-gray-900">Playbooks inteligentes listos para operar</h2>
           </div>
           <Link href="/admin/automation" className="text-sm font-semibold text-primary">

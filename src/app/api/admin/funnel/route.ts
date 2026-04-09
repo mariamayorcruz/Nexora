@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdmin } from '@/lib/admin';
-import { buildEmailCenterSummary } from '@/lib/admin-ops';
 import { getAdminWorkspaceSnapshot, saveAdminWorkspacePartial } from '@/lib/admin-config';
 
 export const dynamic = 'force-dynamic';
@@ -10,23 +9,14 @@ export async function GET(request: NextRequest) {
   if (adminCheck instanceof NextResponse) return adminCheck;
 
   try {
-    const emailCenter = buildEmailCenterSummary(process.env.SUPPORT_EMAIL || '');
     const snapshot = await getAdminWorkspaceSnapshot();
-
     return NextResponse.json({
-      emails: {
-        ...emailCenter,
-        templates: snapshot.emails,
-        deliveryModes: {
-          smtp: emailCenter.smtpReady,
-          emailFrom: emailCenter.senderReady,
-          supportEmail: emailCenter.supportEmailReady,
-        },
-      },
+      funnel: snapshot.funnel,
+      roadmap: snapshot.roadmap,
     });
   } catch (error) {
-    console.error('Error fetching email center:', error);
-    return NextResponse.json({ error: 'Error fetching email center' }, { status: 500 });
+    console.error('Error fetching funnel center:', error);
+    return NextResponse.json({ error: 'Error fetching funnel center' }, { status: 500 });
   }
 }
 
@@ -37,20 +27,17 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     await saveAdminWorkspacePartial({
-      emailTemplates: body.templates,
+      funnelConfig: body.funnel,
+      roadmapConfig: body.roadmap,
     });
 
-    const emailCenter = buildEmailCenterSummary(process.env.SUPPORT_EMAIL || '');
     const snapshot = await getAdminWorkspaceSnapshot();
-
     return NextResponse.json({
-      emails: {
-        ...emailCenter,
-        templates: snapshot.emails,
-      },
+      funnel: snapshot.funnel,
+      roadmap: snapshot.roadmap,
     });
   } catch (error) {
-    console.error('Error saving email center:', error);
-    return NextResponse.json({ error: 'Error saving email center' }, { status: 500 });
+    console.error('Error saving funnel center:', error);
+    return NextResponse.json({ error: 'Error saving funnel center' }, { status: 500 });
   }
 }
