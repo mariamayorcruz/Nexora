@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import DashboardChatbot from '@/components/DashboardChatbot';
+import { useAppLanguage } from '@/hooks/use-app-language';
 
 interface DashboardUser {
   email: string;
@@ -30,6 +31,7 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { language, setLanguage } = useAppLanguage();
   const [user, setUser] = useState<DashboardUser | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -65,31 +67,31 @@ export default function DashboardLayout({
   }, [router]);
 
   const menuItems = [
-    { label: 'Dashboard', href: '/dashboard', icon: 'DA' },
-    { label: 'Conectar redes', href: '/dashboard/connect', icon: 'CR' },
-    { label: 'Funnel', href: '/dashboard/funnel', icon: 'FU' },
+    { label: language === 'en' ? 'Dashboard' : 'Dashboard', href: '/dashboard', icon: 'DA' },
+    { label: language === 'en' ? 'Connect channels' : 'Conectar redes', href: '/dashboard/connect', icon: 'CR' },
+    { label: language === 'en' ? 'Funnel' : 'Funnel', href: '/dashboard/funnel', icon: 'FU' },
     { label: 'CRM', href: '/dashboard/crm', icon: 'CM' },
     { label: 'AI Studio', href: '/dashboard/studio', icon: 'IA' },
-    { label: 'Campañas', href: '/dashboard/campaigns', icon: 'CA' },
-    { label: 'Soporte', href: '/dashboard/support', icon: 'SP' },
-    { label: 'Facturación', href: '/dashboard/billing', icon: 'FA' },
-    { label: 'Configuración', href: '/dashboard/settings', icon: 'CO' },
+    { label: language === 'en' ? 'Campaigns' : 'Campañas', href: '/dashboard/campaigns', icon: 'CA' },
+    { label: language === 'en' ? 'Support' : 'Soporte', href: '/dashboard/support', icon: 'SP' },
+    { label: language === 'en' ? 'Billing' : 'Facturación', href: '/dashboard/billing', icon: 'FA' },
+    { label: language === 'en' ? 'Settings' : 'Configuración', href: '/dashboard/settings', icon: 'CO' },
   ];
 
   if (user?.entitlements?.capabilities?.canUseRadar) {
-    menuItems.splice(1, 0, { label: 'Radar creativo', href: '/dashboard/radar', icon: 'RC' });
+    menuItems.splice(1, 0, { label: language === 'en' ? 'Creative radar' : 'Radar creativo', href: '/dashboard/radar', icon: 'RC' });
   }
 
   if (user?.entitlements?.capabilities?.canUseAdvancedAnalytics) {
     menuItems.splice(user?.entitlements?.capabilities?.canUseRadar ? 6 : 5, 0, {
-      label: 'Analítica',
+      label: language === 'en' ? 'Analytics' : 'Analítica',
       href: '/dashboard/analytics',
       icon: 'AN',
     });
   }
 
   if (user?.isAdmin) {
-    menuItems.push({ label: 'Panel admin', href: '/admin', icon: 'AD' });
+    menuItems.push({ label: language === 'en' ? 'Admin panel' : 'Panel admin', href: '/admin', icon: 'AD' });
   }
 
   const handleLogout = () => {
@@ -128,6 +130,19 @@ export default function DashboardLayout({
         </div>
 
         <nav className="space-y-2 p-4">
+          <div className="mb-3 flex gap-2 px-1">
+            {(['es', 'en'] as const).map((option) => (
+              <button
+                key={option}
+                onClick={() => setLanguage(option)}
+                className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] transition ${
+                  language === option ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-500'
+                }`}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
           {menuItems.map((item) => (
             <Link
               key={item.href}
@@ -155,15 +170,21 @@ export default function DashboardLayout({
             <p className="text-sm font-medium text-slate-900">{user?.email}</p>
             <p className="mt-1 text-xs uppercase tracking-[0.24em] text-slate-400">
               {user?.founderAccess
-                ? 'Plan fundador'
-                : `Plan ${user?.entitlements?.marketingLabel || user?.founderPlan || user?.subscription?.plan || 'starter'}`}
+                ? language === 'en'
+                  ? 'Founder plan'
+                  : 'Plan fundador'
+                : `${language === 'en' ? 'Plan' : 'Plan'} ${user?.entitlements?.marketingLabel || user?.founderPlan || user?.subscription?.plan || 'starter'}`}
             </p>
             {user?.isAdmin && (
-              <p className="mt-3 text-xs font-semibold text-primary">Acceso total al centro de control</p>
+              <p className="mt-3 text-xs font-semibold text-primary">
+                {language === 'en' ? 'Full access to control center' : 'Acceso total al centro de control'}
+              </p>
             )}
             {user?.founderAccess && (
               <p className="mt-2 text-xs font-semibold text-emerald-600">
-                Cuenta fundadora con prioridad creativa y ventajas exclusivas activas
+                {language === 'en'
+                  ? 'Founder account with creative priority and exclusive advantages active'
+                  : 'Cuenta fundadora con prioridad creativa y ventajas exclusivas activas'}
               </p>
             )}
           </div>
@@ -172,7 +193,7 @@ export default function DashboardLayout({
             onClick={handleLogout}
             className="mt-4 w-full rounded-2xl px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
           >
-            Cerrar sesión
+            {language === 'en' ? 'Log out' : 'Cerrar sesión'}
           </button>
         </div>
       </aside>

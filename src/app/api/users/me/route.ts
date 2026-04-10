@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getFounderPlan, getFounderTrialDays, isAdminEmail, isFounderEmail } from '@/lib/access';
 import { buildEntitlementSummary } from '@/lib/entitlements';
+import { getHigherTierPlan } from '@/lib/billing';
 import jwt from 'jsonwebtoken';
 
 export const dynamic = 'force-dynamic';
@@ -29,11 +30,14 @@ export async function GET(request: NextRequest) {
 
     const founderAccess = isFounderEmail(user.email);
     const founderPlan = founderAccess ? getFounderPlan() : null;
+    const effectivePlan = founderAccess
+      ? getHigherTierPlan(founderPlan, user.subscription?.plan)
+      : user.subscription?.plan || 'starter';
 
     if (
       founderAccess &&
       user.subscription &&
-      (user.subscription.plan !== founderPlan || user.subscription.currentPeriodEnd < new Date())
+      (user.subscription.plan !== effectivePlan || user.subscription.currentPeriodEnd < new Date())
     ) {
       const upgradedPeriodEnd = new Date();
       upgradedPeriodEnd.setDate(upgradedPeriodEnd.getDate() + getFounderTrialDays());
@@ -41,7 +45,7 @@ export async function GET(request: NextRequest) {
       const updatedSubscription = await prisma.subscription.update({
         where: { userId: user.id },
         data: {
-          plan: founderPlan || user.subscription.plan,
+          plan: effectivePlan || user.subscription.plan,
           status: 'active',
           currentPeriodEnd: upgradedPeriodEnd,
         },
@@ -67,7 +71,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const entitlements = buildEntitlementSummary(founderPlan || user.subscription?.plan, {
+    const entitlements = buildEntitlementSummary(effectivePlan, {
       adAccounts: adAccounts.length,
       activeCampaigns: campaigns.filter((campaign) => campaign.status === 'active').length,
     });
@@ -80,7 +84,7 @@ export async function GET(request: NextRequest) {
         subscription: user.subscription,
         isAdmin: isAdminEmail(user.email),
         founderAccess,
-        founderPlan,
+        founderPlan: effectivePlan,
         entitlements,
       },
       adAccounts,

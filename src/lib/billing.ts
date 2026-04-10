@@ -98,6 +98,19 @@ export function getBillingPlanLabel(plan?: string | null) {
   return getBillingPlan(plan)?.marketingLabel || plan || 'Starter';
 }
 
+const PLAN_RANK: Record<BillingPlan, number> = {
+  starter: 1,
+  professional: 2,
+  enterprise: 3,
+};
+
+export function getHigherTierPlan(firstPlan?: string | null, secondPlan?: string | null): BillingPlan {
+  const normalizedFirst = getBillingPlan(firstPlan)?.key || 'starter';
+  const normalizedSecond = getBillingPlan(secondPlan)?.key || 'starter';
+
+  return PLAN_RANK[normalizedFirst] >= PLAN_RANK[normalizedSecond] ? normalizedFirst : normalizedSecond;
+}
+
 export function getStripePriceId(plan: BillingPlan, billingCycle: BillingCycle) {
   const config = BILLING_PLANS[plan];
   return billingCycle === 'monthly' ? config.stripePriceIdMonthly : config.stripePriceIdYearly;

@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
+const ALLOWED_STAGES = new Set(['lead', 'contacted', 'qualified', 'proposal', 'won']);
+
 function getUserIdFromRequest(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
   if (!authHeader?.startsWith('Bearer ')) {
@@ -27,7 +29,12 @@ export async function GET(request: NextRequest) {
       orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
     });
 
-    return NextResponse.json({ leads });
+    return NextResponse.json({
+      leads: leads.map((lead) => ({
+        ...lead,
+        stage: ALLOWED_STAGES.has(lead.stage) ? lead.stage : 'lead',
+      })),
+    });
   } catch (error) {
     console.error('Error fetching CRM leads:', error);
     return NextResponse.json({ error: 'Error fetching CRM leads' }, { status: 500 });
@@ -56,7 +63,7 @@ export async function POST(request: NextRequest) {
         phone: body.phone?.trim() || null,
         company: body.company?.trim() || null,
         source: body.source?.trim() || 'manual',
-        stage: body.stage?.trim() || 'lead',
+        stage: ALLOWED_STAGES.has(String(body.stage || '').trim()) ? String(body.stage).trim() : 'lead',
         value: Number(body.value || 0),
         confidence: Math.min(100, Math.max(0, Number(body.confidence || 25))),
         nextAction: body.nextAction?.trim() || null,

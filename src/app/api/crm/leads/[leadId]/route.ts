@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
+const ALLOWED_STAGES = new Set(['lead', 'contacted', 'qualified', 'proposal', 'won']);
+
 function getUserIdFromRequest(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
   if (!authHeader?.startsWith('Bearer ')) {
@@ -42,7 +44,12 @@ export async function PATCH(
         phone: body.phone !== undefined ? body.phone?.trim() || null : undefined,
         company: body.company !== undefined ? body.company?.trim() || null : undefined,
         source: body.source !== undefined ? body.source?.trim() || 'manual' : undefined,
-        stage: body.stage !== undefined ? body.stage?.trim() || 'lead' : undefined,
+        stage:
+          body.stage !== undefined
+            ? ALLOWED_STAGES.has(String(body.stage || '').trim())
+              ? String(body.stage).trim()
+              : 'lead'
+            : undefined,
         value: body.value !== undefined ? Number(body.value || 0) : undefined,
         confidence:
           body.confidence !== undefined

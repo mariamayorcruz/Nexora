@@ -503,6 +503,51 @@ export default function DashboardCrmPage() {
           </div>
         </div>
       </section>
+
+      <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+        <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Base de contactos</p>
+        <h2 className="mt-2 text-2xl font-semibold text-slate-900">Todos los leads visibles</h2>
+
+        <div className="mt-6 space-y-3">
+          {leads.length === 0 ? (
+            <div className="rounded-2xl bg-slate-50 p-5 text-sm text-slate-600">
+              Todavía no hay contactos guardados en este CRM.
+            </div>
+          ) : (
+            leads.map((lead) => (
+              <article key={lead.id} className="rounded-2xl border border-slate-200 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p className="font-semibold text-slate-900">{lead.name || 'Contacto sin nombre'}</p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {lead.company || 'Sin empresa'} · {lead.source} · etapa {lead.stage}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-slate-900">${lead.value.toLocaleString()}</p>
+                    <p className="text-xs text-slate-500">Confianza {lead.confidence}%</p>
+                  </div>
+                </div>
+
+                <div className="mt-3 grid gap-3 md:grid-cols-3">
+                  <div className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">
+                    <span className="block text-xs uppercase tracking-[0.18em] text-slate-400">Email</span>
+                    {lead.email || 'Sin email'}
+                  </div>
+                  <div className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">
+                    <span className="block text-xs uppercase tracking-[0.18em] text-slate-400">Teléfono</span>
+                    {lead.phone || 'Sin teléfono'}
+                  </div>
+                  <div className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">
+                    <span className="block text-xs uppercase tracking-[0.18em] text-slate-400">Siguiente acción</span>
+                    {lead.nextAction || 'Sin definir'}
+                  </div>
+                </div>
+              </article>
+            ))
+          )}
+        </div>
+      </section>
     </div>
   );
 }

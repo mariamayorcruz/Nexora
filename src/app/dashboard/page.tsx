@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { BarChart3, CreditCard, Lightbulb, PlugZap, Settings2, Sparkles, Target, Users2, WandSparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useAppLanguage } from '@/hooks/use-app-language';
 
 interface DashboardUser {
   id: string;
@@ -38,6 +39,7 @@ interface DashboardUser {
 }
 
 export default function DashboardPage() {
+  const { language } = useAppLanguage();
   const [user, setUser] = useState<DashboardUser | null>(null);
   const [adAccounts, setAdAccounts] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
@@ -101,39 +103,48 @@ export default function DashboardPage() {
       <section className="overflow-hidden rounded-[36px] bg-[linear-gradient(135deg,#0f172a_0%,#111827_54%,#0c4a6e_100%)] px-8 py-10 text-white shadow-[0_35px_120px_rgba(15,23,42,0.22)]">
         <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
           <div>
-            <p className="text-xs uppercase tracking-[0.32em] text-cyan-300">Panel de control</p>
+            <p className="text-xs uppercase tracking-[0.32em] text-cyan-300">{language === 'en' ? 'Control center' : 'Panel de control'}</p>
             <h1 className="mt-4 text-4xl font-semibold leading-tight">
-              Bienvenida, {user?.name || user?.email}. Vamos a convertir claridad en crecimiento real.
+              {language === 'en'
+                ? `Welcome, ${user?.name || user?.email}. Let’s turn clarity into real growth.`
+                : `Bienvenida, ${user?.name || user?.email}. Vamos a convertir claridad en crecimiento real.`}
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-              Nexora reúne campañas, funnel, CRM, facturación y una capa creativa con IA para que puedas decidir más
-              rápido, ejecutar mejor y cerrar con más control.
+              {language === 'en'
+                ? 'Nexora brings campaigns, funnel, CRM, billing and an AI creative layer together so you can decide faster, execute better and close with more control.'
+                : 'Nexora reúne campañas, funnel, CRM, facturación y una capa creativa con IA para que puedas decidir más rápido, ejecutar mejor y cerrar con más control.'}
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <span className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm">
-                Plan {entitlements?.marketingLabel || user?.subscription?.plan || 'starter'}
+                {language === 'en' ? 'Plan' : 'Plan'} {entitlements?.marketingLabel || user?.subscription?.plan || 'starter'}
               </span>
               <span className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm">
-                {entitlements?.capabilities.aiCreditsMonthly || 0} créditos IA/mes
+                {entitlements?.capabilities.aiCreditsMonthly || 0} {language === 'en' ? 'AI credits / month' : 'créditos IA/mes'}
               </span>
               {user?.founderAccess && (
                 <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-4 py-2 text-sm text-emerald-200">
-                  Modo fundadora activo
+                  {language === 'en' ? 'Founder mode active' : 'Modo fundadora activo'}
                 </span>
               )}
             </div>
           </div>
 
           <div className="rounded-[30px] border border-white/10 bg-white/5 p-6 backdrop-blur">
-            <p className="text-sm text-slate-300">Siguiente mejor acción</p>
+            <p className="text-sm text-slate-300">{language === 'en' ? 'Next best action' : 'Siguiente mejor acción'}</p>
             <p className="mt-3 text-2xl font-semibold text-white">
               {entitlements?.capabilities?.canUseAdvancedAnalytics
-                ? 'Abrir funnel y CRM para priorizar los contactos con más valor probable.'
-                : 'Conectar tu primera cuenta y desbloquear el siguiente nivel del panel.'}
+                ? language === 'en'
+                  ? 'Open funnel and CRM to prioritize the contacts with the highest probable value.'
+                  : 'Abrir funnel y CRM para priorizar los contactos con más valor probable.'
+                : language === 'en'
+                  ? 'Connect your first account and unlock the next level of the platform.'
+                  : 'Conectar tu primera cuenta y desbloquear el siguiente nivel del panel.'}
             </p>
             <p className="mt-4 text-sm leading-6 text-slate-300">
               {entitlements?.capabilities?.canUseAdvancedAnalytics
-                ? 'Si el embudo ya genera atención, el siguiente salto viene de trabajar oportunidades, seguimiento y creatividad con mejor ritmo.'
+                ? language === 'en'
+                  ? 'If the funnel is already generating attention, the next leap comes from working opportunities, follow-up and creativity with a better rhythm.'
+                  : 'Si el embudo ya genera atención, el siguiente salto viene de trabajar oportunidades, seguimiento y creatividad con mejor ritmo.'
                 : entitlements?.capabilities?.upgradeCta}
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
@@ -141,7 +152,13 @@ export default function DashboardPage() {
                 href={entitlements?.capabilities?.canUseAdvancedAnalytics ? '/dashboard/funnel' : '/dashboard/billing'}
                 className="inline-flex items-center rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200"
               >
-                {entitlements?.capabilities?.canUseAdvancedAnalytics ? 'Abrir funnel comercial' : 'Ver opciones de plan'}
+                {entitlements?.capabilities?.canUseAdvancedAnalytics
+                  ? language === 'en'
+                    ? 'Open sales funnel'
+                    : 'Abrir funnel comercial'
+                  : language === 'en'
+                    ? 'View plan options'
+                    : 'Ver opciones de plan'}
               </Link>
               <Link href="/dashboard/studio" className="inline-flex items-center rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
                 Abrir AI Studio
@@ -153,30 +170,30 @@ export default function DashboardPage() {
 
       <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
         <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_16px_55px_rgba(15,23,42,0.06)]">
-          <p className="text-sm text-slate-500">Cuentas conectadas</p>
+          <p className="text-sm text-slate-500">{language === 'en' ? 'Connected accounts' : 'Cuentas conectadas'}</p>
           <p className="mt-3 text-4xl font-semibold text-slate-900">{adAccounts.length}</p>
           <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-400">
             de {entitlements?.usage.adAccountsLimit || 1} disponibles
           </p>
         </div>
         <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_16px_55px_rgba(15,23,42,0.06)]">
-          <p className="text-sm text-slate-500">Campañas activas</p>
+          <p className="text-sm text-slate-500">{language === 'en' ? 'Active campaigns' : 'Campañas activas'}</p>
           <p className="mt-3 text-4xl font-semibold text-slate-900">{activeCampaigns.length}</p>
           <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-400">
             de {entitlements?.usage.activeCampaignsLimit || 3} disponibles
           </p>
         </div>
         <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_16px_55px_rgba(15,23,42,0.06)]">
-          <p className="text-sm text-slate-500">Leads estimados</p>
+          <p className="text-sm text-slate-500">{language === 'en' ? 'Estimated leads' : 'Leads estimados'}</p>
           <p className="mt-3 text-4xl font-semibold text-slate-900">{estimatedLeads}</p>
-          <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-400">Basados en clics y conversiones</p>
+          <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-400">{language === 'en' ? 'Based on clicks and conversions' : 'Basados en clics y conversiones'}</p>
         </div>
         <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_16px_55px_rgba(15,23,42,0.06)]">
-          <p className="text-sm text-slate-500">ROI estimado</p>
+          <p className="text-sm text-slate-500">{language === 'en' ? 'Estimated ROI' : 'ROI estimado'}</p>
           <p className="mt-3 text-4xl font-semibold text-slate-900">{roi}%</p>
         </div>
         <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_16px_55px_rgba(15,23,42,0.06)]">
-          <p className="text-sm text-slate-500">Ventas probables</p>
+          <p className="text-sm text-slate-500">{language === 'en' ? 'Likely sales' : 'Ventas probables'}</p>
           <p className="mt-3 text-4xl font-semibold text-slate-900">{estimatedWins}</p>
           <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-400">Lectura rápida del embudo</p>
         </div>
