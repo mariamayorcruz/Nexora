@@ -34,6 +34,7 @@ model User {
   aiUsageBuckets    AiWorkspaceUsage[]
   aiJobs            AiWorkspaceJob[]
   leadCaptures      LeadCapture[]
+  connectionRequests ConnectionRequest[]
   invoices          Invoice[]
 }
 
@@ -219,6 +220,24 @@ model PaymentSettings {
   minimumPayout     Float    @default(25.0)
   updatedAt         DateTime @updatedAt
   createdAt         DateTime @default(now())
+}
+
+model ConnectionRequest {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform         String
+  businessName     String?
+  contactEmail     String?
+  adAccountLabel   String?
+  websiteUrl       String?
+  notes            String?  @db.Text
+  setupPreference  String   @default("oauth")
+  status           String   @default("pending")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([userId, platform, status])
 }
 
 model AdminWorkspaceConfig {
