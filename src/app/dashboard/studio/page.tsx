@@ -7,6 +7,7 @@ interface AiTool {
   label: string;
   credits: number;
   description: string;
+  family?: 'copy' | 'video' | 'sales';
 }
 
 interface AiJob {
@@ -49,51 +50,39 @@ const DEFAULT_FORM = {
   audience: '',
   channel: 'Instagram',
   prompt: '',
+  sourceAsset: '',
+  outputFormat: 'vertical 9:16',
+  captionStyle: 'bold clean',
 };
 
-const QUICK_PRESETS = [
-  {
-    label: 'Avatar ad',
-    description: 'Guion con avatar, storyboard, overlays y CTA.',
-    values: {
-      tool: 'video-edit',
-      channel: 'Instagram / Video avatar',
-      prompt: 'Quiero una pieza premium con avatar profesional, ritmo ágil, prueba visual y CTA a demo.',
-    },
-  },
-  {
-    label: 'Instagram ad',
-    description: 'Hooks, primary text, prueba y dirección visual.',
-    values: {
-      tool: 'ad-copy',
-      channel: 'Instagram',
-      prompt: 'Construye una pieza aspiracional, creíble y muy orientada a conversión.',
-    },
-  },
-  {
-    label: 'Pitch deck',
-    description: 'Propuesta elegante lista para presentar.',
-    values: {
-      tool: 'pitch-deck',
-      channel: 'Ventas / Presentación',
-      prompt: 'Quiero una propuesta limpia, ejecutiva y enfocada en cierre.',
-    },
-  },
-];
+const MODE_FAMILIES = [
+  { key: 'video', label: 'Video Studio' },
+  { key: 'copy', label: 'Copy Lab' },
+  { key: 'sales', label: 'Sales Assets' },
+] as const;
 
 export default function DashboardStudioPage() {
   const [usage, setUsage] = useState<StudioUsage | null>(null);
   const [tools, setTools] = useState<AiTool[]>([]);
   const [jobs, setJobs] = useState<AiJob[]>([]);
   const [form, setForm] = useState(DEFAULT_FORM);
+  const [activeFamily, setActiveFamily] = useState<(typeof MODE_FAMILIES)[number]['key']>('video');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
+  const familyTools = useMemo(
+    () => tools.filter((tool) => (tool.family || 'copy') === activeFamily),
+    [tools, activeFamily]
+  );
 
   const selectedTool = useMemo(
     () => tools.find((tool) => tool.key === form.tool) || tools[0],
     [tools, form.tool]
   );
+
+  const isVideoMode = ['avatar-video', 'text-to-video', 'image-to-video', 'smart-edit'].includes(form.tool);
+  const needsSourceAsset = ['image-to-video', 'smart-edit'].includes(form.tool);
 
   const fetchStudio = async () => {
     try {
@@ -122,6 +111,12 @@ export default function DashboardStudioPage() {
   useEffect(() => {
     void fetchStudio();
   }, []);
+
+  useEffect(() => {
+    if (familyTools.length > 0 && !familyTools.some((tool) => tool.key === form.tool)) {
+      setForm((current) => ({ ...current, tool: familyTools[0].key }));
+    }
+  }, [familyTools, form.tool]);
 
   const handleGenerate = async () => {
     setSubmitting(true);
@@ -180,35 +175,15 @@ export default function DashboardStudioPage() {
       <section className="rounded-[36px] bg-[linear-gradient(135deg,#111827_0%,#0f172a_40%,#7c2d12_100%)] px-8 py-10 text-white shadow-[0_32px_110px_rgba(15,23,42,0.22)]">
         <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
           <div>
-            <p className="text-xs uppercase tracking-[0.32em] text-amber-200">AI Studio</p>
+            <p className="text-xs uppercase tracking-[0.32em] text-amber-200">Nexora Video Studio</p>
             <h1 className="mt-4 text-4xl font-semibold leading-tight">
-              Crea anuncios, videos y propuestas con dirección de nivel estudio.
+              Un estudio preparado para web hoy y para app móvil o desktop después.
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-              Inspirado en la velocidad de herramientas como HeyGen para producción y presentación, Nexora ahora entrega
-              estructura, storyboard, voz, escenas, CTA y narrativa comercial en una sola salida.
+              Ya está estructurado por modos reales: avatar video, text-to-video, image-to-video y smart edit. La experiencia
+              es propia de Nexora; el render final dependerá del proveedor que conectemos.
             </p>
             <p className="mt-4 text-sm leading-6 text-amber-100/90">{usage?.supportLabel}</p>
-
-            <div className="mt-6 grid gap-3 md:grid-cols-3">
-              {QUICK_PRESETS.map((preset) => (
-                <button
-                  key={preset.label}
-                  onClick={() =>
-                    setForm((current) => ({
-                      ...current,
-                      tool: preset.values.tool,
-                      channel: preset.values.channel,
-                      prompt: preset.values.prompt,
-                    }))
-                  }
-                  className="rounded-2xl border border-white/10 bg-white/5 p-4 text-left transition hover:bg-white/10"
-                >
-                  <p className="text-sm font-semibold text-white">{preset.label}</p>
-                  <p className="mt-2 text-xs leading-5 text-slate-300">{preset.description}</p>
-                </button>
-              ))}
-            </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1">
@@ -220,20 +195,16 @@ export default function DashboardStudioPage() {
               </p>
             </div>
             <div className="rounded-[26px] border border-white/10 bg-white/5 p-5">
-              <p className="text-sm text-slate-300">Video y edición</p>
+              <p className="text-sm text-slate-300">Motor de video</p>
               <p className="mt-3 text-2xl font-semibold text-white">
-                {usage?.canUseVideoTools
-                  ? usage?.videoRenderReady
-                    ? `Render activo${usage.videoRenderProvider ? ` · ${usage.videoRenderProvider}` : ''}`
-                    : 'Motor de render pendiente'
-                  : 'Disponible desde Growth'}
+                {usage?.videoRenderReady
+                  ? `Activo${usage.videoRenderProvider ? ` · ${usage.videoRenderProvider}` : ''}`
+                  : 'Pendiente de conexión'}
               </p>
               <p className="mt-2 text-sm text-slate-300">
-                {usage?.canUseVideoTools
-                  ? usage?.videoRenderReady
-                    ? `Hasta ${usage?.maxExportsPerRun ?? 0} salidas por ejecución.`
-                    : 'Puedes preparar la estrategia, pero el render real requiere conectar un proveedor de video.'
-                  : `Hasta ${usage?.maxExportsPerRun ?? 0} salidas por ejecución.`}
+                {usage?.videoRenderReady
+                  ? `Hasta ${usage?.maxExportsPerRun ?? 0} renders por ejecución.`
+                  : 'Listo para conectarse a HeyGen, Runway u otro proveedor.'}
               </p>
             </div>
           </div>
@@ -267,26 +238,50 @@ export default function DashboardStudioPage() {
         </div>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+      <section className="grid gap-6 lg:grid-cols-[0.98fr_1.02fr]">
         <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Generador</p>
-          <h2 className="mt-2 text-2xl font-semibold text-slate-900">Lanza una pieza nueva</h2>
+          <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Builder</p>
+          <h2 className="mt-2 text-2xl font-semibold text-slate-900">Diseña tu siguiente asset</h2>
+
+          <div className="mt-6 flex flex-wrap gap-2">
+            {MODE_FAMILIES.map((family) => (
+              <button
+                key={family.key}
+                onClick={() => setActiveFamily(family.key)}
+                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                  activeFamily === family.key ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                {family.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-6 grid gap-3">
+            {familyTools.map((tool) => (
+              <button
+                key={tool.key}
+                onClick={() => setForm((current) => ({ ...current, tool: tool.key }))}
+                className={`rounded-2xl border p-4 text-left transition ${
+                  form.tool === tool.key ? 'border-slate-950 bg-slate-950 text-white' : 'border-slate-200 bg-white text-slate-900'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="font-semibold">{tool.label}</p>
+                    <p className={`mt-2 text-sm leading-6 ${form.tool === tool.key ? 'text-slate-300' : 'text-slate-600'}`}>
+                      {tool.description}
+                    </p>
+                  </div>
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${form.tool === tool.key ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                    {tool.credits} créditos
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
 
           <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <label className="block md:col-span-2">
-              <span className="mb-2 block text-sm font-medium text-slate-700">Tipo de recurso</span>
-              <select
-                value={form.tool}
-                onChange={(event) => setForm((current) => ({ ...current, tool: event.target.value }))}
-                className="input-field"
-              >
-                {tools.map((tool) => (
-                  <option key={tool.key} value={tool.key}>
-                    {tool.label} · {tool.credits} créditos
-                  </option>
-                ))}
-              </select>
-            </label>
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-slate-700">Oferta o servicio</span>
               <input
@@ -311,64 +306,87 @@ export default function DashboardStudioPage() {
                 value={form.channel}
                 onChange={(event) => setForm((current) => ({ ...current, channel: event.target.value }))}
                 className="input-field"
-                placeholder="Instagram, WhatsApp, email, presentación, video avatar..."
+                placeholder="Instagram, WhatsApp, YouTube, funnel, story..."
               />
             </label>
+
+            {isVideoMode && (
+              <>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium text-slate-700">Formato de salida</span>
+                  <select
+                    value={form.outputFormat}
+                    onChange={(event) => setForm((current) => ({ ...current, outputFormat: event.target.value }))}
+                    className="input-field"
+                  >
+                    <option value="vertical 9:16">Vertical 9:16</option>
+                    <option value="horizontal 16:9">Horizontal 16:9</option>
+                    <option value="square 1:1">Square 1:1</option>
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium text-slate-700">Estilo de captions</span>
+                  <select
+                    value={form.captionStyle}
+                    onChange={(event) => setForm((current) => ({ ...current, captionStyle: event.target.value }))}
+                    className="input-field"
+                  >
+                    <option value="bold clean">Bold clean</option>
+                    <option value="ads high-contrast">Ads high-contrast</option>
+                    <option value="creator native">Creator native</option>
+                    <option value="minimal premium">Minimal premium</option>
+                  </select>
+                </label>
+              </>
+            )}
+
+            {needsSourceAsset && (
+              <label className="block md:col-span-2">
+                <span className="mb-2 block text-sm font-medium text-slate-700">Asset fuente</span>
+                <input
+                  value={form.sourceAsset}
+                  onChange={(event) => setForm((current) => ({ ...current, sourceAsset: event.target.value }))}
+                  className="input-field"
+                  placeholder="Nombre del video, imagen o asset que se va a editar"
+                />
+              </label>
+            )}
+
             <label className="block md:col-span-2">
               <span className="mb-2 block text-sm font-medium text-slate-700">Brief o idea base</span>
               <textarea
                 value={form.prompt}
                 onChange={(event) => setForm((current) => ({ ...current, prompt: event.target.value }))}
                 className="input-field min-h-[150px]"
-                placeholder="Explica el ángulo, el dolor, la promesa y la pieza que quieres crear."
+                placeholder="Explica el ángulo, el dolor, el ritmo, la promesa, el estilo de edición o la pieza que quieres crear."
               />
             </label>
           </div>
 
-          <div className="mt-6 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-            {selectedTool?.description || 'Selecciona una herramienta para ver su enfoque.'}
-          </div>
-
-          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            Cuando eliges anuncios o video, el estudio ya no se limita a darte hooks: también entrega dirección visual,
-            escenas, prueba, CTA y lógica narrativa para que la pieza salga con mucho más criterio.
-          </div>
-
-          {form.tool === 'video-edit' && !usage?.videoRenderReady && (
+          {!usage?.videoRenderReady && isVideoMode && (
             <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-              El render real de video todavía no está conectado en este entorno. No volveremos a consumir créditos en
-              `Edición de video` hasta que exista un proveedor activo para text-to-video, image-to-video o avatar video.
+              El producto ya está preparado por modo, pero el render real todavía necesita conectar un proveedor. Mientras eso no exista, no se consumen créditos en modos de video.
             </div>
           )}
 
           <button onClick={handleGenerate} disabled={submitting} className="mt-6 btn-primary">
-            {submitting ? 'Generando...' : `Generar ${selectedTool?.label || 'pieza'} (${selectedTool?.credits || 0} créditos)`}
+            {submitting ? 'Generando...' : `Generar ${selectedTool?.label || 'asset'} (${selectedTool?.credits || 0} créditos)`}
           </button>
         </div>
 
         <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Cómo responde el estudio</p>
-          <h2 className="mt-2 text-2xl font-semibold text-slate-900">Salidas pensadas para ejecución real</h2>
+          <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Arquitectura del producto</p>
+          <h2 className="mt-2 text-2xl font-semibold text-slate-900">Listo para web hoy, app después</h2>
 
           <div className="mt-6 space-y-4">
             {[
-              {
-                title: 'Narrativa central',
-                description: 'Promesa, mecanismo, objeción y CTA con un hilo de venta claro.',
-              },
-              {
-                title: 'Dirección visual',
-                description: 'Escenas, storyboard, avatar, overlays y ritmo sugerido cuando la pieza es audiovisual.',
-              },
-              {
-                title: 'Listo para adaptar',
-                description: 'La misma idea puede bajar luego a reel, carrusel, email, pitch o script comercial.',
-              },
+              'Cada modo ya se construye desde API y no solo desde UI, para que luego pueda salir en móvil o desktop.',
+              'Video Studio separa avatar, text-to-video, image-to-video y smart edit como familias reales de producto.',
+              'Los créditos, jobs y estados se pueden reutilizar en futuras apps sin rehacer la lógica central.',
             ].map((item) => (
-              <article key={item.title} className="rounded-2xl border border-slate-200 p-5">
-                <p className="font-semibold text-slate-900">{item.title}</p>
-                <p className="mt-2 text-sm leading-6 text-slate-600">{item.description}</p>
-              </article>
+              <div key={item} className="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+                {item}
+              </div>
             ))}
           </div>
         </div>
@@ -376,12 +394,12 @@ export default function DashboardStudioPage() {
 
       <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
         <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Historial</p>
-        <h2 className="mt-2 text-2xl font-semibold text-slate-900">Activos generados recientemente</h2>
+        <h2 className="mt-2 text-2xl font-semibold text-slate-900">Assets y outputs recientes</h2>
 
         <div className="mt-6 space-y-4">
           {jobs.length === 0 ? (
             <div className="rounded-2xl bg-slate-50 p-5 text-sm text-slate-600">
-              Aún no has generado piezas en AI Studio. Tu primer output aparecerá aquí con estructura, ángulo y dirección lista para ejecutar.
+              Aún no has generado assets en este estudio. Tu primer output aparecerá aquí con estructura, secciones y CTA.
             </div>
           ) : (
             jobs.map((job) => (

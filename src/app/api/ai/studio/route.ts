@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
-import { buildAiOutput, getAiPlanConfig, getAiToolDefinition, type AiToolKey, AI_TOOL_DEFINITIONS, getCurrentCycleRange } from '@/lib/ai-studio';
+import {
+  AI_TOOL_DEFINITIONS,
+  buildAiOutput,
+  getAiPlanConfig,
+  getAiToolDefinition,
+  getCurrentCycleRange,
+  type AiToolKey,
+} from '@/lib/ai-studio';
 import { getFounderPlan, isFounderEmail } from '@/lib/access';
 import type { Prisma } from '@prisma/client';
 
@@ -59,10 +66,7 @@ async function getUsageBucket(userId: string, plan: string | null | undefined, f
     },
   });
 
-  return {
-    usage,
-    planConfig,
-  };
+  return { usage, planConfig };
 }
 
 export async function GET(request: NextRequest) {
@@ -74,9 +78,7 @@ export async function GET(request: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: {
-        subscription: true,
-      },
+      include: { subscription: true },
     });
 
     if (!user) {
@@ -86,13 +88,11 @@ export async function GET(request: NextRequest) {
     const founderAccess = isFounderEmail(user.email);
     const founderPlan = founderAccess ? getFounderPlan() : null;
     const { usage, planConfig } = await getUsageBucket(user.id, founderPlan || user.subscription?.plan, founderAccess);
-
     const jobs = await prisma.aiWorkspaceJob.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: 'desc' },
       take: 8,
     });
-
     const creditsTotal = usage.creditsIncluded + usage.creditsPurchased;
     const videoRender = getVideoRenderStatus();
 
@@ -130,9 +130,7 @@ export async function POST(request: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: {
-        subscription: true,
-      },
+      include: { subscription: true },
     });
 
     if (!user) {
@@ -145,6 +143,9 @@ export async function POST(request: NextRequest) {
     const offer = String(body.offer || '').trim();
     const audience = String(body.audience || '').trim();
     const channel = String(body.channel || '').trim();
+    const sourceAsset = String(body.sourceAsset || '').trim();
+    const outputFormat = String(body.outputFormat || '').trim();
+    const captionStyle = String(body.captionStyle || '').trim();
 
     if (!prompt || !offer) {
       return NextResponse.json({ error: 'La idea base y la oferta son obligatorias.' }, { status: 400 });
@@ -155,19 +156,20 @@ export async function POST(request: NextRequest) {
     const { usage, planConfig } = await getUsageBucket(user.id, founderPlan || user.subscription?.plan, founderAccess);
     const toolDefinition = getAiToolDefinition(tool);
     const videoRender = getVideoRenderStatus();
+    const isVideoTool = ['avatar-video', 'text-to-video', 'image-to-video', 'smart-edit'].includes(tool);
 
-    if (tool === 'video-edit' && !planConfig.canUseVideoTools) {
+    if (isVideoTool && !planConfig.canUseVideoTools) {
       return NextResponse.json(
-        { error: 'La edición de video con IA está disponible desde Growth en adelante.' },
+        { error: 'Las herramientas de video con IA están disponibles desde Growth en adelante.' },
         { status: 403 }
       );
     }
 
-    if (tool === 'video-edit' && !videoRender.ready) {
+    if (isVideoTool && !videoRender.ready) {
       return NextResponse.json(
         {
           error:
-            'El motor de render para video todavía no está conectado. No se consumieron créditos. Configura VIDEO_RENDER_PROVIDER y la API key del proveedor para habilitar text-to-video, image-to-video o avatar video real.',
+            'El motor de render para video todavía no está conectado. No se consumieron créditos. Configura VIDEO_RENDER_PROVIDER y la API key del proveedor para habilitar avatar video, text-to-video, image-to-video o smart edit real.',
         },
         { status: 412 }
       );
@@ -189,6 +191,9 @@ export async function POST(request: NextRequest) {
       offer,
       audience,
       channel,
+      sourceAsset,
+      outputFormat,
+      captionStyle,
     });
     const serializedOutput = JSON.parse(JSON.stringify(output)) as Prisma.InputJsonValue;
 

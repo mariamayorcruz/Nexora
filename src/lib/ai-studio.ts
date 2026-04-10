@@ -3,7 +3,10 @@ import { BillingPlan, getBillingPlan } from '@/lib/billing';
 export type AiToolKey =
   | 'ad-copy'
   | 'creative-brief'
-  | 'video-edit'
+  | 'avatar-video'
+  | 'text-to-video'
+  | 'image-to-video'
+  | 'smart-edit'
   | 'ugc-script'
   | 'repurpose'
   | 'email-sequence'
@@ -22,6 +25,7 @@ export interface AiToolDefinition {
   label: string;
   credits: number;
   description: string;
+  family?: 'copy' | 'video' | 'sales';
 }
 
 export interface AiOutputSlide {
@@ -73,42 +77,70 @@ export const AI_TOOL_DEFINITIONS: AiToolDefinition[] = [
     label: 'Anuncios y hooks',
     credits: 20,
     description: 'Genera hooks, promesas, pruebas, guion visual y CTA listos para campañas serias.',
+    family: 'copy',
   },
   {
     key: 'creative-brief',
     label: 'Brief creativo',
     credits: 35,
     description: 'Transforma una oferta o servicio en ángulos, pruebas y estructura narrativa.',
+    family: 'copy',
   },
   {
-    key: 'video-edit',
-    label: 'Edición de video',
+    key: 'avatar-video',
+    label: 'Avatar video',
     credits: 90,
-    description: 'Convierte una idea en guion, escenas, tomas, overlays y llamados a la acción.',
+    description: 'Prepara un video con avatar, voz, escenas, overlays y CTA listo para render.',
+    family: 'video',
+  },
+  {
+    key: 'text-to-video',
+    label: 'Text to video',
+    credits: 85,
+    description: 'Convierte una idea o brief en secuencia visual generada desde texto.',
+    family: 'video',
+  },
+  {
+    key: 'image-to-video',
+    label: 'Image to video',
+    credits: 95,
+    description: 'Toma una imagen base y la convierte en una pieza animada con dirección comercial.',
+    family: 'video',
+  },
+  {
+    key: 'smart-edit',
+    label: 'Smart edit',
+    credits: 75,
+    description: 'Edita un video existente con IA: silencios, captions, música, ritmo y variantes.',
+    family: 'video',
   },
   {
     key: 'ugc-script',
     label: 'Guion UGC',
     credits: 45,
     description: 'Crea un guion vendedor con objeción, prueba, ritmo y CTA final.',
+    family: 'sales',
   },
   {
     key: 'repurpose',
     label: 'Repurpose multicanal',
     credits: 55,
     description: 'Toma una pieza y la baja a carrusel, reel, email, WhatsApp y landing.',
+    family: 'sales',
   },
   {
     key: 'email-sequence',
     label: 'Secuencia comercial',
     credits: 30,
     description: 'Escribe follow-ups, nurturing y recuperación con foco en cierre.',
+    family: 'sales',
   },
   {
     key: 'pitch-deck',
     label: 'Pitch deck o propuesta',
     credits: 70,
     description: 'Convierte una idea en una presentación clara, elegante y lista para vender.',
+    family: 'sales',
   },
 ];
 
@@ -122,23 +154,13 @@ function toTitleCase(value: string) {
 
 function normalizeOffer(rawOffer: string) {
   const trimmed = rawOffer.trim();
-
-  if (!trimmed) {
-    return 'tu servicio principal';
-  }
-
-  if (/gotnexora\.com|nexora/i.test(trimmed)) {
-    return 'Nexora';
-  }
-
+  if (!trimmed) return 'tu servicio principal';
+  if (/gotnexora\.com|nexora/i.test(trimmed)) return 'Nexora';
   return trimmed;
 }
 
 function inferCategory(offer: string) {
-  if (/nexora/i.test(offer)) {
-    return 'plataforma de marketing y ads';
-  }
-
+  if (/nexora/i.test(offer)) return 'plataforma de marketing y ads';
   return offer;
 }
 
@@ -194,23 +216,179 @@ function buildInstagramAdCopy(params: {
           'Haz crecer tu operación con una lectura real del negocio',
         ],
       },
+    ],
+  };
+}
+
+function buildVideoStudioOutput(params: {
+  tool: AiToolKey;
+  offer: string;
+  audience: string;
+  channel: string;
+  prompt: string;
+  sourceAsset?: string;
+  outputFormat?: string;
+  captionStyle?: string;
+}) {
+  const offer = normalizeOffer(params.offer);
+  const audience = params.audience || 'tu audiencia ideal';
+  const channel = params.channel || 'video';
+  const sourceAsset = params.sourceAsset || 'sin asset especificado';
+  const outputFormat = params.outputFormat || 'vertical 9:16';
+  const captionStyle = params.captionStyle || 'bold clean';
+
+  const commonSections: AiOutputSection[] = [
+    {
+      title: 'Creative direction',
+      items: [
+        `Audiencia principal: ${audience}.`,
+        `Formato recomendado: ${outputFormat}.`,
+        `Canal objetivo: ${channel}.`,
+      ],
+    },
+    {
+      title: 'Delivery checklist',
+      items: [
+        'Abre con dolor o tensión en los primeros 2 segundos.',
+        'Muestra mecanismo o producto antes del segundo 8.',
+        'Cierra con una sola acción y sin CTA ambiguo.',
+      ],
+    },
+  ];
+
+  if (params.tool === 'avatar-video') {
+    return {
+      headline: `Avatar video listo para producir sobre ${offer}`,
+      bullets: [
+        'Hook con autoridad tranquila y promesa clara.',
+        'Presentación con avatar profesional y ritmo de venta consultiva.',
+        'Escenas cortas con prueba visible y CTA final único.',
+      ],
+      angle: `El avatar debe vender ${offer} como una solución seria, visible y fácil de entender para ${audience}.`,
+      cta: `Termina invitando a demo, prueba o contacto directo con una sola acción.`,
+      sections: [
+        {
+          title: 'Avatar setup',
+          items: [
+            'Avatar ejecutivo, confiable y moderno.',
+            'Voz en español neutro con ritmo ágil.',
+            'Fondo premium alineado con la categoría del negocio.',
+          ],
+        },
+        {
+          title: 'Storyboard',
+          items: [
+            '0-3s: problema visible y costo de seguir igual.',
+            '3-8s: promesa concreta y por qué importa hoy.',
+            '8-16s: recorrido visual o demostración del producto.',
+            '16-25s: prueba, alivio o señal de credibilidad.',
+            '25-35s: CTA limpio y accionable.',
+          ],
+        },
+        ...commonSections,
+      ],
+    };
+  }
+
+  if (params.tool === 'text-to-video') {
+    return {
+      headline: `Text-to-video para ${offer}`,
+      bullets: [
+        'Secuencia visual generada a partir del prompt principal.',
+        'Cadencia de escenas pensada para ads y reels.',
+        'Narrativa visual construida desde beneficio, prueba y CTA.',
+      ],
+      angle: `El video debe sentirse aspiracional, claro y orientado a conversión para ${audience}.`,
+      cta: 'Cierra con una invitación concreta a probar, reservar demo o solicitar más información.',
+      sections: [
+        {
+          title: 'Prompt master',
+          items: [
+            params.prompt || `Construye una pieza visual de alto impacto para vender ${offer}.`,
+            'Mantén estética limpia, moderna y pensada para performance.',
+          ],
+        },
+        {
+          title: 'Scene map',
+          items: [
+            'Escena 1: captar atención con tensión o contraste.',
+            'Escena 2: introducir la oportunidad o el cambio.',
+            'Escena 3: mostrar mecanismo o transformación.',
+            'Escena 4: aterrizar prueba y cierre.',
+          ],
+        },
+        ...commonSections,
+      ],
+    };
+  }
+
+  if (params.tool === 'image-to-video') {
+    return {
+      headline: `Image-to-video para ${offer}`,
+      bullets: [
+        'Animación comercial pensada desde una imagen base.',
+        'Movimiento suave, foco en producto y ritmo de conversión.',
+        'Versión preparada para reel, story o anuncio corto.',
+      ],
+      angle: `La imagen base debe evolucionar a una pieza dinámica que haga más entendible el valor de ${offer}.`,
+      cta: 'Cierra con CTA de prueba, contacto o demostración.',
+      sections: [
+        {
+          title: 'Source image',
+          items: [
+            `Asset base: ${sourceAsset}.`,
+            'Usa una imagen con producto, rostro o resultado visible.',
+          ],
+        },
+        {
+          title: 'Motion plan',
+          items: [
+            'Entrada con push-in o paneo ligero.',
+            'Foco en el elemento principal del frame.',
+            'Salida con texto de cierre y CTA.',
+          ],
+        },
+        ...commonSections,
+      ],
+    };
+  }
+
+  return {
+    headline: `Smart edit para ${offer}`,
+    bullets: [
+      'Corte inteligente de silencios y pausas débiles.',
+      'Captions automáticos con estilos orientados a performance.',
+      'Sugerencia de música, ritmo, highlights y variantes de salida.',
+    ],
+    angle: `La edición debe hacer que el video se sienta más corto, más claro y más vendedor para ${audience}.`,
+    cta: 'Exporta una versión principal y una variante con hook más agresivo para test A/B.',
+    sections: [
       {
-        title: 'Visual direction',
+        title: 'Edit operations',
         items: [
-          'Escena 1: caos entre varias plataformas y reportes inconexos.',
-          'Escena 2: vista limpia del dashboard de Nexora con métricas y leads visibles.',
-          'Escena 3: enfoque en decisión concreta: qué pausar, qué escalar y a quién contactar.',
-          'Escena 4: cierre con prueba gratuita o demo guiada.',
+          'Eliminar silencios largos y respiraciones innecesarias.',
+          'Acelerar bloques lentos sin perder naturalidad.',
+          'Detectar frases fuertes para convertirlas en hook o opener.',
+          'Preparar cortes para formatos vertical y horizontal.',
         ],
       },
       {
-        title: 'Proof points',
+        title: 'Caption system',
         items: [
-          proof,
-          'Control comercial y operativo desde un solo panel.',
-          'Más velocidad para ejecutar y más criterio para optimizar.',
+          `Estilo sugerido: ${captionStyle}.`,
+          'Generar captions automáticos con resaltado de palabras clave.',
+          'Crear al menos 3 estilos: clean, ads bold y creator native.',
         ],
       },
+      {
+        title: 'Media layer',
+        items: [
+          `Asset a editar: ${sourceAsset}.`,
+          'Música suave con energía comercial.',
+          'Hooks alternativos para opening de 2 segundos.',
+        ],
+      },
+      ...commonSections,
     ],
   };
 }
@@ -218,7 +396,6 @@ function buildInstagramAdCopy(params: {
 export function getAiPlanConfig(plan?: string | null, founderAccess = false) {
   const normalizedPlan = (getBillingPlan(plan)?.key || 'starter') as BillingPlan;
   const config = AI_PLAN_CONFIG[normalizedPlan];
-
   return {
     ...config,
     monthlyCredits: config.monthlyCredits + (founderAccess ? config.bonusFounderCredits : 0),
@@ -233,7 +410,6 @@ export function getCurrentCycleRange(referenceDate = new Date()) {
   const cycleStart = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1);
   const cycleEnd = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 1);
   const cycleKey = `${cycleStart.getFullYear()}-${String(cycleStart.getMonth() + 1).padStart(2, '0')}`;
-
   return { cycleKey, cycleStart, cycleEnd };
 }
 
@@ -243,12 +419,28 @@ export function buildAiOutput(params: {
   offer: string;
   audience: string;
   channel: string;
+  sourceAsset?: string;
+  outputFormat?: string;
+  captionStyle?: string;
 }): AiOutputPayload {
-  const { tool, prompt, offer, audience, channel } = params;
+  const { tool, prompt, offer, audience, channel, sourceAsset, outputFormat, captionStyle } = params;
   const trimmedOffer = normalizeOffer(offer);
   const trimmedAudience = audience || 'tu audiencia ideal';
   const trimmedChannel = channel || 'paid media';
   const basePromise = `Ayuda a ${trimmedAudience} a avanzar con ${trimmedOffer}`;
+
+  if (tool === 'avatar-video' || tool === 'text-to-video' || tool === 'image-to-video' || tool === 'smart-edit') {
+    return buildVideoStudioOutput({
+      tool,
+      offer: trimmedOffer,
+      audience: trimmedAudience,
+      channel: trimmedChannel,
+      prompt,
+      sourceAsset,
+      outputFormat,
+      captionStyle,
+    });
+  }
 
   switch (tool) {
     case 'creative-brief':
@@ -262,47 +454,6 @@ export function buildAiOutput(params: {
           'CTA: invita a demo o prueba guiada con un siguiente paso muy concreto.',
         ],
         angle: `Usa ${trimmedChannel} para mostrar producto primero y beneficios después.`,
-      };
-    case 'video-edit':
-      return {
-        headline: `Edición comercial para video de ${trimmedOffer}`,
-        bullets: [
-          'Escena 1 (0-3s): abrir con dolor reconocible y promesa directa.',
-          'Escena 2 (3-8s): mostrar dashboard, flujo o resultado real.',
-          'Escena 3 (8-16s): resolver objeción con demostración concreta.',
-          'Escena 4 (16-24s): CTA corto con urgencia suave y claridad.',
-          'Overlay recomendado: tres frases máximas, tipografía limpia y prueba visible.',
-        ],
-        angle: `Prioriza ritmo corto, rostro humano y resultado tangible para ${trimmedAudience}.`,
-        cta: `Cierra con una invitación breve a prueba, demo o activación guiada de ${trimmedOffer}.`,
-        sections: [
-          {
-            title: 'Dirección de avatar',
-            items: [
-              'Profesional, confiable y orientado a resultados.',
-              'Mirada directa a cámara con tono consultivo, no teatral.',
-              'Fondo limpio de oficina o entorno premium relacionado con negocio.',
-            ],
-          },
-          {
-            title: 'Storyboard',
-            items: [
-              '0-3s: dolor visible y tensión operativa.',
-              '3-8s: promesa concreta y por qué importa ahora.',
-              '8-16s: demostración o recorrido por producto.',
-              '16-24s: prueba, resultado o señal de credibilidad.',
-              '24-30s: CTA con acción única.',
-            ],
-          },
-          {
-            title: 'Overlays en pantalla',
-            items: [
-              'Una sola idea por escena.',
-              'Máximo 5 palabras por overlay.',
-              'Usa contraste fuerte y prueba visual antes de claim abstracto.',
-            ],
-          },
-        ],
       };
     case 'ugc-script':
       return {
