@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
 interface SupportReply {
@@ -22,6 +23,7 @@ const STARTERS = [
 ];
 
 export default function DashboardChatbot() {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -29,11 +31,11 @@ export default function DashboardChatbot() {
     {
       role: 'assistant',
       title: 'Asistente Nexora',
-      text: 'Puedo ayudarte con campañas, creatividad, conexiones, soporte y facturación sin salir del panel.',
+      text: 'Puedo ayudarte con campañas, creatividad, conexiones, funnel, CRM, soporte y facturación sin salir del panel.',
       steps: [
         'Pregunta en lenguaje natural.',
         'Te devuelvo diagnóstico y siguiente paso.',
-        'Si hace falta, luego escalamos a soporte humano.',
+        'Uso el contexto de la pantalla actual para darte una respuesta más útil.',
       ],
     },
   ]);
@@ -54,7 +56,7 @@ export default function DashboardChatbot() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ message: trimmed }),
+        body: JSON.stringify({ message: trimmed, page: pathname }),
       });
 
       const data = await response.json();
@@ -106,7 +108,7 @@ export default function DashboardChatbot() {
             <p className="text-xs uppercase tracking-[0.3em] text-cyan-300">Chatbot Nexora</p>
             <h3 className="mt-2 text-xl font-semibold">Asistencia estratégica dentro del panel</h3>
             <p className="mt-2 text-sm leading-6 text-slate-300">
-              Resuelve dudas de campañas, creatividad, facturación y conexiones sin salir de tu flujo.
+              Resuelve dudas de campañas, creatividad, propuestas, facturación y conexiones sin salir de tu flujo.
             </p>
           </div>
 

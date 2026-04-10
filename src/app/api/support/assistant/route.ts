@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
 
     const token = authHeader.substring(7);
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret-key') as { userId: string };
-    const { message } = (await request.json()) as { message?: string };
+    const { message, page } = (await request.json()) as { message?: string; page?: string };
 
     if (!message?.trim()) {
       return NextResponse.json({ error: 'Describe tu duda para poder ayudarte.' }, { status: 400 });
@@ -34,7 +34,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const reply = buildAiSupportReply(message, {
+    const contextualMessage = page ? `${message}\n\nContexto actual del usuario: ${page}` : message;
+
+    const reply = buildAiSupportReply(contextualMessage, {
       name: user.name,
       plan: user.subscription?.plan || null,
       founderAccess: isFounderEmail(user.email),

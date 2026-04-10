@@ -20,6 +20,7 @@ interface AiJob {
     headline?: string;
     bullets?: string[];
     angle?: string;
+    slides?: { title: string; bullets: string[] }[];
   } | null;
   createdAt: string;
 }
@@ -147,11 +148,11 @@ export default function DashboardStudioPage() {
           <div>
             <p className="text-xs uppercase tracking-[0.32em] text-amber-200">AI Studio</p>
             <h1 className="mt-4 text-4xl font-semibold leading-tight">
-              Crea, edita y repurpose contenido con una capa premium de IA.
+              Crea, edita y convierte ideas en activos listos para vender.
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-              Nexora convierte ideas, ofertas y objetivos comerciales en hooks, briefs, guiones, secuencias y
-              estructuras de video listas para operar mejor cada campaña.
+              Nexora convierte ideas, ofertas y objetivos comerciales en hooks, briefs, secuencias, guiones y ahora
+              también propuestas o presentaciones tipo pitch listas para presentar.
             </p>
             <p className="mt-4 text-sm leading-6 text-amber-100/90">{usage?.supportLabel}</p>
           </div>
@@ -169,14 +170,18 @@ export default function DashboardStudioPage() {
               <p className="mt-3 text-2xl font-semibold text-white">
                 {usage?.canUseVideoTools ? 'Activo' : 'Disponible desde Growth'}
               </p>
-              <p className="mt-2 text-sm text-slate-300">Hasta {usage?.maxExportsPerRun ?? 0} salidas por ejecución.</p>
+              <p className="mt-2 text-sm text-slate-300">
+                Hasta {usage?.maxExportsPerRun ?? 0} salidas por ejecución.
+              </p>
             </div>
           </div>
         </div>
       </section>
 
       {message && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-sm">{message}</div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-sm">
+          {message}
+        </div>
       )}
 
       <section className="grid gap-5 md:grid-cols-4">
@@ -244,7 +249,7 @@ export default function DashboardStudioPage() {
                 value={form.channel}
                 onChange={(event) => setForm((current) => ({ ...current, channel: event.target.value }))}
                 className="input-field"
-                placeholder="Meta Ads, email, WhatsApp, TikTok..."
+                placeholder="Meta Ads, email, WhatsApp, pitch deck, ventas..."
               />
             </label>
             <label className="block md:col-span-2">
@@ -260,6 +265,11 @@ export default function DashboardStudioPage() {
 
           <div className="mt-6 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
             {selectedTool?.description || 'Selecciona una herramienta para ver su enfoque.'}
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            Inspirado en la velocidad de Gamma: si eliges pitch deck, Nexora generará una estructura clara de slides
+            lista para presentar o bajar luego a Canva, PDF o deck visual.
           </div>
 
           <button onClick={handleGenerate} disabled={submitting} className="mt-6 btn-primary">
@@ -319,7 +329,23 @@ export default function DashboardStudioPage() {
                   </p>
                 )}
 
-                {job.output?.bullets?.length ? (
+                {job.output?.slides?.length ? (
+                  <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                    {job.output.slides.map((slide, index) => (
+                      <div key={`${job.id}-slide-${index}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Slide {index + 1}</p>
+                        <p className="mt-2 font-semibold text-slate-900">{slide.title}</p>
+                        <div className="mt-3 space-y-2">
+                          {slide.bullets.map((bullet) => (
+                            <div key={bullet} className="rounded-xl bg-white px-3 py-2 text-sm leading-6 text-slate-700">
+                              {bullet}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : job.output?.bullets?.length ? (
                   <div className="mt-4 grid gap-3 md:grid-cols-2">
                     {job.output.bullets.map((bullet) => (
                       <div key={bullet} className="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">

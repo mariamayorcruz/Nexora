@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { buildAiOutput, getAiPlanConfig, getAiToolDefinition, type AiToolKey, AI_TOOL_DEFINITIONS, getCurrentCycleRange } from '@/lib/ai-studio';
 import { getFounderPlan, isFounderEmail } from '@/lib/access';
+import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -157,6 +158,7 @@ export async function POST(request: NextRequest) {
       audience,
       channel,
     });
+    const serializedOutput = JSON.parse(JSON.stringify(output)) as Prisma.InputJsonValue;
 
     const result = await prisma.$transaction(async (tx) => {
       const job = await tx.aiWorkspaceJob.create({
@@ -167,7 +169,7 @@ export async function POST(request: NextRequest) {
           prompt,
           channel: channel || null,
           creditsUsed: toolDefinition.credits,
-          output,
+          output: serializedOutput,
         },
       });
 

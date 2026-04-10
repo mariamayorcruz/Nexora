@@ -6,7 +6,8 @@ export type AiToolKey =
   | 'video-edit'
   | 'ugc-script'
   | 'repurpose'
-  | 'email-sequence';
+  | 'email-sequence'
+  | 'pitch-deck';
 
 export interface AiPlanConfig {
   monthlyCredits: number;
@@ -23,27 +24,39 @@ export interface AiToolDefinition {
   description: string;
 }
 
+export interface AiOutputSlide {
+  title: string;
+  bullets: string[];
+}
+
+export interface AiOutputPayload {
+  headline: string;
+  bullets: string[];
+  angle: string;
+  slides?: AiOutputSlide[];
+}
+
 export const AI_PLAN_CONFIG: Record<BillingPlan, AiPlanConfig> = {
   starter: {
     monthlyCredits: 250,
     bonusFounderCredits: 500,
     canUseVideoTools: false,
     maxExportsPerRun: 2,
-    supportLabel: 'IA base para validar ideas y producir piezas ligeras.',
+    supportLabel: 'IA base para validar ideas, mejorar mensajes y producir piezas ligeras.',
   },
   professional: {
     monthlyCredits: 1800,
     bonusFounderCredits: 1200,
     canUseVideoTools: true,
     maxExportsPerRun: 4,
-    supportLabel: 'Bolsa sólida para operar campañas activas durante todo el mes.',
+    supportLabel: 'Bolsa sólida para operar campañas activas, presentaciones y contenido todo el mes.',
   },
   enterprise: {
     monthlyCredits: 6500,
     bonusFounderCredits: 2500,
     canUseVideoTools: true,
     maxExportsPerRun: 8,
-    supportLabel: 'Capacidad amplia para equipos intensivos en contenido, video y optimización.',
+    supportLabel: 'Capacidad amplia para equipos intensivos en contenido, pitch, video y optimización continua.',
   },
 };
 
@@ -84,6 +97,12 @@ export const AI_TOOL_DEFINITIONS: AiToolDefinition[] = [
     credits: 30,
     description: 'Escribe follow-ups, nurturing y recuperación con foco en cierre.',
   },
+  {
+    key: 'pitch-deck',
+    label: 'Pitch deck o propuesta',
+    credits: 70,
+    description: 'Convierte una idea en una presentación clara, elegante y lista para vender.',
+  },
 ];
 
 export function getAiPlanConfig(plan?: string | null, founderAccess = false) {
@@ -114,7 +133,7 @@ export function buildAiOutput(params: {
   offer: string;
   audience: string;
   channel: string;
-}) {
+}): AiOutputPayload {
   const { tool, prompt, offer, audience, channel } = params;
   const trimmedOffer = offer || 'tu servicio principal';
   const trimmedAudience = audience || 'tu audiencia ideal';
@@ -129,8 +148,8 @@ export function buildAiOutput(params: {
           `Problema visible: ${trimmedAudience} siente fricción al intentar crecer sin sistema.`,
           `Promesa principal: ${basePromise} con más claridad, control y velocidad.`,
           `Prueba sugerida: mostrar antes y después, captura del dashboard o caso rápido.`,
-          `Objeción a resolver: “ya probé otras herramientas y no tuve visibilidad real”.`,
-          `CTA: invita a demo o prueba guiada con siguiente paso muy concreto.`,
+          'Objeción a resolver: “ya probé otras herramientas y no tuve visibilidad real”.',
+          'CTA: invita a demo o prueba guiada con un siguiente paso muy concreto.',
         ],
         angle: `Usa ${trimmedChannel} para mostrar producto primero y beneficios después.`,
       };
@@ -151,20 +170,20 @@ export function buildAiOutput(params: {
         headline: `Guion UGC para ${trimmedOffer}`,
         bullets: [
           `Hook: “Si ${trimmedAudience} sigue haciendo esto así, está perdiendo margen”.`,
-          `Contexto: mostrar una escena cotidiana donde el problema ya se note.`,
-          `Prueba: enseñar cómo ${trimmedOffer} simplifica la operación o acelera resultados.`,
-          'Cierre: reforzar control, tranquilidad y una acción específica.',
+          'Contexto: muestra una escena cotidiana donde el problema ya se note.',
+          `Prueba: enseña cómo ${trimmedOffer} simplifica la operación o acelera resultados.`,
+          'Cierre: refuerza control, tranquilidad y una acción específica.',
         ],
-        angle: `Haz que suene nativo y conversacional, no como anuncio leído.`,
+        angle: 'Haz que suene nativo y conversacional, no como un anuncio leído.',
       };
     case 'repurpose':
       return {
-        headline: `Repurpose multicanal desde una sola idea`,
+        headline: 'Repurpose multicanal desde una sola idea',
         bullets: [
-          `Reel: una objeción + una prueba + un CTA.`,
-          `Carrusel: dolor, oportunidad, método, resultado y cierre.`,
-          `Email: asunto corto, gancho rápido y CTA de respuesta.`,
-          `WhatsApp: mensaje breve con valor, contexto y siguiente paso.`,
+          'Reel: una objeción, una prueba y un CTA.',
+          'Carrusel: dolor, oportunidad, método, resultado y cierre.',
+          'Email: asunto corto, gancho rápido y CTA de respuesta.',
+          'WhatsApp: mensaje breve con valor, contexto y siguiente paso.',
         ],
         angle: `Mantén la misma promesa en anuncio, landing y seguimiento para ${trimmedAudience}.`,
       };
@@ -176,7 +195,60 @@ export function buildAiOutput(params: {
           'Email 2: objeción más común y prueba o mini caso.',
           'Email 3: urgencia racional, siguiente paso y recordatorio simple.',
         ],
-        angle: `Escribe como si estuvieras abriendo una conversación útil, no empujando una venta.`,
+        angle: 'Escribe como si abrieras una conversación útil, no como si empujaras una venta.',
+      };
+    case 'pitch-deck':
+      return {
+        headline: `Presentación lista para vender ${trimmedOffer}`,
+        bullets: [
+          'Abre con la oportunidad principal, no con contexto genérico.',
+          'Muestra el problema, la solución, la prueba y el siguiente paso con una sola narrativa.',
+          'Mantén una idea fuerte por slide para que la propuesta se entienda rápido.',
+          'Cierra con una acción concreta: demo, llamada o aprobación.',
+        ],
+        angle: `Usa un tono claro, elegante y orientado a resultados para ${trimmedAudience}.`,
+        slides: [
+          {
+            title: 'Portada y promesa',
+            bullets: [
+              `${trimmedOffer} en una frase clara.`,
+              `Promesa principal para ${trimmedAudience}.`,
+              'Resultado o mejora que se puede esperar.',
+            ],
+          },
+          {
+            title: 'Problema y contexto',
+            bullets: [
+              `Qué está frenando hoy a ${trimmedAudience}.`,
+              'Costo de seguir igual.',
+              'Por qué ahora es un buen momento para actuar.',
+            ],
+          },
+          {
+            title: 'Solución y enfoque',
+            bullets: [
+              `Cómo ${trimmedOffer} resuelve el problema.`,
+              `Qué cambia en ${trimmedChannel} o en la operación comercial.`,
+              'Qué hace más simple o más rápido.',
+            ],
+          },
+          {
+            title: 'Prueba y validación',
+            bullets: [
+              'Datos, ejemplos, capturas o señales de confianza.',
+              'Comparativa antes y después.',
+              'Objeción principal resuelta.',
+            ],
+          },
+          {
+            title: 'Oferta y siguiente paso',
+            bullets: [
+              'Qué incluye la propuesta.',
+              'Qué plazo o formato de arranque se recomienda.',
+              'CTA: demo, reunión o activación guiada.',
+            ],
+          },
+        ],
       };
     case 'ad-copy':
     default:
@@ -184,9 +256,9 @@ export function buildAiOutput(params: {
         headline: `Hooks y copies listos para ${trimmedOffer}`,
         bullets: [
           `Hook 1: “${trimmedAudience} no necesita más ruido; necesita una promesa más creíble.”`,
-          `Hook 2: “Lo que más convierte hoy no es volumen, es claridad sobre el siguiente resultado.”`,
+          'Hook 2: “Lo que más convierte hoy no es volumen, es claridad sobre el siguiente resultado.”',
           `Hook 3: “Si ${trimmedOffer} todavía se explica demasiado, la creatividad está perdiendo atención.”`,
-          `CTA: invita a prueba, demo o contacto con una acción única.`,
+          'CTA: invita a prueba, demo o contacto con una acción única.',
         ],
         angle: `${prompt || basePromise} enfocado en ${trimmedChannel}.`,
       };
