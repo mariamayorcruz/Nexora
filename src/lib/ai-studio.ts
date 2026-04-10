@@ -29,11 +29,18 @@ export interface AiOutputSlide {
   bullets: string[];
 }
 
+export interface AiOutputSection {
+  title: string;
+  items: string[];
+}
+
 export interface AiOutputPayload {
   headline: string;
   bullets: string[];
   angle: string;
   slides?: AiOutputSlide[];
+  sections?: AiOutputSection[];
+  cta?: string;
 }
 
 export const AI_PLAN_CONFIG: Record<BillingPlan, AiPlanConfig> = {
@@ -171,6 +178,40 @@ function buildInstagramAdCopy(params: {
       `Dirección estratégica: vende ${offerDisplay} como ${category} premium, no como software genérico. ${urgency}. ${prompt ? `Usa este matiz adicional como capa narrativa: ${prompt}.` : 'Prioriza claridad, autoridad y resultado visible antes que promesas genéricas.'}`,
     ],
     angle: `${offerDisplay} debe venderse como un sistema de control y crecimiento, no como otra herramienta más.`,
+    cta: 'Empieza tu prueba o agenda una demo para ver cómo Nexora convierte claridad en decisiones más rentables.',
+    sections: [
+      {
+        title: 'Primary text',
+        items: [
+          `${offerDisplay} ayuda a ${audience} a ${promise}. Si hoy inviertes en anuncios, generas contactos y aun así sientes que todo depende de intuición, ${offerDisplay} te devuelve control sobre lo que está funcionando y sobre lo que conviene hacer después.`,
+        ],
+      },
+      {
+        title: 'Headlines',
+        items: [
+          'Centraliza ads, leads y pipeline en un solo sistema',
+          'Menos caos operativo. Más claridad para vender.',
+          'Haz crecer tu operación con una lectura real del negocio',
+        ],
+      },
+      {
+        title: 'Visual direction',
+        items: [
+          'Escena 1: caos entre varias plataformas y reportes inconexos.',
+          'Escena 2: vista limpia del dashboard de Nexora con métricas y leads visibles.',
+          'Escena 3: enfoque en decisión concreta: qué pausar, qué escalar y a quién contactar.',
+          'Escena 4: cierre con prueba gratuita o demo guiada.',
+        ],
+      },
+      {
+        title: 'Proof points',
+        items: [
+          proof,
+          'Control comercial y operativo desde un solo panel.',
+          'Más velocidad para ejecutar y más criterio para optimizar.',
+        ],
+      },
+    ],
   };
 }
 
@@ -233,6 +274,35 @@ export function buildAiOutput(params: {
           'Overlay recomendado: tres frases máximas, tipografía limpia y prueba visible.',
         ],
         angle: `Prioriza ritmo corto, rostro humano y resultado tangible para ${trimmedAudience}.`,
+        cta: `Cierra con una invitación breve a prueba, demo o activación guiada de ${trimmedOffer}.`,
+        sections: [
+          {
+            title: 'Dirección de avatar',
+            items: [
+              'Profesional, confiable y orientado a resultados.',
+              'Mirada directa a cámara con tono consultivo, no teatral.',
+              'Fondo limpio de oficina o entorno premium relacionado con negocio.',
+            ],
+          },
+          {
+            title: 'Storyboard',
+            items: [
+              '0-3s: dolor visible y tensión operativa.',
+              '3-8s: promesa concreta y por qué importa ahora.',
+              '8-16s: demostración o recorrido por producto.',
+              '16-24s: prueba, resultado o señal de credibilidad.',
+              '24-30s: CTA con acción única.',
+            ],
+          },
+          {
+            title: 'Overlays en pantalla',
+            items: [
+              'Una sola idea por escena.',
+              'Máximo 5 palabras por overlay.',
+              'Usa contraste fuerte y prueba visual antes de claim abstracto.',
+            ],
+          },
+        ],
       };
     case 'ugc-script':
       return {
@@ -244,6 +314,17 @@ export function buildAiOutput(params: {
           'Cierre: refuerza control, tranquilidad y una acción específica.',
         ],
         angle: 'Haz que suene nativo y conversacional, no como un anuncio leído.',
+        sections: [
+          {
+            title: 'Estructura',
+            items: [
+              'Hook directo con objeción o dolor reconocible.',
+              'Demostración breve de producto o experiencia.',
+              'Resultado visible o alivio inmediato.',
+              'CTA corto y claro.',
+            ],
+          },
+        ],
       };
     case 'repurpose':
       return {
@@ -276,6 +357,7 @@ export function buildAiOutput(params: {
           'Cierra con una acción concreta: demo, llamada o aprobación.',
         ],
         angle: `Usa un tono claro, elegante y orientado a resultados para ${trimmedAudience}.`,
+        cta: 'Cierra con una propuesta concreta y un siguiente paso fácil de aceptar.',
         slides: [
           {
             title: 'Portada y promesa',
@@ -341,6 +423,17 @@ export function buildAiOutput(params: {
           'CTA: invita a una sola acción con bajo riesgo, alta claridad y una promesa concreta del siguiente paso.',
         ],
         angle: `${prompt || basePromise} enfocado en ${trimmedChannel}, con una narrativa más premium, más creíble y orientada a conversión.`,
+        sections: [
+          {
+            title: 'Estructura recomendada',
+            items: [
+              'Hook de dolor o tensión real.',
+              'Promesa concreta y entendible.',
+              'Prueba o mecanismo.',
+              'CTA con acción única.',
+            ],
+          },
+        ],
       };
   }
 }

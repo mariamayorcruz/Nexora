@@ -12,10 +12,6 @@ interface FunnelCampaign {
     spend: number;
     revenue?: number;
   } | null;
-  adAccount?: {
-    platform: string;
-    accountName: string;
-  } | null;
 }
 
 interface FunnelUser {
@@ -31,102 +27,88 @@ interface FunnelUser {
 interface LeadCapture {
   id: string;
   email: string;
+  name?: string | null;
   source: string;
   resource: string;
   createdAt: string;
   convertedToCrmAt?: string | null;
+  crmLeadId?: string | null;
 }
 
-interface FunnelAssumptions {
-  averageDeal: number;
-  responseRate: number;
-  qualificationRate: number;
-  proposalRate: number;
-  closeRate: number;
+interface CrmLead {
+  id: string;
+  name: string;
+  email?: string | null;
+  company?: string | null;
+  source: string;
+  stage: string;
+  value: number;
+  confidence: number;
+  nextAction?: string | null;
+  updatedAt: string;
 }
 
-const DEFAULT_ASSUMPTIONS: FunnelAssumptions = {
-  averageDeal: 1200,
-  responseRate: 58,
-  qualificationRate: 62,
-  proposalRate: 48,
-  closeRate: 34,
-};
+const STAGES = [
+  { key: 'lead', label: 'Lead' },
+  { key: 'contacted', label: 'Contactado' },
+  { key: 'qualified', label: 'Calificado' },
+  { key: 'proposal', label: 'Propuesta' },
+  { key: 'won', label: 'Cerrado' },
+] as const;
 
 export default function FunnelPage() {
   const [campaigns, setCampaigns] = useState<FunnelCampaign[]>([]);
   const [captures, setCaptures] = useState<LeadCapture[]>([]);
+  const [crmLeads, setCrmLeads] = useState<CrmLead[]>([]);
   const [user, setUser] = useState<FunnelUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [assumptions, setAssumptions] = useState<FunnelAssumptions>(DEFAULT_ASSUMPTIONS);
+  const [message, setMessage] = useState('');
 
-  useEffect(() => {
-    const savedAssumptions = localStorage.getItem('nexoraFunnelAssumptions');
-    if (!savedAssumptions) return;
-
+  const fetchData = async () => {
     try {
-      const parsed = JSON.parse(savedAssumptions) as Partial<FunnelAssumptions>;
-      setAssumptions((current) => ({
-        ...current,
-        ...parsed,
-      }));
+      const token = localStorage.getItem('token');
+      const [userResponse, capturesResponse, crmResponse] = await Promise.all([
+        fetch('/api/users/me', {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        }),
+        fetch('/api/business/leads', {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        }),
+        fetch('/api/crm/leads', {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        }),
+      ]);
+
+      const userData = await userResponse.json();
+      const capturesData = capturesResponse.ok ? await capturesResponse.json() : { captures: [] };
+      const crmData = crmResponse.ok ? await crmResponse.json() : { leads: [] };
+
+      setCampaigns(userData.campaigns || []);
+      setUser(userData.user);
+      setCaptures(capturesData.captures || []);
+      setCrmLeads(crmData.leads || []);
     } catch (error) {
-      console.error('Error reading funnel assumptions:', error);
+      console.error('Error fetching funnel data:', error);
+      setMessage('No pudimos cargar el funnel completo en este momento.');
+    } finally {
+      setLoading(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
-    localStorage.setItem('nexoraFunnelAssumptions', JSON.stringify(assumptions));
-  }, [assumptions]);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const [userResponse, capturesResponse] = await Promise.all([
-          fetch('/api/users/me', {
-            headers: { Authorization: `Bearer ${token}` },
-            cache: 'no-store',
-          }),
-          fetch('/api/business/leads', {
-            headers: { Authorization: `Bearer ${token}` },
-            cache: 'no-store',
-          }),
-        ]);
-
-        const data = await userResponse.json();
-        const capturesData = capturesResponse.ok ? await capturesResponse.json() : { captures: [] };
-        setCampaigns(data.campaigns || []);
-        setUser(data.user);
-        setCaptures(capturesData.captures || []);
-      } catch (error) {
-        console.error('Error fetching funnel data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     void fetchData();
   }, []);
 
   const funnel = useMemo(() => {
-    const totals = campaigns.reduce(
+    const campaignTotals = campaigns.reduce(
       (accumulator, campaign) => {
         accumulator.impressions += campaign.analytics?.impressions || 0;
         accumulator.clicks += campaign.analytics?.clicks || 0;
         accumulator.conversions += campaign.analytics?.conversions || 0;
         accumulator.spend += campaign.analytics?.spend || 0;
-        accumulator.revenue += campaign.analytics?.revenue || 0;
-
-        const platform = campaign.adAccount?.platform || 'sin fuente';
-        accumulator.byPlatform[platform] = {
-          platform,
-          accountName: campaign.adAccount?.accountName || 'Cuenta principal',
-          clicks: (accumulator.byPlatform[platform]?.clicks || 0) + (campaign.analytics?.clicks || 0),
-          conversions: (accumulator.byPlatform[platform]?.conversions || 0) + (campaign.analytics?.conversions || 0),
-          spend: (accumulator.byPlatform[platform]?.spend || 0) + (campaign.analytics?.spend || 0),
-        };
-
         return accumulator;
       },
       {
@@ -134,68 +116,117 @@ export default function FunnelPage() {
         clicks: 0,
         conversions: 0,
         spend: 0,
-        revenue: 0,
-        byPlatform: {} as Record<
-          string,
-          { platform: string; accountName: string; clicks: number; conversions: number; spend: number }
-        >,
       }
     );
 
+    const counts = {
+      lead: crmLeads.filter((lead) => lead.stage === 'lead').length,
+      contacted: crmLeads.filter((lead) => lead.stage === 'contacted').length,
+      qualified: crmLeads.filter((lead) => lead.stage === 'qualified').length,
+      proposal: crmLeads.filter((lead) => lead.stage === 'proposal').length,
+      won: crmLeads.filter((lead) => lead.stage === 'won').length,
+    };
+
     const capturedLeads = captures.length;
-    const conversionDrivenLeads =
-      totals.conversions > 0 ? totals.conversions : Math.max(1, Math.round(totals.clicks * 0.08));
-    const baseLeads = Math.max(capturedLeads, conversionDrivenLeads);
-    const contacted = Math.round(baseLeads * (assumptions.responseRate / 100));
-    const qualified = Math.round(contacted * (assumptions.qualificationRate / 100));
-    const proposals = Math.round(qualified * (assumptions.proposalRate / 100));
-    const wins = Math.max(0, Math.round(proposals * (assumptions.closeRate / 100)));
-    const pipelineValue = proposals * assumptions.averageDeal;
-    const forecast = wins * assumptions.averageDeal;
-    const costPerLead = baseLeads > 0 ? totals.spend / baseLeads : 0;
+    const leadsInSystem = Math.max(
+      capturedLeads,
+      crmLeads.length,
+      campaignTotals.conversions > 0 ? campaignTotals.conversions : Math.round(campaignTotals.clicks * 0.08)
+    );
+
+    const contacted = counts.contacted + counts.qualified + counts.proposal + counts.won;
+    const qualified = counts.qualified + counts.proposal + counts.won;
+    const proposals = counts.proposal + counts.won;
+    const wins = counts.won;
+    const averageDeal =
+      crmLeads.filter((lead) => lead.value > 0).reduce((sum, lead) => sum + lead.value, 0) /
+        Math.max(1, crmLeads.filter((lead) => lead.value > 0).length) || 1200;
+    const pipelineValue = crmLeads.filter((lead) => lead.stage !== 'won').reduce((sum, lead) => sum + lead.value, 0);
+    const forecast = crmLeads.reduce((sum, lead) => sum + lead.value * (lead.confidence / 100), 0);
+    const costPerLead = leadsInSystem > 0 ? campaignTotals.spend / leadsInSystem : 0;
 
     const stages = [
-      { id: 'leads', label: 'Leads detectados', value: baseLeads },
-      { id: 'contacted', label: 'Contactos con respuesta esperada', value: contacted },
-      { id: 'qualified', label: 'Oportunidades calificadas', value: qualified },
-      { id: 'proposals', label: 'Propuestas o demos con potencial', value: proposals },
-      { id: 'wins', label: 'Ventas probables', value: wins },
+      { id: 'leads', label: 'Leads en sistema', value: leadsInSystem },
+      { id: 'contacted', label: 'Contactados', value: contacted },
+      { id: 'qualified', label: 'Calificados', value: qualified },
+      { id: 'proposals', label: 'Propuestas activas', value: proposals },
+      { id: 'wins', label: 'Cierres', value: wins },
     ];
 
-    const topStageValue = Math.max(...stages.map((stage) => stage.value), 1);
-    const nextBottleneck = stages.find((stage, index) => index > 0 && stage.value < stages[index - 1].value * 0.55);
-
-    const contactSources = Object.values(totals.byPlatform)
-      .sort((left, right) => right.conversions - left.conversions || right.clicks - left.clicks)
-      .map((source) => {
-        const estimatedContacts = source.conversions > 0 ? source.conversions : Math.max(1, Math.round(source.clicks * 0.06));
-        const likelyWins = Math.max(0, Math.round(estimatedContacts * (assumptions.closeRate / 100)));
-        return {
-          ...source,
-          estimatedContacts,
-          likelyWins,
-          estimatedValue: likelyWins * assumptions.averageDeal,
-        };
-      });
-
     return {
-      totals,
-      stages,
-      topStageValue,
+      campaignTotals,
+      leadsInSystem,
       capturedLeads,
-      baseLeads,
       contacted,
       qualified,
       proposals,
       wins,
+      averageDeal,
       pipelineValue,
       forecast,
       costPerLead,
-      nextBottleneck,
-      contactSources,
+      stages,
+      topStageValue: Math.max(...stages.map((stage) => stage.value), 1),
       recentCaptures: captures.slice(0, 6),
+      activeOpportunities: crmLeads
+        .filter((lead) => lead.stage !== 'won')
+        .sort((left, right) => right.value - left.value || right.confidence - left.confidence)
+        .slice(0, 8),
     };
-  }, [campaigns, assumptions, captures]);
+  }, [campaigns, captures, crmLeads]);
+
+  const moveLead = async (leadId: string, stage: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/crm/leads/${leadId}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          stage,
+          lastContactedAt: new Date().toISOString(),
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'No se pudo actualizar la etapa.');
+      }
+
+      setMessage('Etapa actualizada correctamente.');
+      await fetchData();
+    } catch (error) {
+      console.error('Error updating lead stage:', error);
+      setMessage(error instanceof Error ? error.message : 'No se pudo actualizar la etapa.');
+    }
+  };
+
+  const promoteCapture = async (captureId: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/business/leads', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ captureId }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'No se pudo pasar el lead al CRM.');
+      }
+
+      setMessage('Lead captado pasado al CRM correctamente.');
+      await fetchData();
+    } catch (error) {
+      console.error('Error promoting capture:', error);
+      setMessage(error instanceof Error ? error.message : 'No se pudo pasar el lead al CRM.');
+    }
+  };
 
   if (loading) {
     return (
@@ -229,54 +260,60 @@ export default function FunnelPage() {
         <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
           <div>
             <p className="text-xs uppercase tracking-[0.32em] text-cyan-300">Funnel comercial</p>
-            <h1 className="mt-4 text-4xl font-semibold leading-tight">Tus contactos, interesados y ventas probables en una sola lectura.</h1>
+            <h1 className="mt-4 text-4xl font-semibold leading-tight">
+              Ahora sí: interesados reales, oportunidades activas y etapas que puedes mover.
+            </h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-              Este panel ya no mira solo campañas: también integra personas que dejaron su email en tus recursos para que el forecast se acerque más al negocio real.
+              Esta vista combina captación, CRM y pipeline. Ya no es solo forecast: aquí puedes ver quién se interesó, quién está en CRM y en qué etapa está cada oportunidad.
             </p>
           </div>
 
           <div className="rounded-[28px] border border-white/10 bg-white/5 p-6">
-            <p className="text-sm text-slate-300">Forecast estimado</p>
-            <p className="mt-3 text-5xl font-semibold">${funnel.forecast.toLocaleString()}</p>
+            <p className="text-sm text-slate-300">Forecast real del pipeline</p>
+            <p className="mt-3 text-5xl font-semibold">${Math.round(funnel.forecast).toLocaleString()}</p>
             <p className="mt-4 text-sm leading-6 text-slate-300">
-              Basado en {funnel.proposals} oportunidades con propuesta y una tasa de cierre configurada del {assumptions.closeRate}%.
+              Basado en {crmLeads.length} leads del CRM, confianza individual y valor estimado por oportunidad.
             </p>
           </div>
         </div>
       </section>
 
+      {message && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-sm">{message}</div>
+      )}
+
       <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
         <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-gray-500">Leads detectados</p>
-          <p className="mt-3 text-3xl font-semibold text-gray-900">{funnel.baseLeads}</p>
-          <p className="mt-2 text-sm text-gray-500">Combinando campañas y captación real.</p>
+          <p className="text-sm text-gray-500">Leads en sistema</p>
+          <p className="mt-3 text-3xl font-semibold text-gray-900">{funnel.leadsInSystem}</p>
+          <p className="mt-2 text-sm text-gray-500">Campañas, captación y CRM combinados.</p>
         </div>
         <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
           <p className="text-sm text-gray-500">Interesados captados</p>
           <p className="mt-3 text-3xl font-semibold text-gray-900">{funnel.capturedLeads}</p>
-          <p className="mt-2 text-sm text-gray-500">Leads reales desde master class y recursos.</p>
+          <p className="mt-2 text-sm text-gray-500">Personas que dejaron sus datos.</p>
         </div>
         <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-gray-500">Ventas probables</p>
-          <p className="mt-3 text-3xl font-semibold text-gray-900">{funnel.wins}</p>
-          <p className="mt-2 text-sm text-gray-500">Con el cierre actual de tu operación.</p>
+          <p className="text-sm text-gray-500">Propuestas activas</p>
+          <p className="mt-3 text-3xl font-semibold text-gray-900">{funnel.proposals}</p>
+          <p className="mt-2 text-sm text-gray-500">Oportunidades en tramo de cierre.</p>
         </div>
         <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
           <p className="text-sm text-gray-500">Valor del pipeline</p>
-          <p className="mt-3 text-3xl font-semibold text-gray-900">${funnel.pipelineValue.toLocaleString()}</p>
-          <p className="mt-2 text-sm text-gray-500">Valor potencial de demos, propuestas y oportunidades.</p>
+          <p className="mt-3 text-3xl font-semibold text-gray-900">${Math.round(funnel.pipelineValue).toLocaleString()}</p>
+          <p className="mt-2 text-sm text-gray-500">Sin contar cierres ya ganados.</p>
         </div>
         <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
           <p className="text-sm text-gray-500">Costo por lead</p>
           <p className="mt-3 text-3xl font-semibold text-gray-900">${funnel.costPerLead.toFixed(0)}</p>
-          <p className="mt-2 text-sm text-gray-500">Lectura rápida para saber cuánto cuesta abrir conversación.</p>
+          <p className="mt-2 text-sm text-gray-500">Lectura rápida de adquisición.</p>
         </div>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+      <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
         <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-          <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Embudo estimado</p>
-          <h2 className="mt-2 text-2xl font-semibold text-gray-900">Dónde están tus oportunidades reales</h2>
+          <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Embudo operativo</p>
+          <h2 className="mt-2 text-2xl font-semibold text-gray-900">Dónde está hoy cada tramo del negocio</h2>
 
           <div className="mt-6 space-y-4">
             {funnel.stages.map((stage, index) => {
@@ -304,46 +341,8 @@ export default function FunnelPage() {
         </div>
 
         <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-          <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Supuestos del forecast</p>
-          <h2 className="mt-2 text-2xl font-semibold text-gray-900">Ajusta el modelo a tu negocio</h2>
-
-          <div className="mt-6 space-y-4">
-            {[
-              { key: 'averageDeal', label: 'Ticket promedio', suffix: '$' },
-              { key: 'responseRate', label: 'Respuesta a contactos', suffix: '%' },
-              { key: 'qualificationRate', label: 'Calificación', suffix: '%' },
-              { key: 'proposalRate', label: 'Paso a propuesta', suffix: '%' },
-              { key: 'closeRate', label: 'Cierre', suffix: '%' },
-            ].map((field) => (
-              <label key={field.key} className="block">
-                <span className="mb-2 block text-sm font-medium text-gray-700">{field.label}</span>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min={0}
-                    value={assumptions[field.key as keyof FunnelAssumptions]}
-                    onChange={(event) =>
-                      setAssumptions((current) => ({
-                        ...current,
-                        [field.key]: Number(event.target.value || 0),
-                      }))
-                    }
-                    className="input-field pr-12"
-                  />
-                  <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-400">
-                    {field.suffix}
-                  </span>
-                </div>
-              </label>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
           <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Interesados recientes</p>
-          <h2 className="mt-2 text-2xl font-semibold text-gray-900">Quién ya levantó la mano</h2>
+          <h2 className="mt-2 text-2xl font-semibold text-gray-900">Personas que ya levantaron la mano</h2>
 
           <div className="mt-6 space-y-4">
             {funnel.recentCaptures.length === 0 ? (
@@ -352,51 +351,80 @@ export default function FunnelPage() {
               </div>
             ) : (
               funnel.recentCaptures.map((capture) => (
-                <div key={capture.id} className="rounded-2xl border border-gray-200 p-5">
+                <article key={capture.id} className="rounded-2xl border border-gray-200 p-5">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <p className="font-semibold text-gray-900">{capture.email}</p>
+                      <p className="font-semibold text-gray-900">{capture.name || capture.email}</p>
                       <p className="mt-1 text-sm text-gray-500">
-                        {capture.source} · {capture.resource}
+                        {capture.email} · {capture.source} · {capture.resource}
                       </p>
                     </div>
-                    <span className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-700">
-                      {capture.convertedToCrmAt ? 'Convertido' : 'Nuevo'}
-                    </span>
+                    {capture.convertedToCrmAt ? (
+                      <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                        En CRM
+                      </span>
+                    ) : (
+                      <button onClick={() => promoteCapture(capture.id)} className="btn-secondary px-4 py-2 text-xs">
+                        Pasar a CRM
+                      </button>
+                    )}
                   </div>
                   <p className="mt-3 text-sm text-gray-600">{new Date(capture.createdAt).toLocaleString('es-ES')}</p>
-                </div>
+                </article>
               ))
             )}
           </div>
         </div>
+      </section>
 
-        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-          <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Próximo enfoque</p>
-          <h2 className="mt-2 text-2xl font-semibold text-gray-900">Qué mover para vender más rápido</h2>
+      <section className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+        <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Pipeline manipulable</p>
+        <h2 className="mt-2 text-2xl font-semibold text-gray-900">Cambia etapas y sigue tus oportunidades reales</h2>
 
-          <div className="mt-6 space-y-4">
-            <div className="rounded-2xl bg-gray-50 p-5">
-              <p className="text-sm font-semibold text-gray-900">Cuello de botella principal</p>
-              <p className="mt-2 text-sm leading-6 text-gray-600">
-                {funnel.nextBottleneck
-                  ? `La caída más fuerte aparece en "${funnel.nextBottleneck.label}". Ahí conviene mejorar seguimiento, velocidad de respuesta o claridad de oferta.`
-                  : 'Tu embudo está relativamente sano. El siguiente salto vendrá de aumentar el volumen de leads de calidad.'}
-              </p>
+        <div className="mt-6 space-y-4">
+          {funnel.activeOpportunities.length === 0 ? (
+            <div className="rounded-2xl bg-gray-50 p-5 text-sm text-gray-600">
+              Aún no hay oportunidades activas en CRM. Pasa tus interesados al CRM o agrega contactos manualmente para empezar a moverlos por etapa.
             </div>
-            <div className="rounded-2xl bg-gray-50 p-5">
-              <p className="text-sm font-semibold text-gray-900">Acción recomendada esta semana</p>
-              <p className="mt-2 text-sm leading-6 text-gray-600">
-                Prioriza a quienes ya dejaron su email, pásalos al CRM, crea una secuencia corta de seguimiento y ofrece una llamada o propuesta con una sola promesa fuerte.
-              </p>
-            </div>
-            <div className="rounded-2xl bg-gray-50 p-5">
-              <p className="text-sm font-semibold text-gray-900">Cómo aprovechar mejor tus contactos</p>
-              <p className="mt-2 text-sm leading-6 text-gray-600">
-                Usa este funnel como forecast comercial: mezcla interesados captados, oportunidades calificadas y valor probable de cierre para vender con más criterio.
-              </p>
-            </div>
-          </div>
+          ) : (
+            funnel.activeOpportunities.map((lead) => (
+              <article key={lead.id} className="rounded-2xl border border-gray-200 p-5">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p className="font-semibold text-gray-900">{lead.name}</p>
+                    <p className="mt-1 text-sm text-gray-500">
+                      {lead.email || 'Sin email'} · {lead.company || 'Sin empresa'} · {lead.source}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-lg font-semibold text-gray-900">${lead.value.toLocaleString()}</p>
+                    <p className="text-sm text-gray-500">Confianza {lead.confidence}%</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto]">
+                  <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                    <span className="block text-xs uppercase tracking-[0.18em] text-slate-400">Siguiente acción</span>
+                    {lead.nextAction || 'Definir seguimiento'}
+                  </div>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-medium text-slate-700">Etapa</span>
+                    <select
+                      value={lead.stage}
+                      onChange={(event) => void moveLead(lead.id, event.target.value)}
+                      className="input-field min-w-[200px]"
+                    >
+                      {STAGES.map((stage) => (
+                        <option key={stage.key} value={stage.key}>
+                          {stage.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </article>
+            ))
+          )}
         </div>
       </section>
     </div>

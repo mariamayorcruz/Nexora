@@ -21,6 +21,8 @@ interface AiJob {
     bullets?: string[];
     angle?: string;
     slides?: { title: string; bullets: string[] }[];
+    sections?: { title: string; items: string[] }[];
+    cta?: string;
   } | null;
   createdAt: string;
 }
@@ -43,9 +45,39 @@ const DEFAULT_FORM = {
   tool: 'ad-copy',
   offer: '',
   audience: '',
-  channel: 'Meta Ads',
+  channel: 'Instagram',
   prompt: '',
 };
+
+const QUICK_PRESETS = [
+  {
+    label: 'Avatar ad',
+    description: 'Guion con avatar, storyboard, overlays y CTA.',
+    values: {
+      tool: 'video-edit',
+      channel: 'Instagram / Video avatar',
+      prompt: 'Quiero una pieza premium con avatar profesional, ritmo ágil, prueba visual y CTA a demo.',
+    },
+  },
+  {
+    label: 'Instagram ad',
+    description: 'Hooks, primary text, prueba y dirección visual.',
+    values: {
+      tool: 'ad-copy',
+      channel: 'Instagram',
+      prompt: 'Construye una pieza aspiracional, creíble y muy orientada a conversión.',
+    },
+  },
+  {
+    label: 'Pitch deck',
+    description: 'Propuesta elegante lista para presentar.',
+    values: {
+      tool: 'pitch-deck',
+      channel: 'Ventas / Presentación',
+      prompt: 'Quiero una propuesta limpia, ejecutiva y enfocada en cierre.',
+    },
+  },
+];
 
 export default function DashboardStudioPage() {
   const [usage, setUsage] = useState<StudioUsage | null>(null);
@@ -143,18 +175,38 @@ export default function DashboardStudioPage() {
 
   return (
     <div className="space-y-8">
-      <section className="rounded-[36px] bg-[linear-gradient(135deg,#111827_0%,#0f172a_42%,#7c2d12_100%)] px-8 py-10 text-white shadow-[0_32px_110px_rgba(15,23,42,0.22)]">
+      <section className="rounded-[36px] bg-[linear-gradient(135deg,#111827_0%,#0f172a_40%,#7c2d12_100%)] px-8 py-10 text-white shadow-[0_32px_110px_rgba(15,23,42,0.22)]">
         <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
           <div>
             <p className="text-xs uppercase tracking-[0.32em] text-amber-200">AI Studio</p>
             <h1 className="mt-4 text-4xl font-semibold leading-tight">
-              Crea, edita y convierte ideas en activos listos para vender.
+              Crea anuncios, videos y propuestas con dirección de nivel estudio.
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-              Nexora convierte ideas, ofertas y objetivos comerciales en hooks, briefs, secuencias, guiones y ahora
-              también propuestas o presentaciones tipo pitch listas para presentar.
+              Inspirado en la velocidad de herramientas como HeyGen para producción y presentación, Nexora ahora entrega
+              estructura, storyboard, voz, escenas, CTA y narrativa comercial en una sola salida.
             </p>
             <p className="mt-4 text-sm leading-6 text-amber-100/90">{usage?.supportLabel}</p>
+
+            <div className="mt-6 grid gap-3 md:grid-cols-3">
+              {QUICK_PRESETS.map((preset) => (
+                <button
+                  key={preset.label}
+                  onClick={() =>
+                    setForm((current) => ({
+                      ...current,
+                      tool: preset.values.tool,
+                      channel: preset.values.channel,
+                      prompt: preset.values.prompt,
+                    }))
+                  }
+                  className="rounded-2xl border border-white/10 bg-white/5 p-4 text-left transition hover:bg-white/10"
+                >
+                  <p className="text-sm font-semibold text-white">{preset.label}</p>
+                  <p className="mt-2 text-xs leading-5 text-slate-300">{preset.description}</p>
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1">
@@ -249,7 +301,7 @@ export default function DashboardStudioPage() {
                 value={form.channel}
                 onChange={(event) => setForm((current) => ({ ...current, channel: event.target.value }))}
                 className="input-field"
-                placeholder="Meta Ads, email, WhatsApp, pitch deck, ventas..."
+                placeholder="Instagram, WhatsApp, email, presentación, video avatar..."
               />
             </label>
             <label className="block md:col-span-2">
@@ -258,7 +310,7 @@ export default function DashboardStudioPage() {
                 value={form.prompt}
                 onChange={(event) => setForm((current) => ({ ...current, prompt: event.target.value }))}
                 className="input-field min-h-[150px]"
-                placeholder="Explica el ángulo, el dolor, el resultado o la pieza que quieres crear."
+                placeholder="Explica el ángulo, el dolor, la promesa y la pieza que quieres crear."
               />
             </label>
           </div>
@@ -268,8 +320,8 @@ export default function DashboardStudioPage() {
           </div>
 
           <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            Inspirado en la velocidad de Gamma: si eliges pitch deck, Nexora generará una estructura clara de slides
-            lista para presentar o bajar luego a Canva, PDF o deck visual.
+            Cuando eliges anuncios o video, el estudio ya no se limita a darte hooks: también entrega dirección visual,
+            escenas, prueba, CTA y lógica narrativa para que la pieza salga con mucho más criterio.
           </div>
 
           <button onClick={handleGenerate} disabled={submitting} className="mt-6 btn-primary">
@@ -278,21 +330,27 @@ export default function DashboardStudioPage() {
         </div>
 
         <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Herramientas</p>
-          <h2 className="mt-2 text-2xl font-semibold text-slate-900">Tu stack creativo por crédito</h2>
+          <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Cómo responde el estudio</p>
+          <h2 className="mt-2 text-2xl font-semibold text-slate-900">Salidas pensadas para ejecución real</h2>
 
           <div className="mt-6 space-y-4">
-            {tools.map((tool) => (
-              <article key={tool.key} className="rounded-2xl border border-slate-200 p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="font-semibold text-slate-900">{tool.label}</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">{tool.description}</p>
-                  </div>
-                  <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">
-                    {tool.credits} créditos
-                  </span>
-                </div>
+            {[
+              {
+                title: 'Narrativa central',
+                description: 'Promesa, mecanismo, objeción y CTA con un hilo de venta claro.',
+              },
+              {
+                title: 'Dirección visual',
+                description: 'Escenas, storyboard, avatar, overlays y ritmo sugerido cuando la pieza es audiovisual.',
+              },
+              {
+                title: 'Listo para adaptar',
+                description: 'La misma idea puede bajar luego a reel, carrusel, email, pitch o script comercial.',
+              },
+            ].map((item) => (
+              <article key={item.title} className="rounded-2xl border border-slate-200 p-5">
+                <p className="font-semibold text-slate-900">{item.title}</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{item.description}</p>
               </article>
             ))}
           </div>
@@ -306,7 +364,7 @@ export default function DashboardStudioPage() {
         <div className="mt-6 space-y-4">
           {jobs.length === 0 ? (
             <div className="rounded-2xl bg-slate-50 p-5 text-sm text-slate-600">
-              Aún no has generado piezas en AI Studio. Tu primer output aparecerá aquí con estructura, ángulo y bullets.
+              Aún no has generado piezas en AI Studio. Tu primer output aparecerá aquí con estructura, ángulo y dirección lista para ejecutar.
             </div>
           ) : (
             jobs.map((job) => (
@@ -323,11 +381,35 @@ export default function DashboardStudioPage() {
                   </span>
                 </div>
 
+                {job.output?.headline && (
+                  <div className="mt-4 rounded-2xl bg-slate-950 px-4 py-4 text-white">
+                    <p className="text-xs uppercase tracking-[0.18em] text-slate-300">Idea central</p>
+                    <p className="mt-2 text-lg font-semibold">{job.output.headline}</p>
+                  </div>
+                )}
+
                 {job.output?.angle && (
                   <p className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
                     Ángulo recomendado: {job.output.angle}
                   </p>
                 )}
+
+                {job.output?.sections?.length ? (
+                  <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                    {job.output.sections.map((section, index) => (
+                      <div key={`${job.id}-section-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <p className="text-xs uppercase tracking-[0.18em] text-slate-400">{section.title}</p>
+                        <div className="mt-3 space-y-2">
+                          {section.items.map((item) => (
+                            <div key={item} className="rounded-xl bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-700">
+                              {item}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
 
                 {job.output?.slides?.length ? (
                   <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -354,6 +436,12 @@ export default function DashboardStudioPage() {
                     ))}
                   </div>
                 ) : null}
+
+                {job.output?.cta && (
+                  <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900">
+                    CTA sugerido: {job.output.cta}
+                  </div>
+                )}
               </article>
             ))
           )}
