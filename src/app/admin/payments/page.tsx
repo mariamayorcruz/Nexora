@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 interface PaymentSettings {
   stripeWebhookSecret: string;
@@ -15,22 +15,45 @@ interface PaymentSettings {
   minimumPayout: number;
 }
 
-export default function PaymentsPage() {
-  const [settings, setSettings] = useState<PaymentSettings>({
-    stripeWebhookSecret: '',
+const DEFAULT_SETTINGS: PaymentSettings = {
+  stripeWebhookSecret: '',
+  bankAccount: {
+    accountNumber: '',
+    routingNumber: '',
+    accountHolder: '',
+    bankName: '',
+  },
+  paypalEmail: '',
+  commissionRate: 2.9,
+  minimumPayout: 25,
+};
+
+function normalizeSettings(rawSettings: Partial<PaymentSettings> | null | undefined): PaymentSettings {
+  return {
+    stripeWebhookSecret: rawSettings?.stripeWebhookSecret || '',
     bankAccount: {
-      accountNumber: '',
-      routingNumber: '',
-      accountHolder: '',
-      bankName: '',
+      accountNumber: rawSettings?.bankAccount?.accountNumber || '',
+      routingNumber: rawSettings?.bankAccount?.routingNumber || '',
+      accountHolder: rawSettings?.bankAccount?.accountHolder || '',
+      bankName: rawSettings?.bankAccount?.bankName || '',
     },
-    paypalEmail: '',
-    commissionRate: 0,
-    minimumPayout: 0,
-  });
+    paypalEmail: rawSettings?.paypalEmail || '',
+    commissionRate:
+      typeof rawSettings?.commissionRate === 'number' && Number.isFinite(rawSettings.commissionRate)
+        ? rawSettings.commissionRate
+        : 2.9,
+    minimumPayout:
+      typeof rawSettings?.minimumPayout === 'number' && Number.isFinite(rawSettings.minimumPayout)
+        ? rawSettings.minimumPayout
+        : 25,
+  };
+}
+
+export default function PaymentsPage() {
+  const [settings, setSettings] = useState<PaymentSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -38,38 +61,51 @@ export default function PaymentsPage() {
         const token = localStorage.getItem('token');
         const response = await fetch('/api/admin/payment-settings', {
           headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
         });
+
         const data = await response.json();
-        setSettings(data.settings);
+        if (!response.ok) {
+          throw new Error(data.error || 'No se pudo cargar la configuración de pagos.');
+        }
+
+        setSettings(normalizeSettings(data.settings));
       } catch (error) {
         console.error('Error fetching payment settings:', error);
+        setMessage(error instanceof Error ? error.message : 'No se pudo cargar la configuración de pagos.');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchSettings();
+    void fetchSettings();
   }, []);
 
   const handleSave = async () => {
     setSaving(true);
+    setMessage('');
+
     try {
       const token = localStorage.getItem('token');
       const response = await fetch('/api/admin/payment-settings', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(settings),
       });
 
-      if (!response.ok) throw new Error('Failed to save settings');
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'No se pudo guardar la configuración.');
+      }
 
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
+      setSettings(normalizeSettings(data.settings));
+      setMessage('Configuración de pagos guardada correctamente.');
     } catch (error) {
       console.error('Error saving payment settings:', error);
+      setMessage(error instanceof Error ? error.message : 'No se pudo guardar la configuración.');
     } finally {
       setSaving(false);
     }
@@ -77,193 +113,168 @@ export default function PaymentsPage() {
 
   if (loading) {
     return (
-      <div className="text-center py-12">
-        <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="py-12 text-center">
+        <div className="inline-block h-12 w-12 animate-spin rounded-full border-b-2 border-primary" />
       </div>
     );
   }
 
   return (
-    <div>
-      <h2 className="text-3xl font-bold mb-2">Configuración de Pagos</h2>
-      <p className="text-gray-600 mb-8">Configura cómo y dónde recibir los pagos de tus usuarios</p>
+    <div className="space-y-8">
+      <div>
+        <h2 className="text-3xl font-bold text-gray-900">Configuración de pagos</h2>
+        <p className="mt-2 text-gray-600">Centraliza Stripe, transferencias, PayPal y parámetros internos de cobro.</p>
+      </div>
 
-      {saved && (
-        <div className="mb-6 p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg">
-          ✓ Configuración guardada exitosamente
+      {message && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-sm">
+          {message}
         </div>
       )}
 
-      {/* Stripe Settings */}
-      <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
-        <h3 className="text-xl font-bold mb-6">Stripe (Pagos Automáticos)</h3>
-        <div className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Webhook Secret
-            </label>
+      <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+        <div className="rounded-[28px] border border-gray-200 bg-white p-8 shadow-sm">
+          <h3 className="text-xl font-bold text-gray-900">Stripe</h3>
+          <p className="mt-2 text-sm text-gray-600">Mantén aquí la referencia del webhook interno para control operativo.</p>
+
+          <div className="mt-6">
+            <label className="block text-sm font-medium text-gray-700">Webhook secret</label>
             <input
               type="password"
               value={settings.stripeWebhookSecret}
-              onChange={(e) => setSettings({...settings, stripeWebhookSecret: e.target.value})}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              onChange={(event) => setSettings((current) => ({ ...current, stripeWebhookSecret: event.target.value }))}
+              className="input-field mt-2"
               placeholder="whsec_..."
             />
-            <p className="text-xs text-gray-500 mt-2">
-              Obtén esto en tu dashboard de Stripe → Webhooks
-            </p>
+            <p className="mt-2 text-xs text-gray-500">Obtén este valor desde Stripe → Developers → Webhooks.</p>
           </div>
         </div>
-      </div>
 
-      {/* Bank Account Settings */}
-      <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
-        <h3 className="text-xl font-bold mb-6">Cuenta Bancaria (Transferencias Manuales)</h3>
-        <div className="grid md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Nombre del Banco
+        <div className="rounded-[28px] border border-gray-200 bg-white p-8 shadow-sm">
+          <h3 className="text-xl font-bold text-gray-900">Parámetros del negocio</h3>
+          <div className="mt-6 grid gap-4 md:grid-cols-2">
+            <label className="block">
+              <span className="text-sm font-medium text-gray-700">Comisión por transacción (%)</span>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                value={settings.commissionRate}
+                onChange={(event) =>
+                  setSettings((current) => ({
+                    ...current,
+                    commissionRate: Number(event.target.value || 0),
+                  }))
+                }
+                className="input-field mt-2"
+              />
             </label>
+            <label className="block">
+              <span className="text-sm font-medium text-gray-700">Monto mínimo de pago ($)</span>
+              <input
+                type="number"
+                min="0"
+                value={settings.minimumPayout}
+                onChange={(event) =>
+                  setSettings((current) => ({
+                    ...current,
+                    minimumPayout: Number(event.target.value || 0),
+                  }))
+                }
+                className="input-field mt-2"
+              />
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-[28px] border border-gray-200 bg-white p-8 shadow-sm">
+        <h3 className="text-xl font-bold text-gray-900">Cuenta bancaria</h3>
+        <p className="mt-2 text-sm text-gray-600">Datos para transferencias manuales o flujos de payout operativos.</p>
+
+        <div className="mt-6 grid gap-6 md:grid-cols-2">
+          <label className="block">
+            <span className="text-sm font-medium text-gray-700">Nombre del banco</span>
             <input
               type="text"
               value={settings.bankAccount.bankName}
-              onChange={(e) => setSettings({
-                ...settings,
-                bankAccount: {...settings.bankAccount, bankName: e.target.value}
-              })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              placeholder="Banco Santander"
+              onChange={(event) =>
+                setSettings((current) => ({
+                  ...current,
+                  bankAccount: { ...current.bankAccount, bankName: event.target.value },
+                }))
+              }
+              className="input-field mt-2"
+              placeholder="Banco o entidad"
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Titular de la Cuenta
-            </label>
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-gray-700">Titular de la cuenta</span>
             <input
               type="text"
               value={settings.bankAccount.accountHolder}
-              onChange={(e) => setSettings({
-                ...settings,
-                bankAccount: {...settings.bankAccount, accountHolder: e.target.value}
-              })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              placeholder="Juan García Pérez"
+              onChange={(event) =>
+                setSettings((current) => ({
+                  ...current,
+                  bankAccount: { ...current.bankAccount, accountHolder: event.target.value },
+                }))
+              }
+              className="input-field mt-2"
+              placeholder="Nombre del titular"
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Número de Cuenta
-            </label>
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-gray-700">Número de cuenta</span>
             <input
               type="text"
               value={settings.bankAccount.accountNumber}
-              onChange={(e) => setSettings({
-                ...settings,
-                bankAccount: {...settings.bankAccount, accountNumber: e.target.value}
-              })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              placeholder="ES21 1465 0100 72 2030876293"
+              onChange={(event) =>
+                setSettings((current) => ({
+                  ...current,
+                  bankAccount: { ...current.bankAccount, accountNumber: event.target.value },
+                }))
+              }
+              className="input-field mt-2"
+              placeholder="Cuenta o IBAN"
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Código SWIFT/BIC
-            </label>
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-gray-700">Código SWIFT / routing</span>
             <input
               type="text"
               value={settings.bankAccount.routingNumber}
-              onChange={(e) => setSettings({
-                ...settings,
-                bankAccount: {...settings.bankAccount, routingNumber: e.target.value}
-              })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              placeholder="BSCHESMM"
+              onChange={(event) =>
+                setSettings((current) => ({
+                  ...current,
+                  bankAccount: { ...current.bankAccount, routingNumber: event.target.value },
+                }))
+              }
+              className="input-field mt-2"
+              placeholder="SWIFT, ABA o routing"
             />
-          </div>
-        </div>
-      </div>
-
-      {/* PayPal Settings */}
-      <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
-        <h3 className="text-xl font-bold mb-6">PayPal (Opcional)</h3>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Email de PayPal
           </label>
+        </div>
+      </section>
+
+      <section className="rounded-[28px] border border-gray-200 bg-white p-8 shadow-sm">
+        <h3 className="text-xl font-bold text-gray-900">PayPal</h3>
+        <div className="mt-6">
+          <label className="block text-sm font-medium text-gray-700">Email de PayPal</label>
           <input
             type="email"
             value={settings.paypalEmail}
-            onChange={(e) => setSettings({...settings, paypalEmail: e.target.value})}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            onChange={(event) => setSettings((current) => ({ ...current, paypalEmail: event.target.value }))}
+            className="input-field mt-2"
             placeholder="tu-email@paypal.com"
           />
-          <p className="text-xs text-gray-500 mt-2">
-            Para pagos manuales o como alternativa
-          </p>
         </div>
-      </div>
+      </section>
 
-      {/* Commission Settings */}
-      <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
-        <h3 className="text-xl font-bold mb-6">Configuración de Comisiones</h3>
-        <div className="grid md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Comisión por Transacción (%)
-            </label>
-            <input
-              type="number"
-              min="0"
-              max="100"
-              step="0.1"
-              value={settings.commissionRate}
-              onChange={(e) => setSettings({...settings, commissionRate: parseFloat(e.target.value)})}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              placeholder="2.9"
-            />
-            <p className="text-xs text-gray-500 mt-2">
-              Porcentaje que cobra Stripe + tu margen
-            </p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Monto Mínimo de Pago ($)
-            </label>
-            <input
-              type="number"
-              min="0"
-              value={settings.minimumPayout}
-              onChange={(e) => setSettings({...settings, minimumPayout: parseFloat(e.target.value)})}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              placeholder="25"
-            />
-            <p className="text-xs text-gray-500 mt-2">
-              Monto mínimo para procesar pagos
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Save Button */}
       <div className="flex justify-end">
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="btn-primary disabled:opacity-50"
-        >
-          {saving ? 'Guardando...' : 'Guardar Configuración'}
+        <button onClick={handleSave} disabled={saving} className="btn-primary disabled:opacity-60">
+          {saving ? 'Guardando...' : 'Guardar configuración'}
         </button>
-      </div>
-
-      {/* Security Notice */}
-      <div className="mt-8 bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-        <h4 className="font-bold text-yellow-900 mb-2">⚠️ Información de Seguridad</h4>
-        <ul className="text-yellow-800 text-sm space-y-1">
-          <li>• Mantén estos datos seguros y no los compartas</li>
-          <li>• Usa HTTPS para todas las comunicaciones</li>
-          <li>• Configura webhooks de Stripe para actualizaciones automáticas</li>
-          <li>• Revisa regularmente los logs de pagos</li>
-        </ul>
       </div>
     </div>
   );

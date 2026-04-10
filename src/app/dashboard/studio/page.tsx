@@ -39,6 +39,8 @@ interface StudioUsage {
   supportLabel: string;
   canUseVideoTools: boolean;
   maxExportsPerRun: number;
+  videoRenderReady?: boolean;
+  videoRenderProvider?: string | null;
 }
 
 const DEFAULT_FORM = {
@@ -220,10 +222,18 @@ export default function DashboardStudioPage() {
             <div className="rounded-[26px] border border-white/10 bg-white/5 p-5">
               <p className="text-sm text-slate-300">Video y edición</p>
               <p className="mt-3 text-2xl font-semibold text-white">
-                {usage?.canUseVideoTools ? 'Activo' : 'Disponible desde Growth'}
+                {usage?.canUseVideoTools
+                  ? usage?.videoRenderReady
+                    ? `Render activo${usage.videoRenderProvider ? ` · ${usage.videoRenderProvider}` : ''}`
+                    : 'Motor de render pendiente'
+                  : 'Disponible desde Growth'}
               </p>
               <p className="mt-2 text-sm text-slate-300">
-                Hasta {usage?.maxExportsPerRun ?? 0} salidas por ejecución.
+                {usage?.canUseVideoTools
+                  ? usage?.videoRenderReady
+                    ? `Hasta ${usage?.maxExportsPerRun ?? 0} salidas por ejecución.`
+                    : 'Puedes preparar la estrategia, pero el render real requiere conectar un proveedor de video.'
+                  : `Hasta ${usage?.maxExportsPerRun ?? 0} salidas por ejecución.`}
               </p>
             </div>
           </div>
@@ -323,6 +333,13 @@ export default function DashboardStudioPage() {
             Cuando eliges anuncios o video, el estudio ya no se limita a darte hooks: también entrega dirección visual,
             escenas, prueba, CTA y lógica narrativa para que la pieza salga con mucho más criterio.
           </div>
+
+          {form.tool === 'video-edit' && !usage?.videoRenderReady && (
+            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              El render real de video todavía no está conectado en este entorno. No volveremos a consumir créditos en
+              `Edición de video` hasta que exista un proveedor activo para text-to-video, image-to-video o avatar video.
+            </div>
+          )}
 
           <button onClick={handleGenerate} disabled={submitting} className="mt-6 btn-primary">
             {submitting ? 'Generando...' : `Generar ${selectedTool?.label || 'pieza'} (${selectedTool?.credits || 0} créditos)`}

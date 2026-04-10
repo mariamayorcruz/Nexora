@@ -7,6 +7,24 @@ import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
+function getVideoRenderStatus() {
+  const provider =
+    process.env.VIDEO_RENDER_PROVIDER ||
+    (process.env.HEYGEN_API_KEY ? 'heygen' : '') ||
+    (process.env.RUNWAY_API_KEY ? 'runway' : '') ||
+    (process.env.OPENAI_API_KEY ? 'openai' : '');
+  const apiKey =
+    process.env.VIDEO_RENDER_API_KEY ||
+    process.env.HEYGEN_API_KEY ||
+    process.env.RUNWAY_API_KEY ||
+    process.env.OPENAI_API_KEY;
+
+  return {
+    ready: Boolean(provider && apiKey),
+    provider: provider || null,
+  };
+}
+
 function getUserIdFromRequest(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
   if (!authHeader?.startsWith('Bearer ')) {
@@ -76,6 +94,7 @@ export async function GET(request: NextRequest) {
     });
 
     const creditsTotal = usage.creditsIncluded + usage.creditsPurchased;
+    const videoRender = getVideoRenderStatus();
 
     return NextResponse.json({
       usage: {
@@ -90,6 +109,8 @@ export async function GET(request: NextRequest) {
         supportLabel: planConfig.supportLabel,
         canUseVideoTools: planConfig.canUseVideoTools,
         maxExportsPerRun: planConfig.maxExportsPerRun,
+        videoRenderReady: videoRender.ready,
+        videoRenderProvider: videoRender.provider,
       },
       tools: AI_TOOL_DEFINITIONS,
       jobs,
@@ -133,11 +154,22 @@ export async function POST(request: NextRequest) {
     const founderPlan = founderAccess ? getFounderPlan() : null;
     const { usage, planConfig } = await getUsageBucket(user.id, founderPlan || user.subscription?.plan, founderAccess);
     const toolDefinition = getAiToolDefinition(tool);
+    const videoRender = getVideoRenderStatus();
 
     if (tool === 'video-edit' && !planConfig.canUseVideoTools) {
       return NextResponse.json(
         { error: 'La edición de video con IA está disponible desde Growth en adelante.' },
         { status: 403 }
+      );
+    }
+
+    if (tool === 'video-edit' && !videoRender.ready) {
+      return NextResponse.json(
+        {
+          error:
+            'El motor de render para video todavía no está conectado. No se consumieron créditos. Configura VIDEO_RENDER_PROVIDER y la API key del proveedor para habilitar text-to-video, image-to-video o avatar video real.',
+        },
+        { status: 412 }
       );
     }
 
