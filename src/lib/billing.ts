@@ -34,7 +34,7 @@ export const BILLING_PLANS: Record<BillingPlan, BillingPlanConfig> = {
     key: 'starter',
     label: 'Starter',
     marketingLabel: 'Starter',
-    monthlyPrice: 29,
+    monthlyPrice: 30,
     yearlyPrice: 24,
     aiCreditsMonthly: 250,
     description: 'Para negocios que quieren ordenar su operación publicitaria sin subir estructura fija.',

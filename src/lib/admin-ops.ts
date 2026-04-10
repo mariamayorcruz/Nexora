@@ -63,7 +63,7 @@ export interface EmailCenterSummary {
 
 export function calculateMrr(subscriptions: SubscriptionSummary[]) {
   const monthlyMap: Record<string, number> = {
-    starter: 29,
+    starter: 30,
     professional: 79,
     enterprise: 149,
   };
