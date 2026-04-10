@@ -124,7 +124,9 @@ export default function DashboardLayout({
             </div>
             <div>
               <p className="text-lg font-bold text-slate-900">Nexora</p>
-              <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Growth OS</p>
+              <p className="text-xs uppercase tracking-[0.24em] text-slate-400">
+                {language === 'en' ? 'Revenue Command' : 'Centro de control'}
+              </p>
             </div>
           </Link>
         </div>
