@@ -1,7 +1,21 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
+
+const previewCards = [
+  {
+    title: 'Mapa de decisiones Nexora',
+    detail: 'Una guía corta para ordenar oferta, mensaje, embudo y siguiente paso comercial.',
+  },
+  {
+    title: 'Marco para bajar ideas a propuesta',
+    detail: 'Te ayuda a dejar de pensar en abstracto y empezar a vender con una estructura clara.',
+  },
+  {
+    title: 'Siguiente paso accionable',
+    detail: 'El recurso termina llevándote a una decisión concreta, no a más ruido.',
+  },
+];
 
 export default function MasterclassLead() {
   const [form, setForm] = useState({ name: '', email: '' });
@@ -21,7 +35,7 @@ export default function MasterclassLead() {
           name: form.name,
           email: form.email,
           source: 'masterclass',
-          resource: 'el-mapa-de-decisiones-48-horas',
+          resource: 'nexora-decision-map',
         }),
       });
 
@@ -49,17 +63,14 @@ export default function MasterclassLead() {
           </h2>
           <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
             Cuando alguien pide tu master class gratis, la experiencia debe sentirse como el inicio de una relación seria.
-            Por eso Nexora puede entregar valor inmediato con un recurso accionable, elegante y útil desde el primer minuto.
+            Por eso Nexora entrega un recurso propio, accionable y elegante desde el primer minuto.
           </p>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-3">
-            {[
-              'Mapa de decisiones en 48 horas',
-              'Marco para bajar ideas a producto y oferta',
-              'Siguiente paso claro para seguir contigo',
-            ].map((item) => (
-              <div key={item} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="text-sm font-medium leading-6 text-slate-700">{item}</p>
+            {previewCards.map((item) => (
+              <div key={item.title} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <p className="text-sm font-semibold leading-6 text-slate-900">{item.title}</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{item.detail}</p>
               </div>
             ))}
           </div>
@@ -91,7 +102,7 @@ export default function MasterclassLead() {
 
             <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm leading-6 text-slate-500">
-                Acceso al PDF, lectura rápida y siguiente paso para seguir contigo con más contexto.
+                Acceso a una guía propia de Nexora con mapa, framework y siguiente paso comercial.
               </p>
               <button type="submit" disabled={loading} className="btn-primary disabled:opacity-60">
                 {loading ? 'Preparando acceso...' : 'Quiero la master class gratis'}
@@ -106,18 +117,21 @@ export default function MasterclassLead() {
             La entrega debe sentirse útil, premium y orientada a decisión.
           </h3>
           <p className="mt-3 text-sm leading-7 text-slate-600">
-            Esta referencia comunica bien algo importante: el lead ya siente que ganó claridad antes de comprar. Eso
-            sube la confianza y mejora muchísimo el siguiente paso comercial.
+            En vez de mandar un archivo genérico o material ajeno, esta experiencia prepara al lead para pensar mejor
+            su oferta, su sistema de ventas y el siguiente paso contigo.
           </p>
 
-          <div className="mt-6 overflow-hidden rounded-[1.75rem] border border-slate-200 bg-slate-50">
-            <Image
-              src="/resources/masterclass-preview.jpeg"
-              alt="Vista previa del recurso de master class"
-              width={1200}
-              height={1200}
-              className="h-auto w-full object-cover"
-            />
+          <div className="mt-6 space-y-4">
+            {[
+              'Qué estás vendiendo realmente y cuál es la promesa principal.',
+              'Qué parte del embudo está frenando claridad o conversión.',
+              'Cómo bajar eso a una oferta, pitch o secuencia dentro de Nexora.',
+            ].map((item, index) => (
+              <div key={item} className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5">
+                <p className="text-xs uppercase tracking-[0.22em] text-slate-400">Paso 0{index + 1}</p>
+                <p className="mt-2 text-base font-medium leading-7 text-slate-800">{item}</p>
+              </div>
+            ))}
           </div>
         </div>
       </div>

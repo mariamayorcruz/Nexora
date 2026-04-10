@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     const email = String(body.email || '').trim().toLowerCase();
     const name = String(body.name || '').trim();
     const source = String(body.source || 'masterclass').trim() || 'masterclass';
-    const resource = String(body.resource || 'el-mapa-de-decisiones-48-horas').trim() || 'el-mapa-de-decisiones-48-horas';
+    const resource = String(body.resource || 'nexora-decision-map').trim() || 'nexora-decision-map';
 
     if (!email || !email.includes('@')) {
       return NextResponse.json({ error: 'Necesitamos un email válido para entregarte el recurso.' }, { status: 400 });
@@ -34,7 +34,6 @@ export async function POST(request: NextRequest) {
       success: true,
       leadCaptureId: leadCapture.id,
       resource,
-      downloadUrl: '/resources/el-mapa-de-decisiones-48-horas.pdf',
       redirectUrl: `/masterclass/gracias?resource=${resource}`,
     });
   } catch (error) {
