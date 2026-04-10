@@ -41,6 +41,9 @@ export default function Hero() {
               Crear cuenta
               <ArrowRight className="h-4 w-4" />
             </Link>
+            <Link href="#masterclass" className="btn-secondary inline-flex items-center justify-center gap-2">
+              Obtener master class gratis
+            </Link>
             <Link href="#demo" className="btn-secondary inline-flex items-center justify-center gap-2">
               <PlayCircle className="h-4 w-4" />
               Ver demo guiada

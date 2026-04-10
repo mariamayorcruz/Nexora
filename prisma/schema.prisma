@@ -33,6 +33,7 @@ model User {
   crmSettings       CrmWorkspaceSettings?
   aiUsageBuckets    AiWorkspaceUsage[]
   aiJobs            AiWorkspaceJob[]
+  leadCaptures      LeadCapture[]
   invoices          Invoice[]
 }
 
@@ -184,6 +185,19 @@ model AiWorkspaceJob {
   output      Json?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model LeadCapture {
+  id         String   @id @default(cuid())
+  email      String
+  name       String?
+  source     String   @default("masterclass")
+  resource   String   @default("el-mapa-de-decisiones-48-horas")
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt  DateTime @default(now())
+
+  @@index([email, source])
 }
 
 model VerificationToken {
