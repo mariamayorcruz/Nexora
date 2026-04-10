@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { buildMasterclassEmail } from '@/lib/lead-magnets';
+import { isEmailDeliveryConfigured, sendTransactionalEmail } from '@/lib/mailer';
 import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
@@ -30,11 +32,30 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    let deliveryStatus: 'sent' | 'pending_setup' | 'failed' = 'pending_setup';
+
+    if (isEmailDeliveryConfigured()) {
+      try {
+        const emailPayload = buildMasterclassEmail({ name, email });
+        await sendTransactionalEmail({
+          to: email,
+          subject: emailPayload.subject,
+          html: emailPayload.html,
+          text: emailPayload.text,
+        });
+        deliveryStatus = 'sent';
+      } catch (emailError) {
+        console.error('Masterclass email delivery error:', emailError);
+        deliveryStatus = 'failed';
+      }
+    }
+
     return NextResponse.json({
       success: true,
       leadCaptureId: leadCapture.id,
       resource,
-      redirectUrl: `/masterclass/gracias?resource=${resource}`,
+      deliveryStatus,
+      redirectUrl: `/masterclass/gracias?resource=${resource}&delivery=${deliveryStatus}&email=${encodeURIComponent(email)}`,
     });
   } catch (error) {
     console.error('Lead magnet claim error:', error);

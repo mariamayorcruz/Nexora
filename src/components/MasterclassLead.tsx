@@ -5,7 +5,7 @@ import { useState } from 'react';
 const previewCards = [
   {
     title: 'Mapa de decisiones Nexora',
-    detail: 'Una guía corta para ordenar oferta, mensaje, embudo y siguiente paso comercial.',
+    detail: 'Una guia corta para ordenar oferta, mensaje, embudo y siguiente paso comercial.',
   },
   {
     title: 'Marco para bajar ideas a propuesta',
@@ -13,7 +13,7 @@ const previewCards = [
   },
   {
     title: 'Siguiente paso accionable',
-    detail: 'El recurso termina llevándote a una decisión concreta, no a más ruido.',
+    detail: 'El recurso termina llevandote a una decision concreta, no a mas ruido.',
   },
 ];
 
@@ -59,10 +59,10 @@ export default function MasterclassLead() {
         <div>
           <span className="section-tag">Master class gratis</span>
           <h2 className="mt-6 text-4xl font-semibold leading-tight md:text-5xl">
-            No entregues solo un “gracias”. Entrega claridad que haga avanzar a la persona.
+            No entregues solo un &quot;gracias&quot;. Entrega claridad que haga avanzar a la persona.
           </h2>
           <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
-            Cuando alguien pide tu master class gratis, la experiencia debe sentirse como el inicio de una relación seria.
+            Cuando alguien pide tu master class gratis, la experiencia debe sentirse como el inicio de una relacion seria.
             Por eso Nexora entrega un recurso propio, accionable y elegante desde el primer minuto.
           </p>
 
@@ -102,7 +102,8 @@ export default function MasterclassLead() {
 
             <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm leading-6 text-slate-500">
-                Acceso a una guía propia de Nexora con mapa, framework y siguiente paso comercial.
+                Acceso a una guia propia de Nexora con mapa, framework y siguiente paso comercial. Si SMTP ya esta listo,
+                tambien recibe un correo con acceso a AI Studio, planes y futura app.
               </p>
               <button type="submit" disabled={loading} className="btn-primary disabled:opacity-60">
                 {loading ? 'Preparando acceso...' : 'Quiero la master class gratis'}
@@ -114,24 +115,32 @@ export default function MasterclassLead() {
         <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_22px_70px_rgba(15,23,42,0.08)]">
           <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Vista previa del valor</p>
           <h3 className="mt-3 text-2xl font-semibold text-slate-900">
-            La entrega debe sentirse útil, premium y orientada a decisión.
+            La entrega debe sentirse util, premium y orientada a decision.
           </h3>
           <p className="mt-3 text-sm leading-7 text-slate-600">
-            En vez de mandar un archivo genérico o material ajeno, esta experiencia prepara al lead para pensar mejor
+            En vez de mandar un archivo generico o material ajeno, esta experiencia prepara al lead para pensar mejor
             su oferta, su sistema de ventas y el siguiente paso contigo.
           </p>
 
           <div className="mt-6 space-y-4">
             {[
-              'Qué estás vendiendo realmente y cuál es la promesa principal.',
-              'Qué parte del embudo está frenando claridad o conversión.',
-              'Cómo bajar eso a una oferta, pitch o secuencia dentro de Nexora.',
+              'Que estas vendiendo realmente y cual es la promesa principal.',
+              'Que parte del embudo esta frenando claridad o conversion.',
+              'Como bajar eso a una oferta, pitch o secuencia dentro de Nexora.',
             ].map((item, index) => (
               <div key={item} className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5">
                 <p className="text-xs uppercase tracking-[0.22em] text-slate-400">Paso 0{index + 1}</p>
                 <p className="mt-2 text-base font-medium leading-7 text-slate-800">{item}</p>
               </div>
             ))}
+          </div>
+
+          <div className="mt-6 rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5">
+            <p className="text-xs uppercase tracking-[0.22em] text-slate-400">Despues de registrarse</p>
+            <p className="mt-2 text-base font-medium leading-7 text-slate-800">
+              La persona ve una entrega inmediata en pantalla y, cuando el correo esta configurado, tambien recibe un
+              email con tres salidas claras: AI Studio, contratar un plan y descargar la app cuando este disponible.
+            </p>
           </div>
         </div>
       </div>
