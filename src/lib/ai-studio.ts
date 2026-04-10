@@ -65,7 +65,7 @@ export const AI_TOOL_DEFINITIONS: AiToolDefinition[] = [
     key: 'ad-copy',
     label: 'Anuncios y hooks',
     credits: 20,
-    description: 'Genera hooks, titulares, claims y CTAs listos para Meta, Google o TikTok.',
+    description: 'Genera hooks, promesas, pruebas, guion visual y CTA listos para campañas serias.',
   },
   {
     key: 'creative-brief',
@@ -105,6 +105,75 @@ export const AI_TOOL_DEFINITIONS: AiToolDefinition[] = [
   },
 ];
 
+function toTitleCase(value: string) {
+  return value
+    .split(' ')
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+function normalizeOffer(rawOffer: string) {
+  const trimmed = rawOffer.trim();
+
+  if (!trimmed) {
+    return 'tu servicio principal';
+  }
+
+  if (/gotnexora\.com|nexora/i.test(trimmed)) {
+    return 'Nexora';
+  }
+
+  return trimmed;
+}
+
+function inferCategory(offer: string) {
+  if (/nexora/i.test(offer)) {
+    return 'plataforma de marketing y ads';
+  }
+
+  return offer;
+}
+
+function buildInstagramAdCopy(params: {
+  offer: string;
+  audience: string;
+  channel: string;
+  prompt: string;
+}) {
+  const offer = normalizeOffer(params.offer);
+  const audience = params.audience || 'equipos, negocios y marketers que quieren vender mejor';
+  const category = inferCategory(offer);
+  const channel = params.channel || 'Instagram';
+  const prompt = params.prompt || '';
+  const offerDisplay = toTitleCase(offer);
+  const promise = /nexora/i.test(offer)
+    ? 'centralizar campañas, creatividad, seguimiento comercial y decisiones de crecimiento en un solo sistema'
+    : `hacer más simple y más rentable el crecimiento con ${offer}`;
+  const proof = /nexora/i.test(offer)
+    ? 'ves inversión, conversiones, ROI, leads y pipeline sin saltar entre herramientas'
+    : 'el usuario siente más claridad, control y velocidad desde el primer uso';
+  const urgency = /instagram/i.test(channel.toLowerCase())
+    ? 'en Instagram gana quien hace entendible el resultado antes de pedir atención'
+    : `en ${channel} gana quien reduce fricción y deja claro el siguiente resultado`;
+
+  return {
+    headline: `${offerDisplay}: anuncio experto listo para vender en ${channel}`,
+    bullets: [
+      `Hook premium 1: “Si tu marketing vive repartido en cinco herramientas, no estás creciendo: estás improvisando. ${offerDisplay} reúne campañas, datos y seguimiento en un solo sistema.”`,
+      `Hook premium 2: “La mayoría no necesita más tráfico; necesita una operación que convierta la atención en decisiones y ventas. Ahí es donde ${offerDisplay} cambia el juego.”`,
+      `Hook premium 3: “Cuando por fin ves anuncios, leads y pipeline en el mismo lugar, dejas de adivinar y empiezas a escalar con criterio.”`,
+      `Promesa central: “${offerDisplay} ayuda a ${audience} a ${promise}. Deja de operar a ciegas y empieza a decidir con una lectura real del negocio.”`,
+      `Copy principal: “${offerDisplay} no nació para sumar otra pestaña a tu operación. Nació para darle orden, velocidad y claridad a una parte del negocio que normalmente vive fragmentada. Si hoy inviertes en anuncios, generas contactos y aun así sientes que todo depende de intuición, ${offerDisplay} te devuelve control sobre lo que está funcionando y sobre lo que conviene hacer después.”`,
+      `Prueba y credibilidad: “La ventaja real de ${offerDisplay} es que ${proof}. Eso baja el caos operativo, mejora la lectura del rendimiento y hace que cada campaña se sienta más accionable.”`,
+      `Guion visual recomendado: abre con una escena de caos entre múltiples plataformas, corta a una vista limpia del dashboard, muestra una mejora visible y remata con una toma donde el usuario entiende qué hacer a continuación.`,
+      `CTA experto: “Empieza tu prueba, agenda una demo y descubre cómo se ve una operación publicitaria cuando por fin trabaja como un sistema.”`,
+      `Dirección estratégica: vende ${offerDisplay} como ${category} premium, no como software genérico. ${urgency}. ${prompt ? `Usa este matiz adicional como capa narrativa: ${prompt}.` : 'Prioriza claridad, autoridad y resultado visible antes que promesas genéricas.'}`,
+    ],
+    angle: `${offerDisplay} debe venderse como un sistema de control y crecimiento, no como otra herramienta más.`,
+  };
+}
+
 export function getAiPlanConfig(plan?: string | null, founderAccess = false) {
   const normalizedPlan = (getBillingPlan(plan)?.key || 'starter') as BillingPlan;
   const config = AI_PLAN_CONFIG[normalizedPlan];
@@ -135,7 +204,7 @@ export function buildAiOutput(params: {
   channel: string;
 }): AiOutputPayload {
   const { tool, prompt, offer, audience, channel } = params;
-  const trimmedOffer = offer || 'tu servicio principal';
+  const trimmedOffer = normalizeOffer(offer);
   const trimmedAudience = audience || 'tu audiencia ideal';
   const trimmedChannel = channel || 'paid media';
   const basePromise = `Ayuda a ${trimmedAudience} a avanzar con ${trimmedOffer}`;
@@ -252,15 +321,26 @@ export function buildAiOutput(params: {
       };
     case 'ad-copy':
     default:
+      if (/instagram/i.test(trimmedChannel) || /nexora/i.test(trimmedOffer) || /gotnexora\.com/i.test(prompt)) {
+        return buildInstagramAdCopy({
+          offer: trimmedOffer,
+          audience: trimmedAudience,
+          channel: trimmedChannel,
+          prompt,
+        });
+      }
+
       return {
         headline: `Hooks y copies listos para ${trimmedOffer}`,
         bullets: [
-          `Hook 1: “${trimmedAudience} no necesita más ruido; necesita una promesa más creíble.”`,
-          'Hook 2: “Lo que más convierte hoy no es volumen, es claridad sobre el siguiente resultado.”',
-          `Hook 3: “Si ${trimmedOffer} todavía se explica demasiado, la creatividad está perdiendo atención.”`,
-          'CTA: invita a prueba, demo o contacto con una acción única.',
+          `Hook 1: “${trimmedAudience} no compra más información; compra una promesa que se siente inevitable.”`,
+          `Hook 2: “${trimmedOffer} vende mejor cuando se entiende qué cambia en la vida o en el negocio del cliente desde el primer impacto.”`,
+          'Hook 3: “Si tu anuncio necesita demasiada explicación, está perdiendo a la gente correcta antes de mostrar la prueba.”',
+          `Copy principal: presenta el dolor, nombra el cambio concreto y muestra por qué ${trimmedOffer} se siente diferente a la alternativa actual.`,
+          'Prueba sugerida: usa una captura, resultado, comparativa o microdemostración antes del CTA.',
+          'CTA: invita a una sola acción con bajo riesgo, alta claridad y una promesa concreta del siguiente paso.',
         ],
-        angle: `${prompt || basePromise} enfocado en ${trimmedChannel}.`,
+        angle: `${prompt || basePromise} enfocado en ${trimmedChannel}, con una narrativa más premium, más creíble y orientada a conversión.`,
       };
   }
 }
