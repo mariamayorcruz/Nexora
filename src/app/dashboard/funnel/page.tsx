@@ -28,6 +28,15 @@ interface FunnelUser {
   } | null;
 }
 
+interface LeadCapture {
+  id: string;
+  email: string;
+  source: string;
+  resource: string;
+  createdAt: string;
+  convertedToCrmAt?: string | null;
+}
+
 interface FunnelAssumptions {
   averageDeal: number;
   responseRate: number;
@@ -46,6 +55,7 @@ const DEFAULT_ASSUMPTIONS: FunnelAssumptions = {
 
 export default function FunnelPage() {
   const [campaigns, setCampaigns] = useState<FunnelCampaign[]>([]);
+  const [captures, setCaptures] = useState<LeadCapture[]>([]);
   const [user, setUser] = useState<FunnelUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [assumptions, setAssumptions] = useState<FunnelAssumptions>(DEFAULT_ASSUMPTIONS);
@@ -73,14 +83,22 @@ export default function FunnelPage() {
     const fetchData = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch('/api/users/me', {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: 'no-store',
-        });
+        const [userResponse, capturesResponse] = await Promise.all([
+          fetch('/api/users/me', {
+            headers: { Authorization: `Bearer ${token}` },
+            cache: 'no-store',
+          }),
+          fetch('/api/business/leads', {
+            headers: { Authorization: `Bearer ${token}` },
+            cache: 'no-store',
+          }),
+        ]);
 
-        const data = await response.json();
+        const data = await userResponse.json();
+        const capturesData = capturesResponse.ok ? await capturesResponse.json() : { captures: [] };
         setCampaigns(data.campaigns || []);
         setUser(data.user);
+        setCaptures(capturesData.captures || []);
       } catch (error) {
         console.error('Error fetching funnel data:', error);
       } finally {
@@ -124,8 +142,10 @@ export default function FunnelPage() {
       }
     );
 
-    const baseLeads =
+    const capturedLeads = captures.length;
+    const conversionDrivenLeads =
       totals.conversions > 0 ? totals.conversions : Math.max(1, Math.round(totals.clicks * 0.08));
+    const baseLeads = Math.max(capturedLeads, conversionDrivenLeads);
     const contacted = Math.round(baseLeads * (assumptions.responseRate / 100));
     const qualified = Math.round(contacted * (assumptions.qualificationRate / 100));
     const proposals = Math.round(qualified * (assumptions.proposalRate / 100));
@@ -162,6 +182,7 @@ export default function FunnelPage() {
       totals,
       stages,
       topStageValue,
+      capturedLeads,
       baseLeads,
       contacted,
       qualified,
@@ -172,8 +193,9 @@ export default function FunnelPage() {
       costPerLead,
       nextBottleneck,
       contactSources,
+      recentCaptures: captures.slice(0, 6),
     };
-  }, [campaigns, assumptions]);
+  }, [campaigns, assumptions, captures]);
 
   if (loading) {
     return (
@@ -192,7 +214,7 @@ export default function FunnelPage() {
         <p className="text-xs uppercase tracking-[0.28em] text-gray-400">Funnel comercial</p>
         <h1 className="mt-3 text-3xl font-semibold text-gray-900">Esta vista se desbloquea desde el plan Growth.</h1>
         <p className="mt-4 max-w-2xl text-sm leading-6 text-gray-600">
-          El funnel de oportunidades necesita una lectura más profunda de campañas y rendimiento para estimar ventas probables.
+          El funnel de oportunidades necesita una lectura más profunda de campañas, captación e interés real para estimar ventas probables.
         </p>
         <div className="mt-6 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
           {user?.entitlements?.capabilities.upgradeCta}
@@ -207,9 +229,9 @@ export default function FunnelPage() {
         <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
           <div>
             <p className="text-xs uppercase tracking-[0.32em] text-cyan-300">Funnel comercial</p>
-            <h1 className="mt-4 text-4xl font-semibold leading-tight">Tus contactos, oportunidades y ventas probables en una sola lectura.</h1>
+            <h1 className="mt-4 text-4xl font-semibold leading-tight">Tus contactos, interesados y ventas probables en una sola lectura.</h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-              Este panel convierte clicks, conversiones y campañas en un forecast accionable para que tu equipo sepa a quién seguir, cuánto puede cerrar y qué etapa está frenando ventas.
+              Este panel ya no mira solo campañas: también integra personas que dejaron su email en tus recursos para que el forecast se acerque más al negocio real.
             </p>
           </div>
 
@@ -223,11 +245,16 @@ export default function FunnelPage() {
         </div>
       </section>
 
-      <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
         <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
           <p className="text-sm text-gray-500">Leads detectados</p>
           <p className="mt-3 text-3xl font-semibold text-gray-900">{funnel.baseLeads}</p>
-          <p className="mt-2 text-sm text-gray-500">Estimados desde conversiones y respuesta inicial.</p>
+          <p className="mt-2 text-sm text-gray-500">Combinando campañas y captación real.</p>
+        </div>
+        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+          <p className="text-sm text-gray-500">Interesados captados</p>
+          <p className="mt-3 text-3xl font-semibold text-gray-900">{funnel.capturedLeads}</p>
+          <p className="mt-2 text-sm text-gray-500">Leads reales desde master class y recursos.</p>
         </div>
         <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
           <p className="text-sm text-gray-500">Ventas probables</p>
@@ -242,7 +269,7 @@ export default function FunnelPage() {
         <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
           <p className="text-sm text-gray-500">Costo por lead</p>
           <p className="mt-3 text-3xl font-semibold text-gray-900">${funnel.costPerLead.toFixed(0)}</p>
-          <p className="mt-2 text-sm text-gray-500">Lectura rápida para saber cuánto te cuesta abrir conversación.</p>
+          <p className="mt-2 text-sm text-gray-500">Lectura rápida para saber cuánto cuesta abrir conversación.</p>
         </div>
       </section>
 
@@ -315,41 +342,29 @@ export default function FunnelPage() {
 
       <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
         <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-          <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Contactos accionables</p>
-          <h2 className="mt-2 text-2xl font-semibold text-gray-900">Dónde conviene vender primero</h2>
+          <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Interesados recientes</p>
+          <h2 className="mt-2 text-2xl font-semibold text-gray-900">Quién ya levantó la mano</h2>
 
           <div className="mt-6 space-y-4">
-            {funnel.contactSources.length === 0 ? (
+            {funnel.recentCaptures.length === 0 ? (
               <div className="rounded-2xl bg-gray-50 p-5 text-sm text-gray-600">
-                Aún no hay suficiente actividad para estimar oportunidades por fuente. Conecta cuentas y activa campañas para empezar a ver un pipeline comercial real.
+                Aún no hay interesados captados para este funnel.
               </div>
             ) : (
-              funnel.contactSources.map((source) => (
-                <div key={`${source.platform}-${source.accountName}`} className="rounded-2xl border border-gray-200 p-5">
+              funnel.recentCaptures.map((capture) => (
+                <div key={capture.id} className="rounded-2xl border border-gray-200 p-5">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <p className="text-lg font-semibold capitalize text-gray-900">{source.platform}</p>
-                      <p className="text-sm text-gray-500">{source.accountName}</p>
+                      <p className="font-semibold text-gray-900">{capture.email}</p>
+                      <p className="mt-1 text-sm text-gray-500">
+                        {capture.source} · {capture.resource}
+                      </p>
                     </div>
                     <span className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-700">
-                      ${source.estimatedValue.toLocaleString()} posibles
+                      {capture.convertedToCrmAt ? 'Convertido' : 'Nuevo'}
                     </span>
                   </div>
-
-                  <div className="mt-4 grid gap-3 md:grid-cols-3">
-                    <div className="rounded-2xl bg-gray-50 p-4">
-                      <p className="text-sm text-gray-500">Contactos estimados</p>
-                      <p className="mt-2 text-2xl font-semibold text-gray-900">{source.estimatedContacts}</p>
-                    </div>
-                    <div className="rounded-2xl bg-gray-50 p-4">
-                      <p className="text-sm text-gray-500">Ventas probables</p>
-                      <p className="mt-2 text-2xl font-semibold text-gray-900">{source.likelyWins}</p>
-                    </div>
-                    <div className="rounded-2xl bg-gray-50 p-4">
-                      <p className="text-sm text-gray-500">Gasto asociado</p>
-                      <p className="mt-2 text-2xl font-semibold text-gray-900">${source.spend.toFixed(0)}</p>
-                    </div>
-                  </div>
+                  <p className="mt-3 text-sm text-gray-600">{new Date(capture.createdAt).toLocaleString('es-ES')}</p>
                 </div>
               ))
             )}
@@ -372,13 +387,13 @@ export default function FunnelPage() {
             <div className="rounded-2xl bg-gray-50 p-5">
               <p className="text-sm font-semibold text-gray-900">Acción recomendada esta semana</p>
               <p className="mt-2 text-sm leading-6 text-gray-600">
-                Prioriza los contactos de las fuentes con más conversiones, crea una secuencia de seguimiento corta y ofrece una llamada o propuesta con una sola promesa fuerte.
+                Prioriza a quienes ya dejaron su email, pásalos al CRM, crea una secuencia corta de seguimiento y ofrece una llamada o propuesta con una sola promesa fuerte.
               </p>
             </div>
             <div className="rounded-2xl bg-gray-50 p-5">
               <p className="text-sm font-semibold text-gray-900">Cómo aprovechar mejor tus contactos</p>
               <p className="mt-2 text-sm leading-6 text-gray-600">
-                Usa este funnel como forecast comercial: contactos detectados, oportunidades calificadas y valor probable de cierre. Así tus clientes pueden vender cualquier servicio sin perder de vista volumen, calidad y cierre.
+                Usa este funnel como forecast comercial: mezcla interesados captados, oportunidades calificadas y valor probable de cierre para vender con más criterio.
               </p>
             </div>
           </div>

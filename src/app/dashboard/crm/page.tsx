@@ -29,6 +29,17 @@ interface CrmSettings {
   defaultCadence: string;
 }
 
+interface LeadCapture {
+  id: string;
+  email: string;
+  name?: string | null;
+  source: string;
+  resource: string;
+  crmLeadId?: string | null;
+  convertedToCrmAt?: string | null;
+  createdAt: string;
+}
+
 const STAGES = [
   { key: 'lead', label: 'Lead' },
   { key: 'contacted', label: 'Contactado' },
@@ -62,6 +73,7 @@ const DEFAULT_SETTINGS: CrmSettings = {
 
 export default function DashboardCrmPage() {
   const [leads, setLeads] = useState<CrmLead[]>([]);
+  const [captures, setCaptures] = useState<LeadCapture[]>([]);
   const [settings, setSettings] = useState<CrmSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -72,7 +84,7 @@ export default function DashboardCrmPage() {
   const fetchCrm = async () => {
     try {
       const token = localStorage.getItem('token');
-      const [leadsResponse, settingsResponse] = await Promise.all([
+      const [leadsResponse, settingsResponse, capturesResponse] = await Promise.all([
         fetch('/api/crm/leads', {
           headers: { Authorization: `Bearer ${token}` },
           cache: 'no-store',
@@ -81,12 +93,18 @@ export default function DashboardCrmPage() {
           headers: { Authorization: `Bearer ${token}` },
           cache: 'no-store',
         }),
+        fetch('/api/business/leads', {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        }),
       ]);
 
       const leadsData = await leadsResponse.json();
       const settingsData = await settingsResponse.json();
+      const capturesData = capturesResponse.ok ? await capturesResponse.json() : { captures: [] };
       setLeads(leadsData.leads || []);
       setSettings(settingsData.settings || DEFAULT_SETTINGS);
+      setCaptures(capturesData.captures || []);
     } catch (error) {
       console.error('Error fetching CRM data:', error);
     } finally {
@@ -206,6 +224,31 @@ export default function DashboardCrmPage() {
       setMessage(error instanceof Error ? error.message : 'No pudimos guardar la configuración.');
     } finally {
       setSavingSettings(false);
+    }
+  };
+
+  const promoteCapture = async (captureId: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/business/leads', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ captureId }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'No se pudo pasar el lead al CRM.');
+      }
+
+      setMessage('Lead captado pasado al CRM correctamente.');
+      await fetchCrm();
+    } catch (error) {
+      console.error('Error promoting capture:', error);
+      setMessage(error instanceof Error ? error.message : 'No pudimos pasar el lead al CRM.');
     }
   };
 
@@ -501,6 +544,44 @@ export default function DashboardCrmPage() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+        <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Interesados captados</p>
+        <h2 className="mt-2 text-2xl font-semibold text-slate-900">Personas que ya mostraron interés real</h2>
+
+        <div className="mt-6 space-y-3">
+          {captures.length === 0 ? (
+            <div className="rounded-2xl bg-slate-50 p-5 text-sm text-slate-600">
+              Aún no hay interesados captados desde la master class u otros recursos.
+            </div>
+          ) : (
+            captures.map((capture) => (
+              <article key={capture.id} className="rounded-2xl border border-slate-200 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p className="font-semibold text-slate-900">{capture.name || 'Lead sin nombre'}</p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {capture.email} · {capture.source} · {new Date(capture.createdAt).toLocaleString('es-ES')}
+                    </p>
+                  </div>
+                  {capture.convertedToCrmAt ? (
+                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                      En CRM
+                    </span>
+                  ) : (
+                    <button onClick={() => promoteCapture(capture.id)} className="btn-secondary px-4 py-2 text-xs">
+                      Pasar a CRM
+                    </button>
+                  )}
+                </div>
+                <div className="mt-3 rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">
+                  Recurso solicitado: {capture.resource}
+                </div>
+              </article>
+            ))
+          )}
         </div>
       </section>
 
