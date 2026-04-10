@@ -48,6 +48,13 @@ interface CrmLead {
   updatedAt: string;
 }
 
+interface LeadDraft {
+  stage: string;
+  value: string;
+  confidence: string;
+  nextAction: string;
+}
+
 const STAGES = [
   { key: 'lead', label: 'Lead' },
   { key: 'contacted', label: 'Contactado' },
@@ -60,6 +67,8 @@ export default function FunnelPage() {
   const [campaigns, setCampaigns] = useState<FunnelCampaign[]>([]);
   const [captures, setCaptures] = useState<LeadCapture[]>([]);
   const [crmLeads, setCrmLeads] = useState<CrmLead[]>([]);
+  const [drafts, setDrafts] = useState<Record<string, LeadDraft>>({});
+  const [savingLeadId, setSavingLeadId] = useState<string | null>(null);
   const [user, setUser] = useState<FunnelUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
@@ -90,6 +99,19 @@ export default function FunnelPage() {
       setUser(userData.user);
       setCaptures(capturesData.captures || []);
       setCrmLeads(crmData.leads || []);
+      setDrafts(
+        Object.fromEntries(
+          (crmData.leads || []).map((lead: CrmLead) => [
+            lead.id,
+            {
+              stage: lead.stage,
+              value: String(lead.value || 0),
+              confidence: String(lead.confidence || 0),
+              nextAction: lead.nextAction || '',
+            },
+          ])
+        )
+      );
     } catch (error) {
       console.error('Error fetching funnel data:', error);
       setMessage('No pudimos cargar el funnel completo en este momento.');
@@ -175,9 +197,11 @@ export default function FunnelPage() {
     };
   }, [campaigns, captures, crmLeads]);
 
-  const moveLead = async (leadId: string, stage: string) => {
+  const saveLead = async (leadId: string) => {
     try {
+      setSavingLeadId(leadId);
       const token = localStorage.getItem('token');
+      const draft = drafts[leadId];
       const response = await fetch(`/api/crm/leads/${leadId}`, {
         method: 'PATCH',
         headers: {
@@ -185,7 +209,10 @@ export default function FunnelPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          stage,
+          stage: draft.stage,
+          value: Number(draft.value || 0),
+          confidence: Number(draft.confidence || 0),
+          nextAction: draft.nextAction,
           lastContactedAt: new Date().toISOString(),
         }),
       });
@@ -195,11 +222,13 @@ export default function FunnelPage() {
         throw new Error(data.error || 'No se pudo actualizar la etapa.');
       }
 
-      setMessage('Etapa actualizada correctamente.');
+      setMessage('Lead actualizado correctamente.');
       await fetchData();
     } catch (error) {
-      console.error('Error updating lead stage:', error);
-      setMessage(error instanceof Error ? error.message : 'No se pudo actualizar la etapa.');
+      console.error('Error updating lead:', error);
+      setMessage(error instanceof Error ? error.message : 'No se pudo actualizar el lead.');
+    } finally {
+      setSavingLeadId(null);
     }
   };
 
@@ -360,9 +389,14 @@ export default function FunnelPage() {
                       </p>
                     </div>
                     {capture.convertedToCrmAt ? (
-                      <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
-                        En CRM
-                      </span>
+                      <div className="text-right">
+                        <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                          En CRM
+                        </span>
+                        <p className="mt-2 text-xs text-gray-500">
+                          {capture.crmLeadId ? 'Ya tiene lead vinculado' : 'Convertido'}
+                        </p>
+                      </div>
                     ) : (
                       <button onClick={() => promoteCapture(capture.id)} className="btn-secondary px-4 py-2 text-xs">
                         Pasar a CRM
@@ -403,24 +437,82 @@ export default function FunnelPage() {
                 </div>
 
                 <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto]">
-                  <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
-                    <span className="block text-xs uppercase tracking-[0.18em] text-slate-400">Siguiente acción</span>
-                    {lead.nextAction || 'Definir seguimiento'}
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <label className="block rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                      <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-slate-400">Siguiente accion</span>
+                      <input
+                        value={drafts[lead.id]?.nextAction || ''}
+                        onChange={(event) =>
+                          setDrafts((current) => ({
+                            ...current,
+                            [lead.id]: { ...current[lead.id], nextAction: event.target.value },
+                          }))
+                        }
+                        className="input-field"
+                        placeholder="Escribe el siguiente paso"
+                      />
+                    </label>
+                    <label className="block rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                      <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-slate-400">Valor</span>
+                      <input
+                        type="number"
+                        value={drafts[lead.id]?.value || '0'}
+                        onChange={(event) =>
+                          setDrafts((current) => ({
+                            ...current,
+                            [lead.id]: { ...current[lead.id], value: event.target.value },
+                          }))
+                        }
+                        className="input-field"
+                        placeholder="0"
+                      />
+                    </label>
+                    <label className="block rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                      <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-slate-400">Confianza</span>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={drafts[lead.id]?.confidence || '0'}
+                        onChange={(event) =>
+                          setDrafts((current) => ({
+                            ...current,
+                            [lead.id]: { ...current[lead.id], confidence: event.target.value },
+                          }))
+                        }
+                        className="input-field"
+                        placeholder="0"
+                      />
+                    </label>
                   </div>
-                  <label className="block">
-                    <span className="mb-2 block text-sm font-medium text-slate-700">Etapa</span>
-                    <select
-                      value={lead.stage}
-                      onChange={(event) => void moveLead(lead.id, event.target.value)}
-                      className="input-field min-w-[200px]"
+                  <div className="flex flex-col gap-3">
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-medium text-slate-700">Etapa</span>
+                      <select
+                        value={drafts[lead.id]?.stage || lead.stage}
+                        onChange={(event) =>
+                          setDrafts((current) => ({
+                            ...current,
+                            [lead.id]: { ...current[lead.id], stage: event.target.value },
+                          }))
+                        }
+                        className="input-field min-w-[220px]"
+                      >
+                        {STAGES.map((stage) => (
+                          <option key={stage.key} value={stage.key}>
+                            {stage.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <button
+                      onClick={() => void saveLead(lead.id)}
+                      disabled={savingLeadId === lead.id}
+                      className="btn-primary px-4 py-3 text-sm"
                     >
-                      {STAGES.map((stage) => (
-                        <option key={stage.key} value={stage.key}>
-                          {stage.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                      {savingLeadId === lead.id ? 'Guardando...' : 'Guardar cambios'}
+                    </button>
+                  </div>
                 </div>
               </article>
             ))

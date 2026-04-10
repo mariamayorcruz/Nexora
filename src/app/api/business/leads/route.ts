@@ -22,10 +22,6 @@ async function getAuthorizedUser(request: NextRequest) {
     return { error: NextResponse.json({ error: 'User not found' }, { status: 404 }) };
   }
 
-  if (!isAdminEmail(user.email) && !isFounderEmail(user.email)) {
-    return { error: NextResponse.json({ error: 'Access denied' }, { status: 403 }) };
-  }
-
   return { user };
 }
 
@@ -34,7 +30,13 @@ export async function GET(request: NextRequest) {
     const auth = await getAuthorizedUser(request);
     if ('error' in auth) return auth.error;
 
+    const privileged = isAdminEmail(auth.user.email) || isFounderEmail(auth.user.email);
     const captures = await prisma.leadCapture.findMany({
+      where: privileged
+        ? undefined
+        : {
+            OR: [{ userId: auth.user.id }, { email: auth.user.email }],
+          },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
@@ -70,6 +72,11 @@ export async function POST(request: NextRequest) {
 
     if (!capture) {
       return NextResponse.json({ error: 'Lead no encontrado.' }, { status: 404 });
+    }
+
+    const privileged = isAdminEmail(auth.user.email) || isFounderEmail(auth.user.email);
+    if (!privileged && capture.userId !== auth.user.id && capture.email !== auth.user.email) {
+      return NextResponse.json({ error: 'No tienes permiso para mover este lead.' }, { status: 403 });
     }
 
     const existingLead = await prisma.crmLead.findFirst({

@@ -247,6 +247,14 @@ function buildVideoStudioOutput(params: {
       ],
     },
     {
+      title: 'Conversion layer',
+      items: [
+        'Abrir con un problema visible, no con una introduccion lenta.',
+        'Mostrar producto, mecanismo o resultado antes del segundo 8.',
+        'Cerrar con una sola accion concreta y sin CTA difuso.',
+      ],
+    },
+    {
       title: 'Delivery checklist',
       items: [
         'Abre con dolor o tensión en los primeros 2 segundos.',
@@ -285,6 +293,14 @@ function buildVideoStudioOutput(params: {
             '25-35s: CTA limpio y accionable.',
           ],
         },
+        {
+          title: 'On-screen copy',
+          items: [
+            'Overlay 1: dolor o perdida que el usuario reconoce enseguida.',
+            'Overlay 2: promesa concreta con lenguaje entendible.',
+            'Overlay 3: CTA de prueba, demo o contacto guiado.',
+          ],
+        },
         ...commonSections,
       ],
     };
@@ -317,6 +333,14 @@ function buildVideoStudioOutput(params: {
             'Escena 4: aterrizar prueba y cierre.',
           ],
         },
+        {
+          title: 'Render notes',
+          items: [
+            'Movimiento de camara limpio y energia premium.',
+            'Luz alta, foco en contraste y legibilidad del mensaje.',
+            'Evitar visuales genericos; priorizar escenas que apoyen la promesa.',
+          ],
+        },
         ...commonSections,
       ],
     };
@@ -346,6 +370,14 @@ function buildVideoStudioOutput(params: {
             'Entrada con push-in o paneo ligero.',
             'Foco en el elemento principal del frame.',
             'Salida con texto de cierre y CTA.',
+          ],
+        },
+        {
+          title: 'Creative upgrades',
+          items: [
+            'Agregar profundidad, micro-movimiento y ritmo de anuncio.',
+            'Acompanarlo con captions cortos y contraste alto.',
+            'Preparar una variante corta para story y otra para reel.',
           ],
         },
         ...commonSections,
@@ -381,11 +413,27 @@ function buildVideoStudioOutput(params: {
         ],
       },
       {
+        title: 'Music and pacing',
+        items: [
+          'Musica suave con energia comercial, sin tapar la voz.',
+          'Subir ritmo en transiciones donde cae la atencion.',
+          'Crear una variante mas agresiva para ads y otra mas premium para organic.',
+        ],
+      },
+      {
         title: 'Media layer',
         items: [
           `Asset a editar: ${sourceAsset}.`,
           'Música suave con energía comercial.',
           'Hooks alternativos para opening de 2 segundos.',
+        ],
+      },
+      {
+        title: 'Export package',
+        items: [
+          'Version principal subtitulada.',
+          'Version sin subtitulos para reutilizar.',
+          'Version corta de 15 segundos para test rapido.',
         ],
       },
       ...commonSections,
