@@ -105,8 +105,8 @@ export default function MasterclassThankYouPage({
             <div className="mt-5 rounded-[1.5rem] border border-slate-200 bg-white p-5 text-sm leading-7 text-slate-700">
               <p>Hola,</p>
               <p className="mt-3">
-                Tu master class de Nexora ya esta lista. Aqui tienes el mapa de decisiones para ordenar oferta, mensaje,
-                funnel y siguiente paso comercial.
+                Tu recurso gratuito ya esta listo. Aqui tienes una guia para mejorar tu proceso comercial y definir el
+                siguiente paso con mayor claridad.
               </p>
               <ul className="mt-4 list-disc space-y-2 pl-5">
                 <li>Ir a AI Studio Nexora</li>

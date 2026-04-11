@@ -4,16 +4,34 @@ import { useState } from 'react';
 
 const previewCards = [
   {
-    title: 'Mapa de decisiones Nexora',
-    detail: 'Una guia corta para ordenar oferta, mensaje, embudo y siguiente paso comercial.',
+    title: 'Auditoria en 7 minutos',
+    detail: 'Detecta qué está frenando conversiones y qué mover primero para recuperar rentabilidad.',
   },
   {
-    title: 'Marco para bajar ideas a propuesta',
-    detail: 'Te ayuda a dejar de pensar en abstracto y empezar a vender con una estructura clara.',
+    title: 'Plan de accion concreto',
+    detail: 'Recibe un orden de prioridades para captación, seguimiento comercial y cierre.',
   },
   {
-    title: 'Siguiente paso accionable',
-    detail: 'El recurso termina llevandote a una decision concreta, no a mas ruido.',
+    title: 'Ruta de implementacion',
+    detail: 'Define en qué módulo de Nexora empezar según tu situación actual.',
+  },
+];
+
+const proofCases = [
+  {
+    title: 'Estudio creativo (servicios)',
+    result: '+31% en leads calificados en 45 dias',
+    detail: 'Unificaron campañas y seguimiento comercial para dejar de perder prospectos entre canales.',
+  },
+  {
+    title: 'Ecommerce niche',
+    result: '-22% en costo por adquisición en 6 semanas',
+    detail: 'Reasignaron presupuesto con lectura diaria de rendimiento y pausaron campañas de bajo retorno.',
+  },
+  {
+    title: 'Consultoría B2B',
+    result: '+18% en cierres desde pipeline en 2 meses',
+    detail: 'Pasaron de seguimiento manual a un flujo consistente con etapas y siguientes acciones claras.',
   },
 ];
 
@@ -54,16 +72,16 @@ export default function MasterclassLead() {
   };
 
   return (
-    <section id="masterclass" className="bg-[#fffaf0] px-4 py-24 text-slate-900 sm:px-6 lg:px-8">
+    <section id="diagnostico" className="bg-[#fffaf0] px-4 py-24 text-slate-900 sm:px-6 lg:px-8">
       <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1.02fr_0.98fr]">
         <div>
-          <span className="section-tag">Master class gratis</span>
+          <span className="section-tag">Auditoria gratis</span>
           <h2 className="mt-6 text-4xl font-semibold leading-tight md:text-5xl">
-            No entregues solo un &quot;gracias&quot;. Entrega claridad que haga avanzar a la persona.
+            Auditoria de campañas en 7 minutos: detecta fugas y activa un plan de crecimiento.
           </h2>
           <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
-            Cuando alguien pide tu master class gratis, la experiencia debe sentirse como el inicio de una relacion seria.
-            Por eso Nexora entrega un recurso propio, accionable y elegante desde el primer minuto.
+            Responde un formulario corto y recibe un diagnóstico accionable con prioridades por impacto.
+            Así sabes exactamente qué corregir para vender más sin seguir improvisando.
           </p>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-3">
@@ -76,7 +94,7 @@ export default function MasterclassLead() {
           </div>
 
           <form onSubmit={handleSubmit} className="mt-10 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.06)]">
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Recibe acceso inmediato</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Recibe tu auditoria</p>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               <input
                 value={form.name}
@@ -102,31 +120,42 @@ export default function MasterclassLead() {
 
             <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm leading-6 text-slate-500">
-                Acceso a una guia propia de Nexora con mapa, framework y siguiente paso comercial. Si SMTP ya esta listo,
-                tambien recibe un correo con acceso a AI Studio, planes y futura app.
+                Te enviaremos el diagnóstico y una ruta recomendada para empezar en Nexora según tu caso.
               </p>
               <button type="submit" disabled={loading} className="btn-primary disabled:opacity-60">
-                {loading ? 'Preparando acceso...' : 'Quiero la master class gratis'}
+                {loading ? 'Procesando...' : 'Quiero mi auditoria gratis'}
               </button>
             </div>
           </form>
+
+          <div className="mt-8 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+            <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Prueba social</p>
+            <div className="mt-4 grid gap-4 sm:grid-cols-3">
+              {proofCases.map((item) => (
+                <div key={item.title} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-semibold text-slate-900">{item.title}</p>
+                  <p className="mt-2 text-base font-semibold text-emerald-700">{item.result}</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">{item.detail}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_22px_70px_rgba(15,23,42,0.08)]">
-          <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Vista previa del valor</p>
+          <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Qué incluye la auditoria</p>
           <h3 className="mt-3 text-2xl font-semibold text-slate-900">
-            La entrega debe sentirse util, premium y orientada a decision.
+            Una evaluación práctica para mejorar resultados, no un reporte decorativo.
           </h3>
           <p className="mt-3 text-sm leading-7 text-slate-600">
-            En vez de mandar un archivo generico o material ajeno, esta experiencia prepara al lead para pensar mejor
-            su oferta, su sistema de ventas y el siguiente paso contigo.
+            Te entrega prioridades claras para optimizar inversión, mejorar seguimiento y aumentar cierres.
           </p>
 
           <div className="mt-6 space-y-4">
             {[
-              'Que estas vendiendo realmente y cual es la promesa principal.',
-              'Que parte del embudo esta frenando claridad o conversion.',
-              'Como bajar eso a una oferta, pitch o secuencia dentro de Nexora.',
+              'Qué campañas están consumiendo presupuesto sin retorno suficiente.',
+              'Qué parte de tu seguimiento comercial está frenando cierres.',
+              'Qué acción ejecutar esta semana para mejorar ROI y pipeline.',
             ].map((item, index) => (
               <div key={item} className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5">
                 <p className="text-xs uppercase tracking-[0.22em] text-slate-400">Paso 0{index + 1}</p>
@@ -136,10 +165,9 @@ export default function MasterclassLead() {
           </div>
 
           <div className="mt-6 rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5">
-            <p className="text-xs uppercase tracking-[0.22em] text-slate-400">Despues de registrarse</p>
+            <p className="text-xs uppercase tracking-[0.22em] text-slate-400">Lo que recibes al enviar</p>
             <p className="mt-2 text-base font-medium leading-7 text-slate-800">
-              La persona ve una entrega inmediata en pantalla y, cuando el correo esta configurado, tambien recibe un
-              email con tres salidas claras: AI Studio, contratar un plan y descargar la app cuando este disponible.
+              Recibes el diagnóstico al instante y puedes avanzar a demo o decidir tu plan según tu situación actual.
             </p>
           </div>
         </div>

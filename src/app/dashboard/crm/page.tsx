@@ -587,48 +587,56 @@ export default function DashboardCrmPage() {
 
       <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
         <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Base de contactos</p>
-        <h2 className="mt-2 text-2xl font-semibold text-slate-900">Todos los leads visibles</h2>
+        <h2 className="mt-2 text-2xl font-semibold text-slate-900">Todos los leads visibles en formato planilla</h2>
 
-        <div className="mt-6 space-y-3">
+        <div className="mt-6">
           {leads.length === 0 ? (
             <div className="rounded-2xl bg-slate-50 p-5 text-sm text-slate-600">
               Todavía no hay contactos guardados en este CRM.
             </div>
           ) : (
-            leads.map((lead) => (
-              <article key={lead.id} className="rounded-2xl border border-slate-200 p-4">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
+            <div className="overflow-hidden rounded-3xl border border-slate-200">
+              <div className="hidden grid-cols-[1.1fr_1fr_0.9fr_0.8fr_0.8fr_1.1fr] gap-3 bg-slate-50 px-5 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 lg:grid">
+                <div>Lead</div>
+                <div>Contacto</div>
+                <div>Fuente</div>
+                <div>Etapa</div>
+                <div>Valor</div>
+                <div>Siguiente acción</div>
+              </div>
+              {leads.map((lead) => (
+                <article
+                  key={lead.id}
+                  className="grid gap-4 border-t border-slate-200 bg-white px-5 py-5 first:border-t-0 lg:grid-cols-[1.1fr_1fr_0.9fr_0.8fr_0.8fr_1.1fr] lg:items-start lg:gap-3"
+                >
+                  <CrmCell label="Lead">
                     <p className="font-semibold text-slate-900">{lead.name || 'Contacto sin nombre'}</p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      {lead.company || 'Sin empresa'} · {lead.source} · etapa {lead.stage}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-slate-900">${lead.value.toLocaleString()}</p>
-                    <p className="text-xs text-slate-500">Confianza {lead.confidence}%</p>
-                  </div>
-                </div>
-
-                <div className="mt-3 grid gap-3 md:grid-cols-3">
-                  <div className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">
-                    <span className="block text-xs uppercase tracking-[0.18em] text-slate-400">Email</span>
-                    {lead.email || 'Sin email'}
-                  </div>
-                  <div className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">
-                    <span className="block text-xs uppercase tracking-[0.18em] text-slate-400">Teléfono</span>
-                    {lead.phone || 'Sin teléfono'}
-                  </div>
-                  <div className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">
-                    <span className="block text-xs uppercase tracking-[0.18em] text-slate-400">Siguiente acción</span>
-                    {lead.nextAction || 'Sin definir'}
-                  </div>
-                </div>
-              </article>
-            ))
+                    <p className="mt-1 text-xs text-slate-500">{lead.company || 'Sin empresa'}</p>
+                  </CrmCell>
+                  <CrmCell label="Contacto">
+                    {lead.email || lead.phone || 'Sin contacto'}
+                  </CrmCell>
+                  <CrmCell label="Fuente">{lead.source}</CrmCell>
+                  <CrmCell label="Etapa">{lead.stage}</CrmCell>
+                  <CrmCell label="Valor">
+                    ${lead.value.toLocaleString()} · {lead.confidence}%
+                  </CrmCell>
+                  <CrmCell label="Siguiente acción">{lead.nextAction || 'Sin definir'}</CrmCell>
+                </article>
+              ))}
+            </div>
           )}
         </div>
       </section>
+    </div>
+  );
+}
+
+function CrmCell({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-slate-400 lg:hidden">{label}</span>
+      <div className="text-sm text-slate-700">{children}</div>
     </div>
   );
 }

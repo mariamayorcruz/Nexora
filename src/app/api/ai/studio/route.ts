@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import {
   AI_TOOL_DEFINITIONS,
@@ -10,6 +9,7 @@ import {
   type AiToolKey,
 } from '@/lib/ai-studio';
 import { getFounderPlan, isFounderEmail } from '@/lib/access';
+import { getBearerToken, verifyUserToken } from '@/lib/jwt';
 import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
@@ -33,14 +33,13 @@ function getVideoRenderStatus() {
 }
 
 function getUserIdFromRequest(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
+  const token = getBearerToken(request.headers.get('authorization'));
+  if (!token) {
     return null;
   }
 
-  const token = authHeader.substring(7);
-  const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret-key') as { userId: string };
-  return decoded.userId;
+  const decoded = verifyUserToken(token);
+  return decoded?.userId || null;
 }
 
 async function getUsageBucket(userId: string, plan: string | null | undefined, founderAccess: boolean) {
@@ -146,6 +145,12 @@ export async function POST(request: NextRequest) {
     const sourceAsset = String(body.sourceAsset || '').trim();
     const outputFormat = String(body.outputFormat || '').trim();
     const captionStyle = String(body.captionStyle || '').trim();
+    const smartEditOptions = {
+      removeSilences: Boolean(body.removeSilences),
+      addMusic: Boolean(body.addMusic),
+      createCaptions: Boolean(body.createCaptions),
+      generateVariants: Boolean(body.generateVariants),
+    };
 
     if (!prompt || !offer) {
       return NextResponse.json({ error: 'La idea base y la oferta son obligatorias.' }, { status: 400 });
@@ -194,6 +199,7 @@ export async function POST(request: NextRequest) {
       sourceAsset,
       outputFormat,
       captionStyle,
+      smartEditOptions,
     });
     const serializedOutput = JSON.parse(JSON.stringify(output)) as Prisma.InputJsonValue;
 

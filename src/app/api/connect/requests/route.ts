@@ -1,18 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { validateEmail } from '@/lib/auth';
+import { getBearerToken, verifyUserToken } from '@/lib/jwt';
 
 export const dynamic = 'force-dynamic';
+const ALLOWED_PLATFORMS = new Set(['instagram', 'facebook', 'google', 'tiktok']);
+const ALLOWED_SETUP_PREFERENCES = new Set(['oauth', 'manual']);
 
 function getUserIdFromRequest(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
+  const token = getBearerToken(request.headers.get('authorization'));
+  if (!token) {
     return null;
   }
 
-  const token = authHeader.substring(7);
-  const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret-key') as { userId: string };
-  return decoded.userId;
+  const decoded = verifyUserToken(token);
+  return decoded?.userId || null;
 }
 
 export async function GET(request: NextRequest) {
@@ -45,8 +47,18 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const platform = String(body.platform || '').trim().toLowerCase();
 
-    if (!platform) {
-      return NextResponse.json({ error: 'La plataforma es obligatoria.' }, { status: 400 });
+    if (!ALLOWED_PLATFORMS.has(platform)) {
+      return NextResponse.json({ error: 'La plataforma no es válida.' }, { status: 400 });
+    }
+
+    const setupPreference = String(body.setupPreference || '').trim().toLowerCase();
+    if (!ALLOWED_SETUP_PREFERENCES.has(setupPreference)) {
+      return NextResponse.json({ error: 'El modo de conexión no es válido.' }, { status: 400 });
+    }
+
+    const contactEmail = body.contactEmail?.trim() || null;
+    if (contactEmail && !validateEmail(contactEmail)) {
+      return NextResponse.json({ error: 'El email de contacto no es válido.' }, { status: 400 });
     }
 
     const connectionRequest = await prisma.connectionRequest.create({
@@ -54,11 +66,11 @@ export async function POST(request: NextRequest) {
         userId,
         platform,
         businessName: body.businessName?.trim() || null,
-        contactEmail: body.contactEmail?.trim() || null,
+        contactEmail,
         adAccountLabel: body.adAccountLabel?.trim() || null,
         websiteUrl: body.websiteUrl?.trim() || null,
         notes: body.notes?.trim() || null,
-        setupPreference: body.setupPreference === 'manual' ? 'manual' : 'oauth',
+        setupPreference,
         status: 'pending',
       },
     });

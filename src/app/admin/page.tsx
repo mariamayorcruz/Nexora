@@ -105,6 +105,9 @@ export default function AdminDashboard() {
               <Link href="/admin/funnel" className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950">
                 Ver funnel
               </Link>
+              <Link href="/admin/code-assistant" className="rounded-full bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950">
+                Abrir AI Code
+              </Link>
               <Link href="/admin/automation" className="rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white">
                 Ver automatización
               </Link>

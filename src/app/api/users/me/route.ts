@@ -3,19 +3,21 @@ import { prisma } from '@/lib/prisma';
 import { getFounderPlan, getFounderTrialDays, isAdminEmail, isFounderEmail } from '@/lib/access';
 import { buildEntitlementSummary } from '@/lib/entitlements';
 import { getHigherTierPlan } from '@/lib/billing';
-import jwt from 'jsonwebtoken';
+import { getBearerToken, verifyUserToken } from '@/lib/jwt';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
+    const token = getBearerToken(request.headers.get('authorization'));
+    if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret-key') as any;
+    const decoded = verifyUserToken(token);
+    if (!decoded?.userId) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    }
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
@@ -29,6 +31,7 @@ export async function GET(request: NextRequest) {
     }
 
     const founderAccess = isFounderEmail(user.email);
+    const adminAccess = isAdminEmail(user.email) || founderAccess;
     const founderPlan = founderAccess ? getFounderPlan() : null;
     const effectivePlan = founderAccess
       ? getHigherTierPlan(founderPlan, user.subscription?.plan)
@@ -82,7 +85,7 @@ export async function GET(request: NextRequest) {
         email: user.email,
         name: user.name,
         subscription: user.subscription,
-        isAdmin: isAdminEmail(user.email),
+        isAdmin: adminAccess,
         founderAccess,
         founderPlan: effectivePlan,
         entitlements,

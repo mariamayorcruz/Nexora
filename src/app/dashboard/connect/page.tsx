@@ -38,36 +38,32 @@ interface ConnectUser {
   } | null;
 }
 
-const platforms = [
+const PLATFORMS = [
   {
     key: 'instagram',
     name: 'Instagram Ads',
-    icon: 'IG',
-    description: 'Sincroniza creatividad, audiencias y campañas de Meta con foco visual.',
-    color: 'from-fuchsia-500 to-orange-400',
+    helper: 'Reels, UGC y campañas visuales.',
+    authUrl: 'https://business.facebook.com/latest/settings/ad-accounts',
   },
   {
     key: 'facebook',
     name: 'Facebook Ads',
-    icon: 'FB',
-    description: 'Centraliza campañas de captación y remarketing para venta directa.',
-    color: 'from-blue-700 to-cyan-500',
+    helper: 'Captación, remarketing y venta directa.',
+    authUrl: 'https://business.facebook.com/latest/settings/ad-accounts',
   },
   {
     key: 'google',
     name: 'Google Ads',
-    icon: 'GO',
-    description: 'Conecta demanda activa y mide mejor el rendimiento de tus intenciones de compra.',
-    color: 'from-emerald-500 to-lime-400',
+    helper: 'Demanda activa y búsquedas con intención.',
+    authUrl: 'https://ads.google.com/home/',
   },
   {
     key: 'tiktok',
     name: 'TikTok Ads',
-    icon: 'TT',
-    description: 'Activa alcance creativo y lectura de hooks para campañas de respuesta rápida.',
-    color: 'from-slate-900 to-slate-700',
+    helper: 'Creatividad corta y respuesta rápida.',
+    authUrl: 'https://ads.tiktok.com/business/',
   },
-];
+] as const;
 
 const EMPTY_FORM = {
   platform: 'instagram',
@@ -108,11 +104,12 @@ export default function ConnectPage() {
 
       const userData = await userResponse.json();
       const requestsData = requestsResponse.ok ? await requestsResponse.json() : { requests: [] };
+
       setUser(userData.user);
       setAdAccounts(userData.adAccounts || []);
       setRequests(requestsData.requests || []);
     } catch (error) {
-      console.error('Error fetching ad account state:', error);
+      console.error('Error fetching connect state:', error);
       setMessage('No pudimos cargar tus conexiones. Intenta actualizar la página.');
     } finally {
       setLoading(false);
@@ -125,6 +122,8 @@ export default function ConnectPage() {
 
   const adAccountUsage = user?.entitlements?.usage;
   const adAccountLimitReached = !!adAccountUsage && adAccountUsage.adAccounts >= adAccountUsage.adAccountsLimit;
+  const selectedPlatform = PLATFORMS.find((platform) => platform.key === form.platform) || PLATFORMS[0];
+  const openRequests = requests.filter((request) => request.status !== 'completed');
 
   const helperText = useMemo(() => {
     if (!adAccountUsage) return '';
@@ -160,7 +159,7 @@ export default function ConnectPage() {
       }
 
       setForm(EMPTY_FORM);
-      setMessage('Solicitud de conexión creada. Ya puedes seguir el estado desde esta misma pantalla.');
+      setMessage('Solicitud creada. Ya puedes seguir el estado desde esta misma pantalla.');
       await fetchData();
     } catch (error) {
       console.error('Error creating connection request:', error);
@@ -186,11 +185,10 @@ export default function ConnectPage() {
       <section className="rounded-[30px] border border-gray-200 bg-white p-8 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-6">
           <div>
-            <p className="text-xs uppercase tracking-[0.28em] text-gray-400">Conexiones del plan</p>
-            <h1 className="mt-3 text-3xl font-semibold text-gray-900">Conecta tus redes publicitarias sin perder control.</h1>
+            <p className="text-xs uppercase tracking-[0.28em] text-gray-400">Conectar canales</p>
+            <h1 className="mt-3 text-3xl font-semibold text-gray-900">Una sola pantalla para iniciar y seguir tus conexiones.</h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-gray-600">
-              Mientras cerramos las integraciones OAuth nativas, Nexora ya te deja iniciar cada conexión de forma operable:
-              eliges plataforma, registras la cuenta y haces seguimiento del estado desde un solo lugar.
+              Aquí simplificamos todo: eliges plataforma, dejas los datos mínimos y ves el estado sin perderte entre tarjetas o pasos innecesarios.
             </p>
           </div>
           <div className="rounded-[24px] bg-slate-950 px-6 py-5 text-white">
@@ -198,7 +196,7 @@ export default function ConnectPage() {
             <p className="mt-2 text-4xl font-semibold">
               {adAccountUsage?.adAccounts || 0}/{adAccountUsage?.adAccountsLimit || 1}
             </p>
-            <p className="mt-2 text-sm text-slate-300">cuentas conectadas</p>
+            <p className="mt-2 text-sm text-slate-300">cuentas preparadas</p>
           </div>
         </div>
 
@@ -206,103 +204,107 @@ export default function ConnectPage() {
         {message && <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">{message}</div>}
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+      <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
         <div className="rounded-[28px] border border-gray-200 bg-white p-7 shadow-sm">
-          <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Plataformas</p>
-          <h2 className="mt-2 text-2xl font-semibold text-gray-900">Qué canales puedes preparar hoy</h2>
+          <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Paso 1</p>
+          <h2 className="mt-2 text-2xl font-semibold text-gray-900">Elige el canal y deja lo esencial</h2>
 
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            {platforms.map((platform) => (
-              <article key={platform.key} className="rounded-[24px] border border-gray-200 p-5">
-                <div className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-r ${platform.color} text-sm font-semibold text-white`}>
-                  {platform.icon}
-                </div>
-                <h3 className="mt-4 text-lg font-semibold text-gray-900">{platform.name}</h3>
-                <p className="mt-2 text-sm leading-6 text-gray-600">{platform.description}</p>
-                <button
-                  onClick={() => setForm((current) => ({ ...current, platform: platform.key }))}
-                  className="mt-4 w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
-                >
-                  Preparar {platform.name}
-                </button>
-              </article>
+          <div className="mt-6 flex flex-wrap gap-2">
+            {PLATFORMS.map((platform) => (
+              <button
+                key={platform.key}
+                onClick={() => setForm((current) => ({ ...current, platform: platform.key }))}
+                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                  form.platform === platform.key ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                {platform.name}
+              </button>
             ))}
           </div>
-        </div>
 
-        <div className="rounded-[28px] border border-gray-200 bg-white p-7 shadow-sm">
-          <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Nueva solicitud</p>
-          <h2 className="mt-2 text-2xl font-semibold text-gray-900">Inicia una conexión real</h2>
+          <div className="mt-6 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+            <p className="text-sm font-semibold text-gray-900">{selectedPlatform.name}</p>
+            <p className="mt-2 text-sm leading-6 text-gray-600">{selectedPlatform.helper}</p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <a
+                href={selectedPlatform.authUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+              >
+                Abrir centro oficial
+              </a>
+              <span className="rounded-full bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Paso 1 abrir • Paso 2 guardar solicitud • Paso 3 seguimiento
+              </span>
+            </div>
+          </div>
 
           <div className="mt-6 grid gap-4">
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-gray-700">Plataforma</span>
-              <select
-                value={form.platform}
-                onChange={(event) => setForm((current) => ({ ...current, platform: event.target.value }))}
-                className="input-field"
-              >
-                {platforms.map((platform) => (
-                  <option key={platform.key} value={platform.key}>
-                    {platform.name}
-                  </option>
-                ))}
-              </select>
-            </label>
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-gray-700">Nombre del negocio o marca</span>
               <input
                 value={form.businessName}
                 onChange={(event) => setForm((current) => ({ ...current, businessName: event.target.value }))}
                 className="input-field"
-                placeholder="Nombre de la cuenta o marca"
+                placeholder="Nombre de la marca"
               />
             </label>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-gray-700">Email de contacto</span>
+                <input
+                  value={form.contactEmail}
+                  onChange={(event) => setForm((current) => ({ ...current, contactEmail: event.target.value }))}
+                  className="input-field"
+                  placeholder="correo@marca.com"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-gray-700">Cuenta publicitaria</span>
+                <input
+                  value={form.adAccountLabel}
+                  onChange={(event) => setForm((current) => ({ ...current, adAccountLabel: event.target.value }))}
+                  className="input-field"
+                  placeholder="Business ID o cuenta principal"
+                />
+              </label>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-gray-700">Sitio web</span>
+                <input
+                  value={form.websiteUrl}
+                  onChange={(event) => setForm((current) => ({ ...current, websiteUrl: event.target.value }))}
+                  className="input-field"
+                  placeholder="https://..."
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-gray-700">Modo</span>
+                <select
+                  value={form.setupPreference}
+                  onChange={(event) => setForm((current) => ({ ...current, setupPreference: event.target.value }))}
+                  className="input-field"
+                >
+                  <option value="oauth">OAuth guiado</option>
+                  <option value="manual">Carga manual</option>
+                </select>
+              </label>
+            </div>
+
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-gray-700">Email de contacto</span>
-              <input
-                value={form.contactEmail}
-                onChange={(event) => setForm((current) => ({ ...current, contactEmail: event.target.value }))}
-                className="input-field"
-                placeholder="correo@marca.com"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-gray-700">Nombre o ID de la cuenta publicitaria</span>
-              <input
-                value={form.adAccountLabel}
-                onChange={(event) => setForm((current) => ({ ...current, adAccountLabel: event.target.value }))}
-                className="input-field"
-                placeholder="Cuenta Meta principal, MCC, Business ID..."
-              />
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-gray-700">Sitio web</span>
-              <input
-                value={form.websiteUrl}
-                onChange={(event) => setForm((current) => ({ ...current, websiteUrl: event.target.value }))}
-                className="input-field"
-                placeholder="https://..."
-              />
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-gray-700">Modo de preparación</span>
-              <select
-                value={form.setupPreference}
-                onChange={(event) => setForm((current) => ({ ...current, setupPreference: event.target.value }))}
-                className="input-field"
-              >
-                <option value="oauth">OAuth guiado</option>
-                <option value="manual">Carga manual / revisión previa</option>
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-gray-700">Notas</span>
+              <span className="mb-2 block text-sm font-medium text-gray-700">Notas opcionales</span>
               <textarea
                 value={form.notes}
                 onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
-                className="input-field min-h-[120px]"
-                placeholder="Qué necesitas conectar, qué objetivo tienes o qué acceso ya existe."
+                className="input-field min-h-[110px]"
+                placeholder="Objetivo, acceso existente o algo que debamos saber."
               />
             </label>
           </div>
@@ -312,80 +314,96 @@ export default function ConnectPage() {
             disabled={saving || adAccountLimitReached}
             className="mt-6 btn-primary w-full disabled:opacity-60"
           >
-            {saving ? 'Guardando...' : adAccountLimitReached ? 'Límite alcanzado' : 'Crear solicitud de conexión'}
+            {saving ? 'Guardando...' : adAccountLimitReached ? 'Límite alcanzado' : 'Crear solicitud'}
           </button>
-        </div>
-      </section>
-
-      <section className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">Estado de conexiones</h2>
-            <p className="text-sm text-gray-500">Cuentas activas y solicitudes en curso.</p>
-          </div>
-          <Link href="/dashboard/billing" className="rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
-            Gestionar plan
-          </Link>
+          <p className="mt-3 text-xs leading-5 text-slate-500">
+            Mientras cerramos OAuth nativo, aquí ya puedes abrir Meta o Google, dejar tus datos y seguir el estado desde Nexora sin perder el orden.
+          </p>
         </div>
 
-        <div className="mt-6 grid gap-4 lg:grid-cols-2">
-          <div className="rounded-2xl bg-gray-50 p-5">
-            <p className="text-xs uppercase tracking-[0.22em] text-gray-400">Cuentas conectadas</p>
-            {adAccounts.length === 0 ? (
-              <div className="mt-4 text-sm text-gray-600">
-                Aún no tienes cuentas conectadas. Puedes empezar creando una solicitud real de conexión arriba.
+        <div className="space-y-6">
+          <section className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Paso 2</p>
+                <h2 className="mt-2 text-2xl font-semibold text-gray-900">Seguimiento claro</h2>
               </div>
-            ) : (
-              <div className="mt-4 space-y-3">
-                {adAccounts.map((account) => (
-                  <div key={account.id} className="rounded-2xl border border-gray-200 bg-white p-4">
-                    <p className="text-xs uppercase tracking-[0.22em] text-gray-400">{account.platform}</p>
-                    <p className="mt-2 text-lg font-semibold text-gray-900">{account.accountName}</p>
-                    <p className="mt-2 text-sm text-gray-600">
-                      {account.connected ? 'Conectada y disponible para lectura.' : 'Pendiente de reconexión.'}
+              <Link href="/dashboard/billing" className="rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+                Gestionar plan
+              </Link>
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-3">
+              <MiniStat label="Conectadas" value={String(adAccounts.filter((account) => account.connected).length)} />
+              <MiniStat label="En proceso" value={String(openRequests.length)} />
+              <MiniStat label="Disponibles" value={String(adAccountUsage?.adAccountsRemaining || 0)} />
+            </div>
+          </section>
+
+          <section className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+            <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Cuentas activas</p>
+            <div className="mt-4 space-y-3">
+              {adAccounts.length === 0 ? (
+                <EmptyPanel text="Aún no tienes cuentas conectadas. Empieza creando una solicitud arriba." />
+              ) : (
+                adAccounts.map((account) => (
+                  <div key={account.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                    <p className="text-sm font-semibold capitalize text-gray-900">{account.platform}</p>
+                    <p className="mt-1 text-sm text-gray-600">{account.accountName}</p>
+                    <p className="mt-2 text-xs uppercase tracking-[0.18em] text-emerald-700">
+                      {account.connected ? 'Conectada' : 'Pendiente'}
                     </p>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                ))
+              )}
+            </div>
+          </section>
 
-          <div className="rounded-2xl bg-gray-50 p-5">
-            <p className="text-xs uppercase tracking-[0.22em] text-gray-400">Solicitudes creadas</p>
-            {requests.length === 0 ? (
-              <div className="mt-4 text-sm text-gray-600">
-                Aún no hay solicitudes de conexión registradas.
-              </div>
-            ) : (
-              <div className="mt-4 space-y-3">
-                {requests.map((request) => (
-                  <div key={request.id} className="rounded-2xl border border-gray-200 bg-white p-4">
+          <section className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+            <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Solicitudes creadas</p>
+            <div className="mt-4 space-y-3">
+              {requests.length === 0 ? (
+                <EmptyPanel text="Todavía no hay solicitudes creadas." />
+              ) : (
+                requests.map((request) => (
+                  <div key={request.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="font-semibold text-gray-900">
-                          {platforms.find((platform) => platform.key === request.platform)?.name || request.platform}
+                          {PLATFORMS.find((platform) => platform.key === request.platform)?.name || request.platform}
                         </p>
-                        <p className="mt-1 text-sm text-gray-500">
-                          {request.businessName || request.adAccountLabel || 'Solicitud sin etiqueta'}
+                        <p className="mt-1 text-sm text-gray-600">
+                          {request.businessName || request.adAccountLabel || request.contactEmail || 'Solicitud sin etiqueta'}
                         </p>
                       </div>
                       <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">
                         {request.status}
                       </span>
                     </div>
-                    <p className="mt-3 text-sm text-gray-600">
-                      {request.contactEmail || 'Sin email'} · {request.setupPreference === 'manual' ? 'Carga manual' : 'OAuth guiado'}
-                    </p>
-                    <p className="mt-2 text-sm text-gray-500">
-                      Actualizado {new Date(request.updatedAt).toLocaleString('es-ES')}
+                    <p className="mt-3 text-sm text-gray-500">
+                      {request.setupPreference === 'manual' ? 'Carga manual' : 'OAuth guiado'} ·{' '}
+                      {new Date(request.updatedAt).toLocaleString('es-ES')}
                     </p>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                ))
+              )}
+            </div>
+          </section>
         </div>
       </section>
     </div>
   );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-gray-50 p-4">
+      <p className="text-xs uppercase tracking-[0.18em] text-gray-400">{label}</p>
+      <p className="mt-2 text-3xl font-semibold text-gray-900">{value}</p>
+    </div>
+  );
+}
+
+function EmptyPanel({ text }: { text: string }) {
+  return <div className="rounded-2xl bg-gray-50 p-5 text-sm text-gray-600">{text}</div>;
 }

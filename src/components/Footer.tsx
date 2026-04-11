@@ -55,17 +55,17 @@ export default function Footer() {
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Mensaje final</h3>
+            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">¿Por qué Nexora?</h3>
             <p className="mt-4 text-sm leading-7 text-slate-300">
-              La página ya no parece un template genérico. Ahora transmite dirección de producto, intención comercial y una
-              mejor base para seguir iterando con branding, testimonios y un video definitivo.
+              Porque te ayuda a pasar de acciones sueltas a un sistema comercial claro: atraer, seguir y convertir con
+              más control y menos fricción operativa.
             </p>
           </div>
         </div>
 
         <div className="mt-10 flex flex-col gap-3 border-t border-white/10 pt-6 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between">
           <p>© 2026 Nexora. Todos los derechos reservados.</p>
-          <p>Desplegable en Vercel, editable en VS Code y listo para versionarse en GitHub.</p>
+          <p>Impulsa tus campañas, leads y cierres desde un solo lugar.</p>
         </div>
       </div>
     </footer>

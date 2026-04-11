@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { validateEmail } from '@/lib/auth';
 import { buildMasterclassEmail } from '@/lib/lead-magnets';
 import { isEmailDeliveryConfigured, sendTransactionalEmail } from '@/lib/mailer';
 import { prisma } from '@/lib/prisma';
@@ -13,7 +14,7 @@ export async function POST(request: NextRequest) {
     const source = String(body.source || 'masterclass').trim() || 'masterclass';
     const resource = String(body.resource || 'nexora-decision-map').trim() || 'nexora-decision-map';
 
-    if (!email || !email.includes('@')) {
+    if (!validateEmail(email)) {
       return NextResponse.json({ error: 'Necesitamos un email válido para entregarte el recurso.' }, { status: 400 });
     }
 
@@ -22,15 +23,26 @@ export async function POST(request: NextRequest) {
       select: { id: true },
     });
 
-    const leadCapture = await prisma.leadCapture.create({
-      data: {
-        email,
-        name: name || null,
-        source,
-        resource,
-        userId: existingUser?.id || null,
-      },
-    });
+    const leadCapture =
+      (await prisma.leadCapture.findFirst({
+        where: {
+          email,
+          source,
+          resource,
+          createdAt: {
+            gte: new Date(Date.now() - 24 * 60 * 60 * 1000),
+          },
+        },
+      })) ||
+      (await prisma.leadCapture.create({
+        data: {
+          email,
+          name: name || null,
+          source,
+          resource,
+          userId: existingUser?.id || null,
+        },
+      }));
 
     let deliveryStatus: 'sent' | 'pending_setup' | 'failed' = 'pending_setup';
 

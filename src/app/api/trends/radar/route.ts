@@ -1,21 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken';
 import { isFounderEmail } from '@/lib/access';
 import { prisma } from '@/lib/prisma';
 import { canAccessRadar, getPlanCapabilities } from '@/lib/entitlements';
 import { buildTrendRadarReport } from '@/lib/trends';
+import { getBearerToken, verifyUserToken } from '@/lib/jwt';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
+    const token = getBearerToken(request.headers.get('authorization'));
+    if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret-key') as { userId: string };
+    const decoded = verifyUserToken(token);
+    if (!decoded?.userId) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    }
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },

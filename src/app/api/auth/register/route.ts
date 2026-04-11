@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { hashPassword, validateEmail, validatePassword } from '@/lib/auth';
 import { getFounderPlan, getFounderTrialDays, isFounderEmail } from '@/lib/access';
-import jwt from 'jsonwebtoken';
+import { signUserToken } from '@/lib/jwt';
 
 export const dynamic = 'force-dynamic';
 
@@ -84,11 +84,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Generar token JWT
-    const token = jwt.sign(
-      { userId: user.id, email: user.email },
-      process.env.JWT_SECRET || 'secret-key',
-      { expiresIn: '7d' }
-    );
+    const token = signUserToken({ userId: user.id, email: user.email });
 
     return NextResponse.json({
       success: true,

@@ -47,6 +47,13 @@ export interface AiOutputPayload {
   cta?: string;
 }
 
+export interface SmartEditOptions {
+  removeSilences?: boolean;
+  addMusic?: boolean;
+  createCaptions?: boolean;
+  generateVariants?: boolean;
+}
+
 export const AI_PLAN_CONFIG: Record<BillingPlan, AiPlanConfig> = {
   starter: {
     monthlyCredits: 250,
@@ -229,6 +236,7 @@ function buildVideoStudioOutput(params: {
   sourceAsset?: string;
   outputFormat?: string;
   captionStyle?: string;
+  smartEditOptions?: SmartEditOptions;
 }) {
   const offer = normalizeOffer(params.offer);
   const audience = params.audience || 'tu audiencia ideal';
@@ -236,6 +244,7 @@ function buildVideoStudioOutput(params: {
   const sourceAsset = params.sourceAsset || 'sin asset especificado';
   const outputFormat = params.outputFormat || 'vertical 9:16';
   const captionStyle = params.captionStyle || 'bold clean';
+  const smartEditOptions = params.smartEditOptions || {};
 
   const commonSections: AiOutputSection[] = [
     {
@@ -388,9 +397,15 @@ function buildVideoStudioOutput(params: {
   return {
     headline: `Smart edit para ${offer}`,
     bullets: [
-      'Corte inteligente de silencios y pausas débiles.',
-      'Captions automáticos con estilos orientados a performance.',
-      'Sugerencia de música, ritmo, highlights y variantes de salida.',
+      smartEditOptions.removeSilences
+        ? 'Corte inteligente de silencios y pausas débiles activado.'
+        : 'Mapa de pausas y momentos lentos identificado para edición manual o asistida.',
+      smartEditOptions.createCaptions
+        ? 'Captions automáticos con estilos orientados a performance.'
+        : 'Sistema de captions listo para activarse con un estilo de subtítulos más vendedor.',
+      smartEditOptions.addMusic
+        ? 'Sugerencia de música, ritmo, highlights y variantes de salida.'
+        : 'Ritmo, estructura y highlights preparados incluso si todavía no quieres añadir música.',
     ],
     angle: `La edición debe hacer que el video se sienta más corto, más claro y más vendedor para ${audience}.`,
     cta: 'Exporta una versión principal y una variante con hook más agresivo para test A/B.',
@@ -398,7 +413,9 @@ function buildVideoStudioOutput(params: {
       {
         title: 'Edit operations',
         items: [
-          'Eliminar silencios largos y respiraciones innecesarias.',
+          smartEditOptions.removeSilences
+            ? 'Eliminar silencios largos y respiraciones innecesarias.'
+            : 'Detectar silencios largos y dejar marcadas las zonas que conviene cortar.',
           'Acelerar bloques lentos sin perder naturalidad.',
           'Detectar frases fuertes para convertirlas en hook o opener.',
           'Preparar cortes para formatos vertical y horizontal.',
@@ -408,14 +425,18 @@ function buildVideoStudioOutput(params: {
         title: 'Caption system',
         items: [
           `Estilo sugerido: ${captionStyle}.`,
-          'Generar captions automáticos con resaltado de palabras clave.',
+          smartEditOptions.createCaptions
+            ? 'Generar captions automáticos con resaltado de palabras clave.'
+            : 'Dejar el caption system preparado para activarse con un clic.',
           'Crear al menos 3 estilos: clean, ads bold y creator native.',
         ],
       },
       {
         title: 'Music and pacing',
         items: [
-          'Musica suave con energia comercial, sin tapar la voz.',
+          smartEditOptions.addMusic
+            ? 'Música suave con energía comercial, sin tapar la voz.'
+            : 'Dejar recomendación de música opcional sin incrustarla todavía.',
           'Subir ritmo en transiciones donde cae la atencion.',
           'Crear una variante mas agresiva para ads y otra mas premium para organic.',
         ],
@@ -433,7 +454,9 @@ function buildVideoStudioOutput(params: {
         items: [
           'Version principal subtitulada.',
           'Version sin subtitulos para reutilizar.',
-          'Version corta de 15 segundos para test rapido.',
+          smartEditOptions.generateVariants
+            ? 'Versión corta de 15 segundos y otra de 30 segundos para test rápido.'
+            : 'Versión corta de 15 segundos sugerida para test rápido.',
         ],
       },
       ...commonSections,
@@ -470,8 +493,9 @@ export function buildAiOutput(params: {
   sourceAsset?: string;
   outputFormat?: string;
   captionStyle?: string;
+  smartEditOptions?: SmartEditOptions;
 }): AiOutputPayload {
-  const { tool, prompt, offer, audience, channel, sourceAsset, outputFormat, captionStyle } = params;
+  const { tool, prompt, offer, audience, channel, sourceAsset, outputFormat, captionStyle, smartEditOptions } = params;
   const trimmedOffer = normalizeOffer(offer);
   const trimmedAudience = audience || 'tu audiencia ideal';
   const trimmedChannel = channel || 'paid media';
@@ -487,6 +511,7 @@ export function buildAiOutput(params: {
       sourceAsset,
       outputFormat,
       captionStyle,
+      smartEditOptions,
     });
   }
 

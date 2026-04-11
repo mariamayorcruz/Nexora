@@ -16,7 +16,6 @@ interface DashboardUser {
     capabilities?: {
       canUseRadar?: boolean;
       canUseAdvancedAnalytics?: boolean;
-      canUseAiStudio?: boolean;
     } | null;
   } | null;
   subscription?: {
@@ -24,11 +23,7 @@ interface DashboardUser {
   } | null;
 }
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { language, setLanguage } = useAppLanguage();
@@ -67,31 +62,32 @@ export default function DashboardLayout({
   }, [router]);
 
   const menuItems = [
-    { label: language === 'en' ? 'Dashboard' : 'Dashboard', href: '/dashboard', icon: 'DA' },
-    { label: language === 'en' ? 'Connect channels' : 'Conectar redes', href: '/dashboard/connect', icon: 'CR' },
-    { label: language === 'en' ? 'Funnel' : 'Funnel', href: '/dashboard/funnel', icon: 'FU' },
-    { label: 'CRM', href: '/dashboard/crm', icon: 'CM' },
+    { label: language === 'en' ? 'Overview' : 'Resumen', href: '/dashboard', icon: 'OV' },
+    { label: language === 'en' ? 'Pipeline' : 'Pipeline', href: '/dashboard/funnel', icon: 'PL' },
+    { label: language === 'en' ? 'Connect' : 'Conectar', href: '/dashboard/connect', icon: 'CN' },
     { label: 'AI Studio', href: '/dashboard/studio', icon: 'IA' },
     { label: language === 'en' ? 'Campaigns' : 'Campañas', href: '/dashboard/campaigns', icon: 'CA' },
-    { label: language === 'en' ? 'Support' : 'Soporte', href: '/dashboard/support', icon: 'SP' },
     { label: language === 'en' ? 'Billing' : 'Facturación', href: '/dashboard/billing', icon: 'FA' },
+    { label: language === 'en' ? 'Support' : 'Soporte', href: '/dashboard/support', icon: 'SP' },
     { label: language === 'en' ? 'Settings' : 'Configuración', href: '/dashboard/settings', icon: 'CO' },
   ];
 
   if (user?.entitlements?.capabilities?.canUseRadar) {
-    menuItems.splice(1, 0, { label: language === 'en' ? 'Creative radar' : 'Radar creativo', href: '/dashboard/radar', icon: 'RC' });
+    menuItems.splice(4, 0, { label: language === 'en' ? 'Radar' : 'Radar', href: '/dashboard/radar', icon: 'RA' });
   }
 
   if (user?.entitlements?.capabilities?.canUseAdvancedAnalytics) {
-    menuItems.splice(user?.entitlements?.capabilities?.canUseRadar ? 6 : 5, 0, {
+    menuItems.splice(user?.entitlements?.capabilities?.canUseRadar ? 5 : 4, 0, {
       label: language === 'en' ? 'Analytics' : 'Analítica',
       href: '/dashboard/analytics',
       icon: 'AN',
     });
   }
 
-  if (user?.isAdmin) {
+  const canAccessAdminPanel = Boolean(user?.isAdmin || user?.founderAccess);
+  if (canAccessAdminPanel) {
     menuItems.push({ label: language === 'en' ? 'Admin panel' : 'Panel admin', href: '/admin', icon: 'AD' });
+    menuItems.push({ label: language === 'en' ? 'AI Code' : 'IA Code', href: '/admin/code-assistant', icon: 'AI' });
   }
 
   const handleLogout = () => {
@@ -119,7 +115,7 @@ export default function DashboardLayout({
       >
         <div className="border-b border-slate-200/80 p-6">
           <Link href="/dashboard" className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-400 via-amber-300 to-cyan-400 text-sm font-semibold text-slate-950 shadow-[0_10px_35px_rgba(56,189,248,0.22)]">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-400 via-amber-300 to-cyan-400 text-sm font-semibold text-slate-950">
               NX
             </div>
             <div>
@@ -150,16 +146,10 @@ export default function DashboardLayout({
               key={item.href}
               href={item.href}
               className={`flex items-center gap-3 rounded-2xl px-4 py-3 transition ${
-                pathname === item.href
-                  ? 'bg-slate-950 text-white shadow-[0_18px_50px_rgba(15,23,42,0.18)]'
-                  : 'text-slate-700 hover:bg-slate-100'
+                pathname === item.href ? 'bg-slate-950 text-white' : 'text-slate-700 hover:bg-slate-100'
               }`}
             >
-              <span
-                className={`flex h-9 w-9 items-center justify-center rounded-xl text-xs font-semibold ${
-                  pathname === item.href ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-500'
-                }`}
-              >
+              <span className={`flex h-9 w-9 items-center justify-center rounded-xl text-xs font-semibold ${pathname === item.href ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-500'}`}>
                 {item.icon}
               </span>
               <span className="font-medium">{item.label}</span>
@@ -168,7 +158,7 @@ export default function DashboardLayout({
         </nav>
 
         <div className="border-t border-slate-200/80 p-4">
-          <div className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-4 shadow-[0_12px_35px_rgba(15,23,42,0.06)]">
+          <div className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-4">
             <p className="text-sm font-medium text-slate-900">{user?.email}</p>
             <p className="mt-1 text-xs uppercase tracking-[0.24em] text-slate-400">
               {user?.founderAccess
@@ -177,24 +167,9 @@ export default function DashboardLayout({
                   : 'Plan fundador'
                 : `${language === 'en' ? 'Plan' : 'Plan'} ${user?.entitlements?.marketingLabel || user?.founderPlan || user?.subscription?.plan || 'starter'}`}
             </p>
-            {user?.isAdmin && (
-              <p className="mt-3 text-xs font-semibold text-primary">
-                {language === 'en' ? 'Full access to control center' : 'Acceso total al centro de control'}
-              </p>
-            )}
-            {user?.founderAccess && (
-              <p className="mt-2 text-xs font-semibold text-emerald-600">
-                {language === 'en'
-                  ? 'Founder account with creative priority and exclusive advantages active'
-                  : 'Cuenta fundadora con prioridad creativa y ventajas exclusivas activas'}
-              </p>
-            )}
           </div>
 
-          <button
-            onClick={handleLogout}
-            className="mt-4 w-full rounded-2xl px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-          >
+          <button onClick={handleLogout} className="mt-4 w-full rounded-2xl px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100">
             {language === 'en' ? 'Log out' : 'Cerrar sesión'}
           </button>
         </div>
@@ -216,10 +191,7 @@ export default function DashboardLayout({
         </main>
       </div>
 
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-30 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />
-      )}
-
+      {sidebarOpen && <div className="fixed inset-0 z-30 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />}
       <DashboardChatbot />
     </div>
   );

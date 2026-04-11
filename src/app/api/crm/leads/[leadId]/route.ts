@@ -1,20 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { getBearerToken, verifyUserToken } from '@/lib/jwt';
 
 export const dynamic = 'force-dynamic';
 
 const ALLOWED_STAGES = new Set(['lead', 'contacted', 'qualified', 'proposal', 'won']);
 
 function getUserIdFromRequest(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
+  const token = getBearerToken(request.headers.get('authorization'));
+  if (!token) {
     return null;
   }
 
-  const token = authHeader.substring(7);
-  const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret-key') as { userId: string };
-  return decoded.userId;
+  const decoded = verifyUserToken(token);
+  return decoded?.userId || null;
 }
 
 export async function PATCH(

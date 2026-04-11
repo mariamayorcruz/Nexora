@@ -53,6 +53,10 @@ const DEFAULT_FORM = {
   sourceAsset: '',
   outputFormat: 'vertical 9:16',
   captionStyle: 'bold clean',
+  removeSilences: true,
+  addMusic: true,
+  createCaptions: true,
+  generateVariants: true,
 };
 
 const MODE_FAMILIES = [
@@ -81,6 +85,7 @@ export default function DashboardStudioPage() {
     [tools, form.tool]
   );
 
+  const latestJob = jobs[0] || null;
   const isVideoMode = ['avatar-video', 'text-to-video', 'image-to-video', 'smart-edit'].includes(form.tool);
   const needsSourceAsset = ['image-to-video', 'smart-edit'].includes(form.tool);
 
@@ -175,13 +180,12 @@ export default function DashboardStudioPage() {
       <section className="rounded-[36px] bg-[linear-gradient(135deg,#111827_0%,#0f172a_40%,#7c2d12_100%)] px-8 py-10 text-white shadow-[0_32px_110px_rgba(15,23,42,0.22)]">
         <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
           <div>
-            <p className="text-xs uppercase tracking-[0.32em] text-amber-200">Nexora Video Studio</p>
+            <p className="text-xs uppercase tracking-[0.32em] text-amber-200">Nexora AI Studio</p>
             <h1 className="mt-4 text-4xl font-semibold leading-tight">
-              Un estudio preparado para web hoy y para app móvil o desktop después.
+              Una sola pantalla para crear, revisar y reutilizar lo que ya generaste.
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-              Ya está estructurado por modos reales: avatar video, text-to-video, image-to-video y smart edit. La experiencia
-              es propia de Nexora; el render final dependerá del proveedor que conectemos.
+              El estudio quedó organizado para sentirse más como un workspace: controles a la izquierda, resultado útil a la derecha e historial vivo abajo.
             </p>
             <p className="mt-4 text-sm leading-6 text-amber-100/90">{usage?.supportLabel}</p>
           </div>
@@ -218,27 +222,16 @@ export default function DashboardStudioPage() {
       )}
 
       <section className="grid gap-5 md:grid-cols-4">
-        <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-slate-500">Créditos usados</p>
-          <p className="mt-3 text-3xl font-semibold text-slate-900">{usage?.creditsUsed ?? 0}</p>
-        </div>
-        <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-slate-500">Créditos del plan</p>
-          <p className="mt-3 text-3xl font-semibold text-slate-900">{usage?.creditsIncluded ?? 0}</p>
-        </div>
-        <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-slate-500">Créditos extra</p>
-          <p className="mt-3 text-3xl font-semibold text-slate-900">{usage?.creditsPurchased ?? 0}</p>
-        </div>
-        <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-slate-500">Renovación</p>
-          <p className="mt-3 text-3xl font-semibold text-slate-900">
-            {usage?.cycleEnd ? new Date(usage.cycleEnd).toLocaleDateString('es-ES') : '-'}
-          </p>
-        </div>
+        <MetricCard label="Créditos usados" value={String(usage?.creditsUsed ?? 0)} />
+        <MetricCard label="Créditos del plan" value={String(usage?.creditsIncluded ?? 0)} />
+        <MetricCard label="Créditos extra" value={String(usage?.creditsPurchased ?? 0)} />
+        <MetricCard
+          label="Renovación"
+          value={usage?.cycleEnd ? new Date(usage.cycleEnd).toLocaleDateString('es-ES') : '-'}
+        />
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[0.98fr_1.02fr]">
+      <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
         <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
           <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Builder</p>
           <h2 className="mt-2 text-2xl font-semibold text-slate-900">Diseña tu siguiente asset</h2>
@@ -263,7 +256,9 @@ export default function DashboardStudioPage() {
                 key={tool.key}
                 onClick={() => setForm((current) => ({ ...current, tool: tool.key }))}
                 className={`rounded-2xl border p-4 text-left transition ${
-                  form.tool === tool.key ? 'border-slate-950 bg-slate-950 text-white' : 'border-slate-200 bg-white text-slate-900'
+                  form.tool === tool.key
+                    ? 'border-slate-950 bg-slate-950 text-white'
+                    : 'border-slate-200 bg-white text-slate-900'
                 }`}
               >
                 <div className="flex items-start justify-between gap-4">
@@ -273,7 +268,11 @@ export default function DashboardStudioPage() {
                       {tool.description}
                     </p>
                   </div>
-                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${form.tool === tool.key ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                      form.tool === tool.key ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
                     {tool.credits} créditos
                   </span>
                 </div>
@@ -352,13 +351,38 @@ export default function DashboardStudioPage() {
               </label>
             )}
 
+            {form.tool === 'smart-edit' && (
+              <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:col-span-2 md:grid-cols-2">
+                <ToggleCard
+                  label="Quitar silencios"
+                  checked={form.removeSilences}
+                  onChange={() => setForm((current) => ({ ...current, removeSilences: !current.removeSilences }))}
+                />
+                <ToggleCard
+                  label="Agregar música"
+                  checked={form.addMusic}
+                  onChange={() => setForm((current) => ({ ...current, addMusic: !current.addMusic }))}
+                />
+                <ToggleCard
+                  label="Crear captions"
+                  checked={form.createCaptions}
+                  onChange={() => setForm((current) => ({ ...current, createCaptions: !current.createCaptions }))}
+                />
+                <ToggleCard
+                  label="Generar variantes"
+                  checked={form.generateVariants}
+                  onChange={() => setForm((current) => ({ ...current, generateVariants: !current.generateVariants }))}
+                />
+              </div>
+            )}
+
             <label className="block md:col-span-2">
               <span className="mb-2 block text-sm font-medium text-slate-700">Brief o idea base</span>
               <textarea
                 value={form.prompt}
                 onChange={(event) => setForm((current) => ({ ...current, prompt: event.target.value }))}
                 className="input-field min-h-[150px]"
-                placeholder="Explica el ángulo, el dolor, el ritmo, la promesa, el estilo de edición o la pieza que quieres crear."
+                placeholder="Explica el ángulo, el dolor, la promesa, el estilo de edición o la pieza que quieres crear."
               />
             </label>
           </div>
@@ -375,25 +399,72 @@ export default function DashboardStudioPage() {
         </div>
 
         <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Arquitectura del producto</p>
-          <h2 className="mt-2 text-2xl font-semibold text-slate-900">Listo para web hoy, app después</h2>
+          <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Vista previa</p>
+          <h2 className="mt-2 text-2xl font-semibold text-slate-900">Resultado inmediato a la derecha</h2>
 
-          <div className="mt-6 space-y-4">
-            {[
-              'Cada modo ya se construye desde API y no solo desde UI, para que luego pueda salir en móvil o desktop.',
-              'Video Studio separa avatar, text-to-video, image-to-video y smart edit como familias reales de producto.',
-              'Los créditos, jobs y estados se pueden reutilizar en futuras apps sin rehacer la lógica central.',
-            ].map((item) => (
-              <div key={item} className="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-                {item}
+          {latestJob ? (
+            <div className="mt-6 space-y-4">
+              <div className="rounded-2xl bg-slate-950 p-5 text-white">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-300">Último output</p>
+                <p className="mt-2 text-lg font-semibold">{latestJob.title}</p>
+                <p className="mt-2 text-sm text-slate-300">
+                  {new Date(latestJob.createdAt).toLocaleString('es-ES')} · {latestJob.channel || 'Sin canal'}
+                </p>
               </div>
-            ))}
-          </div>
+
+              {latestJob.output?.headline && (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Idea central</p>
+                  <p className="mt-2 text-base font-semibold text-slate-900">{latestJob.output.headline}</p>
+                </div>
+              )}
+
+              {latestJob.output?.angle && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-medium text-amber-900">
+                  {latestJob.output.angle}
+                </div>
+              )}
+
+              {latestJob.output?.bullets?.length ? (
+                <div className="space-y-3">
+                  {latestJob.output.bullets.slice(0, 4).map((bullet) => (
+                    <div key={bullet} className="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+                      {bullet}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {latestJob.output?.cta && (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-900">
+                  CTA sugerido: {latestJob.output.cta}
+                </div>
+              )}
+
+              <div className="rounded-2xl border border-slate-200 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Historial rápido</p>
+                <div className="mt-3 space-y-3">
+                  {jobs.slice(0, 4).map((job) => (
+                    <div key={job.id} className="rounded-2xl bg-slate-50 p-3">
+                      <p className="text-sm font-semibold text-slate-900">{job.title}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {job.creditsUsed} créditos · {new Date(job.createdAt).toLocaleString('es-ES')}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-6 rounded-2xl bg-slate-50 p-5 text-sm text-slate-600">
+              Tu primer resultado aparecerá aquí para que el estudio se sienta como editor: controles a la izquierda y salida útil a la derecha.
+            </div>
+          )}
         </div>
       </section>
 
       <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Historial</p>
+        <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Historial completo</p>
         <h2 className="mt-2 text-2xl font-semibold text-slate-900">Assets y outputs recientes</h2>
 
         <div className="mt-6 space-y-4">
@@ -483,5 +554,38 @@ export default function DashboardStudioPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+function MetricCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+      <p className="text-sm text-slate-500">{label}</p>
+      <p className="mt-3 text-3xl font-semibold text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+function ToggleCard({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onChange}
+      className={`rounded-2xl border px-4 py-3 text-left text-sm font-medium transition ${
+        checked
+          ? 'border-slate-950 bg-slate-950 text-white'
+          : 'border-slate-200 bg-white text-slate-700'
+      }`}
+    >
+      {label}
+    </button>
   );
 }

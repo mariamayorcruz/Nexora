@@ -55,6 +55,20 @@ interface LeadDraft {
   nextAction: string;
 }
 
+interface UnifiedRow {
+  id: string;
+  kind: 'capture' | 'crm';
+  name: string;
+  contact: string;
+  source: string;
+  category: string;
+  stage: string;
+  value: number;
+  confidence: number;
+  nextAction: string;
+  createdAt: string;
+}
+
 const STAGES = [
   { key: 'lead', label: 'Lead' },
   { key: 'contacted', label: 'Contactado' },
@@ -194,6 +208,38 @@ export default function FunnelPage() {
         .filter((lead) => lead.stage !== 'won')
         .sort((left, right) => right.value - left.value || right.confidence - left.confidence)
         .slice(0, 8),
+      unifiedRows: [
+        ...captures.map(
+          (capture): UnifiedRow => ({
+            id: capture.id,
+            kind: 'capture',
+            name: capture.name || capture.email,
+            contact: capture.email,
+            source: capture.source,
+            category: capture.resource,
+            stage: capture.convertedToCrmAt ? 'crm' : 'captado',
+            value: 0,
+            confidence: 0,
+            nextAction: capture.convertedToCrmAt ? 'Ya fue convertido al CRM' : 'Pasar a CRM',
+            createdAt: capture.createdAt,
+          })
+        ),
+        ...crmLeads.map(
+          (lead): UnifiedRow => ({
+            id: lead.id,
+            kind: 'crm',
+            name: lead.name,
+            contact: lead.email || lead.company || 'Sin contacto directo',
+            source: lead.source,
+            category: lead.company || 'Oportunidad comercial',
+            stage: lead.stage,
+            value: lead.value,
+            confidence: lead.confidence,
+            nextAction: lead.nextAction || 'Definir siguiente paso',
+            createdAt: lead.updatedAt,
+          })
+        ),
+      ].sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()),
     };
   }, [campaigns, captures, crmLeads]);
 
@@ -413,7 +459,7 @@ export default function FunnelPage() {
 
       <section className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
         <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Pipeline manipulable</p>
-        <h2 className="mt-2 text-2xl font-semibold text-gray-900">Cambia etapas y sigue tus oportunidades reales</h2>
+        <h2 className="mt-2 text-2xl font-semibold text-gray-900">Cambia etapas y sigue tus oportunidades como en una planilla viva</h2>
 
         <div className="mt-6 space-y-4">
           {funnel.activeOpportunities.length === 0 ? (
@@ -421,104 +467,254 @@ export default function FunnelPage() {
               Aún no hay oportunidades activas en CRM. Pasa tus interesados al CRM o agrega contactos manualmente para empezar a moverlos por etapa.
             </div>
           ) : (
-            funnel.activeOpportunities.map((lead) => (
-              <article key={lead.id} className="rounded-2xl border border-gray-200 p-5">
-                <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="overflow-hidden rounded-3xl border border-gray-200">
+              <div className="hidden grid-cols-[1.2fr_1.1fr_0.7fr_0.7fr_1fr_auto] gap-3 bg-slate-50 px-5 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 lg:grid">
+                <div>Lead</div>
+                <div>Siguiente acción</div>
+                <div>Valor</div>
+                <div>Confianza</div>
+                <div>Etapa</div>
+                <div />
+              </div>
+              {funnel.activeOpportunities.map((lead) => (
+                <article
+                  key={lead.id}
+                  className="grid gap-4 border-t border-gray-200 bg-white px-5 py-5 first:border-t-0 lg:grid-cols-[1.2fr_1.1fr_0.7fr_0.7fr_1fr_auto] lg:items-start lg:gap-3"
+                >
                   <div>
                     <p className="font-semibold text-gray-900">{lead.name}</p>
                     <p className="mt-1 text-sm text-gray-500">
-                      {lead.email || 'Sin email'} · {lead.company || 'Sin empresa'} · {lead.source}
+                      {lead.email || 'Sin email'} · {lead.company || 'Sin empresa'}
                     </p>
+                    <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">{lead.source}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-lg font-semibold text-gray-900">${lead.value.toLocaleString()}</p>
-                    <p className="text-sm text-gray-500">Confianza {lead.confidence}%</p>
-                  </div>
-                </div>
 
-                <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto]">
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <label className="block rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
-                      <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-slate-400">Siguiente accion</span>
-                      <input
-                        value={drafts[lead.id]?.nextAction || ''}
-                        onChange={(event) =>
-                          setDrafts((current) => ({
-                            ...current,
-                            [lead.id]: { ...current[lead.id], nextAction: event.target.value },
-                          }))
-                        }
-                        className="input-field"
-                        placeholder="Escribe el siguiente paso"
-                      />
-                    </label>
-                    <label className="block rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
-                      <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-slate-400">Valor</span>
-                      <input
-                        type="number"
-                        value={drafts[lead.id]?.value || '0'}
-                        onChange={(event) =>
-                          setDrafts((current) => ({
-                            ...current,
-                            [lead.id]: { ...current[lead.id], value: event.target.value },
-                          }))
-                        }
-                        className="input-field"
-                        placeholder="0"
-                      />
-                    </label>
-                    <label className="block rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
-                      <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-slate-400">Confianza</span>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={drafts[lead.id]?.confidence || '0'}
-                        onChange={(event) =>
-                          setDrafts((current) => ({
-                            ...current,
-                            [lead.id]: { ...current[lead.id], confidence: event.target.value },
-                          }))
-                        }
-                        className="input-field"
-                        placeholder="0"
-                      />
-                    </label>
-                  </div>
-                  <div className="flex flex-col gap-3">
-                    <label className="block">
-                      <span className="mb-2 block text-sm font-medium text-slate-700">Etapa</span>
-                      <select
-                        value={drafts[lead.id]?.stage || lead.stage}
-                        onChange={(event) =>
-                          setDrafts((current) => ({
-                            ...current,
-                            [lead.id]: { ...current[lead.id], stage: event.target.value },
-                          }))
-                        }
-                        className="input-field min-w-[220px]"
-                      >
-                        {STAGES.map((stage) => (
-                          <option key={stage.key} value={stage.key}>
-                            {stage.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                  <label className="block">
+                    <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-slate-400 lg:hidden">Siguiente acción</span>
+                    <input
+                      value={drafts[lead.id]?.nextAction || ''}
+                      onChange={(event) =>
+                        setDrafts((current) => ({
+                          ...current,
+                          [lead.id]: { ...current[lead.id], nextAction: event.target.value },
+                        }))
+                      }
+                      className="input-field"
+                      placeholder="Escribe el siguiente paso"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-slate-400 lg:hidden">Valor</span>
+                    <input
+                      type="number"
+                      value={drafts[lead.id]?.value || '0'}
+                      onChange={(event) =>
+                        setDrafts((current) => ({
+                          ...current,
+                          [lead.id]: { ...current[lead.id], value: event.target.value },
+                        }))
+                      }
+                      className="input-field"
+                      placeholder="0"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-slate-400 lg:hidden">Confianza</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={drafts[lead.id]?.confidence || '0'}
+                      onChange={(event) =>
+                        setDrafts((current) => ({
+                          ...current,
+                          [lead.id]: { ...current[lead.id], confidence: event.target.value },
+                        }))
+                      }
+                      className="input-field"
+                      placeholder="0"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-slate-400 lg:hidden">Etapa</span>
+                    <select
+                      value={drafts[lead.id]?.stage || lead.stage}
+                      onChange={(event) =>
+                        setDrafts((current) => ({
+                          ...current,
+                          [lead.id]: { ...current[lead.id], stage: event.target.value },
+                        }))
+                      }
+                      className="input-field"
+                    >
+                      {STAGES.map((stage) => (
+                        <option key={stage.key} value={stage.key}>
+                          {stage.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <div className="flex items-end">
                     <button
                       onClick={() => void saveLead(lead.id)}
                       disabled={savingLeadId === lead.id}
-                      className="btn-primary px-4 py-3 text-sm"
+                      className="btn-primary w-full px-4 py-3 text-sm lg:w-auto"
                     >
-                      {savingLeadId === lead.id ? 'Guardando...' : 'Guardar cambios'}
+                      {savingLeadId === lead.id ? 'Guardando...' : 'Guardar'}
                     </button>
                   </div>
-                </div>
-              </article>
-            ))
+                </article>
+              ))}
+            </div>
           )}
         </div>
       </section>
+
+      <section className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+        <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Planilla comercial</p>
+        <h2 className="mt-2 text-2xl font-semibold text-gray-900">Leads, interesados y categorías en una sola tabla</h2>
+
+        {funnel.unifiedRows.length === 0 ? (
+          <div className="mt-6 rounded-2xl bg-gray-50 p-5 text-sm text-gray-600">
+            Todavía no hay datos para la planilla comercial.
+          </div>
+        ) : (
+          <div className="mt-6 overflow-hidden rounded-3xl border border-gray-200">
+            <div className="hidden grid-cols-[0.7fr_1.1fr_1fr_0.9fr_0.9fr_0.8fr_0.8fr_1.1fr_auto] gap-3 bg-slate-50 px-5 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 lg:grid">
+              <div>Tipo</div>
+              <div>Lead</div>
+              <div>Contacto</div>
+              <div>Fuente</div>
+              <div>Categoría</div>
+              <div>Etapa</div>
+              <div>Valor</div>
+              <div>Siguiente acción</div>
+              <div />
+            </div>
+
+            {funnel.unifiedRows.slice(0, 20).map((row) => {
+              if (row.kind === 'capture') {
+                const capture = captures.find((item) => item.id === row.id);
+                return (
+                  <article
+                    key={`capture-${row.id}`}
+                    className="grid gap-4 border-t border-gray-200 bg-white px-5 py-5 first:border-t-0 lg:grid-cols-[0.7fr_1.1fr_1fr_0.9fr_0.9fr_0.8fr_0.8fr_1.1fr_auto] lg:items-start lg:gap-3"
+                  >
+                    <Cell label="Tipo">
+                      <span className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-700">
+                        Interesado
+                      </span>
+                    </Cell>
+                    <Cell label="Lead">{row.name}</Cell>
+                    <Cell label="Contacto">{row.contact}</Cell>
+                    <Cell label="Fuente">{row.source}</Cell>
+                    <Cell label="Categoría">{row.category}</Cell>
+                    <Cell label="Etapa">{row.stage}</Cell>
+                    <Cell label="Valor">$0</Cell>
+                    <Cell label="Siguiente acción">{row.nextAction}</Cell>
+                    <div className="flex items-end">
+                      {capture?.convertedToCrmAt ? (
+                        <span className="rounded-full bg-emerald-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                          En CRM
+                        </span>
+                      ) : (
+                        <button onClick={() => promoteCapture(row.id)} className="btn-secondary w-full px-4 py-3 text-sm lg:w-auto">
+                          Pasar a CRM
+                        </button>
+                      )}
+                    </div>
+                  </article>
+                );
+              }
+
+              const lead = crmLeads.find((item) => item.id === row.id);
+              if (!lead) return null;
+
+              return (
+                <article
+                  key={`crm-${row.id}`}
+                  className="grid gap-4 border-t border-gray-200 bg-white px-5 py-5 first:border-t-0 lg:grid-cols-[0.7fr_1.1fr_1fr_0.9fr_0.9fr_0.8fr_0.8fr_1.1fr_auto] lg:items-start lg:gap-3"
+                >
+                  <Cell label="Tipo">
+                    <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-violet-700">
+                      CRM
+                    </span>
+                  </Cell>
+                  <Cell label="Lead">{lead.name}</Cell>
+                  <Cell label="Contacto">{lead.email || lead.company || 'Sin contacto directo'}</Cell>
+                  <Cell label="Fuente">{lead.source}</Cell>
+                  <Cell label="Categoría">{lead.company || 'Oportunidad comercial'}</Cell>
+                  <Cell label="Etapa">
+                    <select
+                      value={drafts[lead.id]?.stage || lead.stage}
+                      onChange={(event) =>
+                        setDrafts((current) => ({
+                          ...current,
+                          [lead.id]: { ...current[lead.id], stage: event.target.value },
+                        }))
+                      }
+                      className="input-field"
+                    >
+                      {STAGES.map((stage) => (
+                        <option key={stage.key} value={stage.key}>
+                          {stage.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Cell>
+                  <Cell label="Valor">
+                    <input
+                      type="number"
+                      value={drafts[lead.id]?.value || '0'}
+                      onChange={(event) =>
+                        setDrafts((current) => ({
+                          ...current,
+                          [lead.id]: { ...current[lead.id], value: event.target.value },
+                        }))
+                      }
+                      className="input-field"
+                    />
+                  </Cell>
+                  <Cell label="Siguiente acción">
+                    <input
+                      value={drafts[lead.id]?.nextAction || ''}
+                      onChange={(event) =>
+                        setDrafts((current) => ({
+                          ...current,
+                          [lead.id]: { ...current[lead.id], nextAction: event.target.value },
+                        }))
+                      }
+                      className="input-field"
+                    />
+                  </Cell>
+                  <div className="flex items-end">
+                    <button
+                      onClick={() => void saveLead(lead.id)}
+                      disabled={savingLeadId === lead.id}
+                      className="btn-primary w-full px-4 py-3 text-sm lg:w-auto"
+                    >
+                      {savingLeadId === lead.id ? 'Guardando...' : 'Guardar'}
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function Cell({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <span className="mb-2 block text-xs uppercase tracking-[0.18em] text-slate-400 lg:hidden">{label}</span>
+      <div className="text-sm text-slate-700">{children}</div>
     </div>
   );
 }

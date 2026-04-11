@@ -33,10 +33,10 @@ export default function Demo() {
         <div className="max-w-3xl">
           <span className="section-tag section-tag-dark">Demo</span>
           <h2 className="mt-6 text-4xl font-semibold leading-tight md:text-5xl">
-            Un demo real para vender mejor el producto.
+            Mira cómo se ve una operación publicitaria bien organizada.
           </h2>
           <p className="mt-5 text-lg leading-8 text-slate-300">
-            Este video muestra con más claridad cómo se siente Nexora en uso real: control, lectura rápida del rendimiento y una operación publicitaria mucho más ordenada.
+            Este recorrido te muestra cómo centralizar campañas, leer rendimiento en segundos y tomar mejores decisiones sin saltar entre herramientas.
           </p>
         </div>
 
@@ -68,7 +68,7 @@ export default function Demo() {
             <div className="rounded-[1.75rem] border border-orange-400/20 bg-orange-400/10 p-6">
               <p className="text-xs uppercase tracking-[0.28em] text-orange-200">Lo que comunica</p>
               <p className="mt-3 text-sm leading-7 text-orange-50">
-                Nexora no solo organiza campañas. También transmite una operación más seria, más clara y más lista para escalar sin caos.
+                Con Nexora puedes pasar de una operación fragmentada a una forma de trabajo más clara, medible y preparada para crecer.
               </p>
             </div>
           </div>

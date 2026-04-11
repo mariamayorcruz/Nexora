@@ -5,29 +5,29 @@ import { useState } from 'react';
 
 const faqs = [
   {
-    question: '¿Qué cambió en esta nueva versión de la landing?',
+    question: '¿Me sirve si estoy empezando solo o todavía no tengo empresa formal?',
     answer:
-      'La propuesta visual, el copy y la jerarquía completa. La página ahora vende mejor, se siente más premium y explica el producto con mucha más claridad.',
+      'Sí. Puedes usar Nexora como freelancer, consultor o proyecto en etapa inicial para ordenar campañas, seguimiento y métricas desde el primer cliente. No necesitas estructura grande para obtener valor.',
   },
   {
-    question: '¿El demo ya puede hablar sin tener un video grabado?',
+    question: '¿También funciona para empresas grandes, agencias o equipos con alto volumen?',
     answer:
-      'Sí. El bloque de demo usa la voz del navegador para narrar un recorrido comercial del producto. Cuando tengas un video real, puedes conectarlo con una variable pública sin rehacer el frontend.',
+      'Sí. Está diseñado para escalar en operación: más cuentas, más campañas y más personas trabajando con el mismo flujo. La ventaja es mantener control y trazabilidad sin perder velocidad.',
   },
   {
-    question: '¿La página está preparada para Vercel?',
+    question: '¿Cuánto cuesta y qué plan me conviene según mi etapa?',
     answer:
-      'Sí. El proyecto sigue siendo Next.js y la mejora está hecha para convivir bien con el flujo habitual de Vercel, VS Code y GitHub.',
+      'Si estás iniciando o validando oferta, Starter suele ser suficiente. Si ya vendes con campañas activas y equipo comercial, Growth o Scale te dan más capacidad. La mejor elección es el plan que puedas sostener al menos 60 días para medir resultados reales.',
   },
   {
-    question: '¿Qué partes del producto están representadas en la landing?',
+    question: '¿Cuánto tiempo toma implementarlo sin frenar la operación diaria?',
     answer:
-      'Autenticación, dashboard, campañas, analítica, suscripciones, cobros y panel admin. Ajusté el discurso para alinearlo mejor con lo que realmente existe hoy en el repo.',
+      'La mayoría de equipos puede activarlo en pocos días. El proceso es simple: conectar fuentes, ordenar campañas, activar seguimiento y empezar a decidir desde una vista central, sin pausar lo que ya estás ejecutando.',
   },
   {
-    question: '¿Se puede seguir evolucionando hacia una experiencia tipo Saleads?',
+    question: '¿Necesito conocimientos técnicos para usarlo y ver ROI?',
     answer:
-      'Sí. Esta versión deja una base mucho más fuerte para luego sumar branding, casos de uso, logos, testimonios reales, video comercial definitivo y assets de producto.',
+      'No necesitas perfil técnico para operar la plataforma. El retorno se evalúa con métricas de negocio claras: costo por oportunidad, avance del pipeline y cierres por periodo. Si te trabas, tienes soporte para ajustar implementación y no quedarte a medias.',
   },
 ];
 

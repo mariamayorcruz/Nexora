@@ -12,13 +12,13 @@ import {
 const painPoints = [
   {
     stat: '14h',
-    title: 'Perdidas revisando plataformas separadas',
+    title: 'Perdidas por operar en plataformas separadas',
     description:
       'Saltas entre Meta, Google, TikTok, hojas de cálculo y mensajes internos. Cada cambio operativo corta foco y retrasa decisiones.',
   },
   {
-    stat: '$0 visibilidad',
-    title: 'Cobras, inviertes y reportas sin una vista central',
+    stat: '0 visibilidad',
+    title: 'Inviertes sin una lectura central del negocio',
     description:
       'Sin una consola unificada es difícil saber qué campaña empuja negocio y cuál solo consume presupuesto.',
   },
@@ -26,7 +26,7 @@ const painPoints = [
     stat: '1 sola fuente',
     title: 'Tu operación necesita un sistema, no otro parche',
     description:
-      'Una landing que vende mejor funciona cuando el producto detrás transmite orden, seguridad y autoridad visual.',
+      'Cuando campañas, seguimiento y resultados viven en el mismo lugar, es más fácil vender con consistencia.',
   },
 ];
 
@@ -48,18 +48,18 @@ const pillars = [
   },
   {
     icon: Users,
-    title: 'Panel admin incluido',
-    description: 'Usuarios, suscripciones, campañas y configuración del sistema bajo el mismo proyecto.',
+    title: 'Gestión centralizada',
+    description: 'Administra usuarios, planes y configuración desde una sola consola, sin depender de herramientas externas ni hojas separadas.',
   },
   {
     icon: CreditCard,
-    title: 'Base lista para cobro',
-    description: 'Flujo de autenticación y Stripe conectados para soportar monetización desde el inicio.',
+    title: 'Cobro online listo para activar',
+    description: 'Nexora ya incluye flujo con Stripe para planes y pagos con tarjeta. Solo necesitas configurar tus claves y precios para comenzar a cobrar.',
   },
   {
     icon: Shield,
-    title: 'Confianza visual',
-    description: 'Mensajes más maduros, jerarquía de venta mejor resuelta y una experiencia más creíble.',
+    title: 'Experiencia que genera confianza',
+    description: 'Presentación clara, mensajes directos y flujo de acceso limpio para que cada usuario entienda el valor antes de registrarse.',
   },
 ];
 
@@ -71,11 +71,11 @@ export default function Features() {
           <div>
             <span className="section-tag">El problema</span>
             <h2 className="mt-6 max-w-2xl text-4xl font-semibold leading-tight md:text-5xl">
-              Si el sistema se siente improvisado, la conversión también.
+              Si operas en caos, el crecimiento se vuelve impredecible.
             </h2>
             <p className="mt-5 max-w-xl text-lg leading-8 text-slate-600">
-              Las mejores landings de software funcionan cuando hablan de dolor real, muestran un flujo simple y dejan ver
-              producto. Aquí llevamos Nexora hacia esa dirección, con una narrativa más directa y una capa visual mucho más sólida.
+              La mayoría de equipos no falla por falta de esfuerzo, sino por falta de sistema. Nexora une campañas,
+              analítica y seguimiento comercial para convertir datos en acciones claras.
             </p>
           </div>
 
@@ -97,11 +97,10 @@ export default function Features() {
           <div className="max-w-3xl">
             <span className="section-tag">La solución</span>
             <h3 className="mt-6 text-3xl font-semibold text-slate-950 md:text-4xl">
-              Una homepage más completa, más eficiente y mejor conectada con el producto real.
+              Una plataforma única para atraer, seguir y cerrar mejor.
             </h3>
             <p className="mt-4 text-lg leading-8 text-slate-600">
-              Mantuvimos la esencia SaaS de alto valor, pero bajamos el discurso a cosas que este proyecto sí puede sostener hoy:
-              autenticación, dashboard, campañas, analítica, administración y monetización.
+              Nexora está diseñada para dar claridad operativa: menos tiempo en tareas repetitivas y más tiempo en decisiones que impactan ventas.
             </p>
           </div>
 

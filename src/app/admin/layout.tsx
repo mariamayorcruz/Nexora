@@ -52,6 +52,7 @@ export default function AdminLayout({
   const menuItems = [
     { label: 'Dashboard', href: '/admin', icon: 'DA' },
     { label: 'Volver al panel', href: '/dashboard', icon: 'NX' },
+    { label: 'AI Code', href: '/admin/code-assistant', icon: 'AI' },
     { label: 'Funnel', href: '/admin/funnel', icon: 'FU' },
     { label: 'Usuarios', href: '/admin/users', icon: 'US' },
     { label: 'Suscripciones', href: '/admin/subscriptions', icon: 'SU' },

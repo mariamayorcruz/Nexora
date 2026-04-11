@@ -33,7 +33,7 @@ export default function Hero() {
 
           <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300 md:text-xl">
             Nexora reúne campañas, métricas, facturación y administración en una sola experiencia.
-            Si tu operación publicitaria ya te consume tiempo, esta landing ahora habla con la fuerza de un producto serio.
+            Si hoy te cuesta mantener control y crecer con orden, aquí tienes una forma más clara de operar.
           </p>
 
           <div className="mt-10 flex flex-col gap-4 sm:flex-row">
@@ -41,8 +41,8 @@ export default function Hero() {
               Crear cuenta
               <ArrowRight className="h-4 w-4" />
             </Link>
-            <Link href="#masterclass" className="btn-secondary inline-flex items-center justify-center gap-2">
-              Obtener master class gratis
+            <Link href="#diagnostico" className="btn-secondary inline-flex items-center justify-center gap-2">
+              Obtener diagnostico gratis
             </Link>
             <Link href="#demo" className="btn-secondary inline-flex items-center justify-center gap-2">
               <PlayCircle className="h-4 w-4" />
@@ -57,11 +57,11 @@ export default function Hero() {
             </span>
             <span className="inline-flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-cyan-400" />
-              Base lista para Vercel y GitHub
+              Operación más clara y confiable
             </span>
             <span className="inline-flex items-center gap-2">
               <Zap className="h-4 w-4 text-amber-300" />
-              Landing enfocada en conversión
+              Sin contratos anuales forzados
             </span>
           </div>
 
