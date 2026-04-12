@@ -47,7 +47,7 @@ export default function DashboardChatbot() {
   const [creatingDraft, setCreatingDraft] = useState(false);
   const [showApiConfig, setShowApiConfig] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState('');
-  const [providerInput, setProviderInput] = useState<'auto' | 'claude' | 'gemini' | 'openrouter'>('auto');
+  const [providerInput, setProviderInput] = useState<'auto' | 'claude' | 'gemini' | 'openrouter'>('openrouter');
   const [aiActive, setAiActive] = useState(false);
   const [messages, setMessages] = useState<ChatEntry[]>([
     {
@@ -65,7 +65,7 @@ export default function DashboardChatbot() {
   // Cargar configuración de API key guardada
   useState(() => {
     const savedKey = localStorage.getItem('nexora_ai_api_key') || '';
-    const savedProvider = (localStorage.getItem('nexora_ai_provider') || 'auto') as typeof providerInput;
+    const savedProvider = (localStorage.getItem('nexora_ai_provider') || 'openrouter') as typeof providerInput;
     setApiKeyInput(savedKey);
     setProviderInput(savedProvider);
     setAiActive(Boolean(savedKey));
