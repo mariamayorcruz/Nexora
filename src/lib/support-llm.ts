@@ -10,13 +10,14 @@ interface ClaudeSupportContext {
 
 const DEFAULT_ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-latest';
 const DEFAULT_GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-flash-lite-latest';
-// OpenRouter free models — rotamos para asegurar disponibilidad
-const DEFAULT_OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-8b-instruct:free';
+// OpenRouter free models — verificados activos (actualizado 2026-04-12)
+const DEFAULT_OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'openai/gpt-oss-120b:free';
+const DEFAULT_GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
 const OPENROUTER_FALLBACK_MODELS = [
-  'meta-llama/llama-3.3-8b-instruct:free',
-  'mistralai/mistral-7b-instruct:free',
-  'google/gemma-2-9b-it:free',
-  'nousresearch/hermes-3-llama-3.1-8b:free',
+  'openai/gpt-oss-120b:free',
+  'nvidia/nemotron-3-super-120b-a12b:free',
+  'google/gemma-4-26b-a4b-it:free',
+  'qwen/qwen3-next-80b-a3b-instruct:free',
 ];
 
 function extractJsonObject(text: string) {
@@ -266,6 +267,86 @@ export async function buildGeminiSupportReply(params: {
   if (!text) return null;
 
   try {
+    const parsed = JSON.parse(extractJsonObject(text));
+    return safeReply(parsed);
+  } catch {
+    return null;
+  }
+}
+
+// ── Groq (inferencia ultra-rápida) ───────────────────────────────────────────
+export async function buildGroqSupportReply(params: {
+  message: string;
+  context: ClaudeSupportContext;
+  apiKey: string;
+  model?: string;
+}): Promise<SuggestedReply | null> {
+  const { message, context, apiKey, model } = params;
+  const cleanKey = apiKey.trim();
+  if (!cleanKey) return null;
+
+  const system = [
+    'You are Nexora Support AI for Spanish-speaking SaaS users.',
+    'Return STRICT JSON only with keys: title, message, nextSteps, campaignDraft.',
+    'nextSteps must be an array of concise Spanish action steps.',
+    'campaignDraft is optional and must be null or an object with: name, objective, channel, budget, status, launchWindow, hook, promise, cta, angle, checklist.',
+    'Use status exactly "draft" if campaignDraft exists.',
+    'Never include markdown fences or explanations outside JSON.',
+  ].join(' ');
+
+  const userPrompt = JSON.stringify(
+    {
+      userMessage: message,
+      context: {
+        name: context.name || null,
+        plan: context.plan || null,
+        founderAccess: Boolean(context.founderAccess),
+        adAccountsCount: context.adAccountsCount,
+        activeCampaigns: context.activeCampaigns,
+      },
+      style: { language: 'es', tone: 'accionable, concreto, directo' },
+      constraints: [
+        'No inventes datos de facturacion que no esten en contexto.',
+        'Prioriza pasos concretos dentro de Nexora.',
+        'Si el usuario pide crear campaña, puedes devolver campaignDraft.',
+      ],
+    },
+    null,
+    2
+  );
+
+  try {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${cleanKey}`,
+        'User-Agent': 'Nexora/1.0 (https://www.gotnexora.com)',
+      },
+      body: JSON.stringify({
+        model: model || DEFAULT_GROQ_MODEL,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.2,
+        max_tokens: 900,
+      }),
+    });
+
+    if (!response.ok) return null;
+
+    const payload = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+
+    const text = (payload.choices || [])
+      .map((c) => c.message?.content || '')
+      .join('\n')
+      .trim();
+
+    if (!text) return null;
+
     const parsed = JSON.parse(extractJsonObject(text));
     return safeReply(parsed);
   } catch {

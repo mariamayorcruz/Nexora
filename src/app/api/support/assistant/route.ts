@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { isFounderEmail } from '@/lib/access';
 import { buildAiSupportReply } from '@/lib/customer-success';
-import { buildClaudeSupportReply, buildGeminiSupportReply, buildOpenRouterSupportReply } from '@/lib/support-llm';
+import { buildClaudeSupportReply, buildGeminiSupportReply, buildGroqSupportReply, buildOpenRouterSupportReply } from '@/lib/support-llm';
 import { getBearerToken, verifyUserToken } from '@/lib/jwt';
 
 export const dynamic = 'force-dynamic';
@@ -63,8 +63,10 @@ export async function POST(request: NextRequest) {
       String(platformConfig.geminiApiKey || '').trim() || String(process.env.GEMINI_API_KEY || '').trim();
     const platformOpenRouterKey =
       String(platformConfig.openRouterApiKey || '').trim() || String(process.env.OPENROUTER_API_KEY || '').trim();
+    const platformGroqKey =
+      String(platformConfig.groqApiKey || '').trim() || String(process.env.GROQ_API_KEY || '').trim();
 
-    let providerUsed: 'claude' | 'gemini' | 'openrouter' | 'heuristic' = 'heuristic';
+    let providerUsed: 'claude' | 'gemini' | 'openrouter' | 'groq' | 'heuristic' = 'heuristic';
     let llmReply = null;
 
     if (provider === 'claude') {
@@ -96,6 +98,16 @@ export async function POST(request: NextRequest) {
           apiKey: openRouterKey,
         });
         if (llmReply) providerUsed = 'openrouter';
+      }
+    } else if (provider === 'groq') {
+      const groqKey = byok || platformGroqKey;
+      if (groqKey) {
+        llmReply = await buildGroqSupportReply({
+          message: contextualMessage,
+          context: supportContext,
+          apiKey: groqKey,
+        });
+        if (llmReply) providerUsed = 'groq';
       }
     } else if (provider === 'auto') {
       // Cadena: Claude → Gemini → OpenRouter (gratis) → heurístico
@@ -130,6 +142,18 @@ export async function POST(request: NextRequest) {
             apiKey: openRouterKey,
           });
           if (llmReply) providerUsed = 'openrouter';
+        }
+      }
+
+      if (!llmReply) {
+        const groqKey = platformGroqKey;
+        if (groqKey) {
+          llmReply = await buildGroqSupportReply({
+            message: contextualMessage,
+            context: supportContext,
+            apiKey: groqKey,
+          });
+          if (llmReply) providerUsed = 'groq';
         }
       }
     }
