@@ -11,6 +11,7 @@ Gestiona todos tus anuncios de Instagram, Facebook, Google Ads y TikTok desde un
 - **Automatización Inteligente**: Reglas personalizadas para optimizar campañas
 - **Planes Flexibles**: Desde $30/mes hasta soluciones enterprise
 - **Prueba Gratuita**: 14 días de acceso completo sin tarjeta requerida
+- **Modo App (PWA)**: Instalable en desktop y móvil, con experiencia standalone
 
 ### Panel de Administración
 - **Gestión de Usuarios**: Ver, suspender, activar y eliminar usuarios
@@ -19,6 +20,29 @@ Gestiona todos tus anuncios de Instagram, Facebook, Google Ads y TikTok desde un
 - **Configuración de Pagos**: Configurar destinos de pago (Stripe, PayPal, cuentas bancarias)
 - **Analíticas Globales**: Métricas de toda la plataforma (ingresos, usuarios, campañas)
 - **Configuración del Sistema**: Modo mantenimiento, precios por defecto, información legal
+
+## 📲 Modo App (PWA)
+
+Nexora incluye Web App Manifest + Service Worker para abrirse como aplicación standalone.
+
+### Instalar en Chrome / Edge (Desktop)
+
+1. Abre Nexora en producción.
+2. Pulsa el icono de instalar en la barra del navegador.
+3. Abre Nexora desde el acceso directo como app.
+
+### Instalar en iPhone (Safari)
+
+1. Abre Nexora en Safari.
+2. Pulsa Compartir.
+3. Selecciona "Agregar a pantalla de inicio".
+
+### Incluye
+
+- Inicio tipo app en `/dashboard/studio-v2`
+- Manifest con iconos y modo standalone
+- Cache del shell para carga más rápida
+- Fallback offline básico
 
 ## 📋 Requisitos Previos
 
@@ -66,8 +90,20 @@ JWT_SECRET="tu-jwt-secret-aleatorio"
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="pk_test_..."
 STRIPE_SECRET_KEY="sk_test_..."
 
+# OAuth Meta (Instagram/Facebook)
+META_APP_ID="123456789012345"
+META_APP_SECRET="tu-meta-app-secret"
+CONNECT_OAUTH_REDIRECT_BASE_URL="http://localhost:3000"
+
 # API URLs
 NEXT_PUBLIC_API_URL="http://localhost:3000/api"
+```
+
+Para produccion en Vercel, configura las mismas variables en Project Settings > Environment Variables.
+La redirect URI que debes registrar en Meta es:
+
+```text
+https://tu-dominio.com/api/connect/oauth/callback
 ```
 
 ### 4. Configurar base de datos
@@ -388,6 +424,12 @@ Las contribuciones son bienvenidas. Por favor:
 - Obtén tus claves en https://dashboard.stripe.com/apikeys
 - Configúralas en .env.local
 - Para testing usa claves de test mode
+
+### Error: "Falta META_APP_ID o FACEBOOK_APP_ID"
+- Configura `META_APP_ID` (o `FACEBOOK_APP_ID`) con valor real, no `placeholder`
+- Verifica `CONNECT_OAUTH_REDIRECT_BASE_URL` (local: `http://localhost:3000`, prod: tu dominio real)
+- En Meta App Dashboard agrega exactamente la callback: `/api/connect/oauth/callback`
+- Si usas Vercel, añade estas variables tambien en Environment Variables y redeploy
 
 ---
 

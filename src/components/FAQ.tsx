@@ -17,7 +17,12 @@ const faqs = [
   {
     question: '¿Cuánto cuesta y qué plan me conviene según mi etapa?',
     answer:
-      'Si estás iniciando o validando oferta, Starter suele ser suficiente. Si ya vendes con campañas activas y equipo comercial, Growth o Scale te dan más capacidad. La mejor elección es el plan que puedas sostener al menos 60 días para medir resultados reales.',
+      'Si estás iniciando o validando oferta, Starter suele ser suficiente. Si ya vendes con campañas activas y equipo comercial, Professional o Enterprise te dan más capacidad. La mejor elección es el plan que puedas sostener al menos 60 días para medir resultados reales.',
+  },
+  {
+    question: '¿Nexora tiene IA para ayudarme a crear o mejorar campañas?',
+    answer:
+      'Sí. Dentro del dashboard ya existe un asistente IA que responde preguntas sobre campañas, rendimiento, conexiones y próximos pasos. Hoy funciona como copiloto estratégico y de soporte; el siguiente paso natural es conectarlo para crear borradores de campaña y ejecuciones guiadas desde el chat.',
   },
   {
     question: '¿Cuánto tiempo toma implementarlo sin frenar la operación diaria?',

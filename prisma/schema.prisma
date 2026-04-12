@@ -7,9 +7,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -33,6 +32,9 @@ model User {
   crmSettings       CrmWorkspaceSettings?
   aiUsageBuckets    AiWorkspaceUsage[]
   aiJobs            AiWorkspaceJob[]
+  videoProjects     AiVideoProject[]
+  videoProjectVersions AiVideoProjectVersion[]
+  videoAssets       AiVideoAsset[]
   leadCaptures      LeadCapture[]
   connectionRequests ConnectionRequest[]
   invoices          Invoice[]
@@ -188,6 +190,59 @@ model AiWorkspaceJob {
   updatedAt   DateTime @updatedAt
 }
 
+model AiVideoProject {
+  id           String                  @id @default(cuid())
+  userId       String
+  user         User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  tool         String                  @default("text-to-video")
+  prompt       String                  @db.Text
+  outputFormat String                  @default("vertical 9:16")
+  captionStyle String                  @default("bold clean")
+  status       String                  @default("draft")
+  timeline     Json?
+  versions     AiVideoProjectVersion[]
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+
+  @@index([userId, updatedAt])
+}
+
+model AiVideoProjectVersion {
+  id         String         @id @default(cuid())
+  projectId  String
+  project    AiVideoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  version    Int
+  note       String?
+  timeline   Json
+  renderPlan Json?
+  createdAt  DateTime       @default(now())
+
+  @@unique([projectId, version])
+  @@index([userId, createdAt])
+}
+
+model AiVideoAsset {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider    String   @default("library")
+  title       String
+  url         String
+  relativeUrl String?
+  storageKey  String?
+  mimeType    String?
+  sizeBytes   Int?
+  status      String   @default("active")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([userId, status])
+}
+
 model LeadCapture {
   id         String   @id @default(cuid())
   email      String
@@ -247,6 +302,55 @@ model AdminWorkspaceConfig {
   emailTemplates  Json?
   automationConfig Json?
   roadmapConfig   Json?
+  platformConfig  Json?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+model AttributionSession {
+  id              String             @id @default(cuid())
+  trackerId       String             @unique
+  sessionKey      String             @unique
+  landingPath     String?
+  referrer        String?
+  utmSource       String?
+  utmMedium       String?
+  utmCampaign     String?
+  utmTerm         String?
+  utmContent      String?
+  gclid           String?
+  fbclid          String?
+  ttclid          String?
+  msclkid         String?
+  firstSeenAt     DateTime           @default(now())
+  lastSeenAt      DateTime           @default(now())
+  consentStatus   String             @default("unknown")
+  consentUpdatedAt DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  events          AttributionEvent[]
+
+  @@index([createdAt])
+  @@index([utmSource, utmCampaign])
+}
+
+model AttributionEvent {
+  id                   String             @id @default(cuid())
+  attributionSessionId String
+  session              AttributionSession @relation(fields: [attributionSessionId], references: [id], onDelete: Cascade)
+  trackerId            String
+  sessionKey           String
+  eventName            String
+  eventType            String             @default("custom")
+  path                 String?
+  source               String?
+  value                Float?
+  currency             String?
+  dedupKey             String             @unique
+  payload              Json?
+  eventTs              DateTime           @default(now())
+  createdAt            DateTime           @default(now())
+
+  @@index([attributionSessionId, eventTs])
+  @@index([eventName, createdAt])
 }

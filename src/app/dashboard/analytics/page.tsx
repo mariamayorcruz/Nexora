@@ -20,24 +20,19 @@ interface AnalyticsCampaign {
 
 interface LeadCapture {
   id: string;
-  source: string;
-  resource: string;
   createdAt: string;
   convertedToCrmAt?: string | null;
 }
 
 interface CrmLead {
   id: string;
-  source: string;
   stage: string;
   value: number;
   confidence: number;
-  updatedAt: string;
 }
 
 interface AnalyticsUser {
   entitlements?: {
-    marketingLabel: string;
     capabilities: {
       canUseAdvancedAnalytics: boolean;
       upgradeCta: string;
@@ -102,9 +97,6 @@ export default function AnalyticsPage() {
         accumulator.platformSpend[platform] =
           (accumulator.platformSpend[platform] || 0) + (campaign.analytics?.spend || 0);
 
-        const status = campaign.status || 'sin estado';
-        accumulator.statusCount[status] = (accumulator.statusCount[status] || 0) + 1;
-
         return accumulator;
       },
       {
@@ -114,7 +106,6 @@ export default function AnalyticsPage() {
         spend: 0,
         revenue: 0,
         platformSpend: {} as Record<string, number>,
-        statusCount: {} as Record<string, number>,
       }
     );
 
@@ -129,6 +120,10 @@ export default function AnalyticsPage() {
     const leadToCrmRate = capturedLeads > 0 ? (convertedCaptures / capturedLeads) * 100 : 0;
     const costPerLead = capturedLeads > 0 ? totals.spend / capturedLeads : 0;
 
+    const topPlatforms = Object.entries(totals.platformSpend)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3);
+
     return {
       ...totals,
       capturedLeads,
@@ -141,117 +136,111 @@ export default function AnalyticsPage() {
       roi,
       leadToCrmRate,
       costPerLead,
-      platforms: Object.entries(totals.platformSpend).sort((a, b) => b[1] - a[1]),
-      statuses: Object.entries(totals.statusCount).sort((a, b) => b[1] - a[1]),
+      topPlatforms,
     };
   }, [campaigns, captures, crmLeads]);
 
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block h-12 w-12 animate-spin rounded-full border-b-2 border-b-primary" />
-          <p className="mt-4 text-gray-600">Preparando analítica...</p>
-        </div>
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-cyan-400/30 border-t-cyan-400" />
       </div>
     );
   }
 
   if (!user?.entitlements?.capabilities.canUseAdvancedAnalytics) {
     return (
-      <div className="space-y-8">
-        <section className="rounded-[30px] border border-gray-200 bg-white p-8 shadow-sm">
-          <p className="text-xs uppercase tracking-[0.28em] text-gray-400">Analítica avanzada</p>
-          <h1 className="mt-3 text-3xl font-semibold text-gray-900">Esta vista se desbloquea desde el plan Growth.</h1>
-          <p className="mt-4 max-w-2xl text-sm leading-6 text-gray-600">
-            Tu plan actual puede ver el resumen del dashboard, pero la lectura consolidada entre campañas, captación y pipeline vive en el siguiente nivel.
-          </p>
-          <div className="mt-6 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
-            {user?.entitlements?.capabilities.upgradeCta}
-          </div>
-          <Link
-            href="/dashboard/billing"
-            className="mt-6 inline-flex rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90"
-          >
-            Ver upgrade
-          </Link>
-        </section>
-      </div>
+      <section className="rounded-[30px] border border-slate-800 bg-slate-900/70 p-8">
+        <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Analitica avanzada</p>
+        <h1 className="mt-3 text-3xl font-semibold text-white">Desbloquea inteligencia de crecimiento.</h1>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">Esta vista une campañas, leads y pipeline en una lectura ejecutiva limpia.</p>
+        <div className="mt-5 rounded-2xl border border-slate-700 bg-slate-950/70 p-4 text-sm text-slate-300">
+          {user?.entitlements?.capabilities.upgradeCta}
+        </div>
+        <Link href="/dashboard/billing" className="mt-5 inline-flex rounded-xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950">
+          Ver upgrade
+        </Link>
+      </section>
     );
   }
 
+  const actionItems = [
+    metrics.leadToCrmRate < 35
+      ? 'Subir conversion de captados a CRM con follow-up en menos de 24h.'
+      : 'Mantener cadencia de paso a CRM, la base ya responde bien.',
+    metrics.roi < 20
+      ? 'Ajustar creativos y pausar anuncios de bajo retorno antes de escalar presupuesto.'
+      : 'Escalar solo campañas con ROAS estable y costo por lead controlado.',
+    metrics.crmWon === 0
+      ? 'Priorizar cierre de propuestas activas para generar primeras victorias.'
+      : 'Documentar playbook de las oportunidades ganadas y replicarlo.',
+  ];
+
   return (
-    <div className="space-y-8">
-      <section className="rounded-[30px] border border-gray-200 bg-white p-8 shadow-sm">
-        <p className="text-xs uppercase tracking-[0.28em] text-gray-400">Analítica avanzada</p>
-        <h1 className="mt-3 text-3xl font-semibold text-gray-900">Lectura real de campañas, captación y pipeline.</h1>
-        <p className="mt-3 text-sm leading-6 text-gray-600">
-          Esta vista ya no depende solo de campañas. También usa los leads captados y las oportunidades del CRM para que el panel no se sienta vacío ni desconectado del negocio.
+    <div className="space-y-5">
+      <section className="rounded-[30px] border border-slate-800 bg-slate-900/70 p-6">
+        <p className="text-xs uppercase tracking-[0.26em] text-cyan-300">Control ejecutivo</p>
+        <h1 className="mt-2 text-3xl font-semibold text-white">Analitica sin ruido visual</h1>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+          Lectura compacta de gasto, retorno, captacion y pipeline comercial para decidir rapido.
         </p>
       </section>
 
-      <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-6">
-        <MetricCard label="Impresiones" value={metrics.impressions.toLocaleString()} />
-        <MetricCard label="Clicks" value={metrics.clicks.toLocaleString()} />
-        <MetricCard label="Leads captados" value={metrics.capturedLeads.toLocaleString()} />
-        <MetricCard label="Leads a CRM" value={metrics.convertedCaptures.toLocaleString()} />
-        <MetricCard label="CTR" value={`${metrics.ctr.toFixed(1)}%`} />
-        <MetricCard label="ROI" value={`${metrics.roi.toFixed(0)}%`} />
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+        <Kpi label="Gasto" value={`$${Math.round(metrics.spend).toLocaleString()}`} />
+        <Kpi label="ROI" value={`${metrics.roi.toFixed(0)}%`} />
+        <Kpi label="Captados" value={metrics.capturedLeads.toLocaleString()} />
+        <Kpi label="Paso a CRM" value={`${metrics.leadToCrmRate.toFixed(0)}%`} />
+        <Kpi label="Forecast" value={`$${Math.round(metrics.forecast).toLocaleString()}`} />
+        <Kpi label="Cierres" value={metrics.crmWon.toLocaleString()} />
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-3">
-        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-gray-900">Inversión y retorno</h2>
-          <div className="mt-6 space-y-4">
-            <PanelStat label="Gasto total" value={`$${metrics.spend.toFixed(0)}`} />
-            <PanelStat label="Revenue atribuido" value={`$${metrics.revenue.toFixed(0)}`} />
-            <PanelStat label="Costo por lead" value={`$${metrics.costPerLead.toFixed(0)}`} />
+      <section className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+        <div className="rounded-[24px] border border-slate-800 bg-slate-900/70 p-5">
+          <h2 className="text-lg font-semibold text-white">Rendimiento clave</h2>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <Row label="Impresiones" value={metrics.impressions.toLocaleString()} />
+            <Row label="Clicks" value={metrics.clicks.toLocaleString()} />
+            <Row label="CTR" value={`${metrics.ctr.toFixed(2)}%`} />
+            <Row label="Costo por lead" value={`$${Math.round(metrics.costPerLead).toLocaleString()}`} />
+            <Row label="Leads calificados" value={metrics.crmQualified.toLocaleString()} />
+            <Row label="Pipeline abierto" value={`$${Math.round(metrics.pipelineValue).toLocaleString()}`} />
+          </div>
+
+          <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Top plataformas por gasto</p>
+            <div className="mt-2 space-y-2">
+              {metrics.topPlatforms.length === 0 ? (
+                <p className="text-sm text-slate-500">Sin gasto registrado todavia.</p>
+              ) : (
+                metrics.topPlatforms.map(([platform, spend]) => (
+                  <div key={platform} className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900 px-3 py-2">
+                    <span className="text-sm capitalize text-slate-200">{platform}</span>
+                    <span className="text-sm font-semibold text-white">${Math.round(spend).toLocaleString()}</span>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-gray-900">Salud del funnel</h2>
-          <div className="mt-6 space-y-4">
-            <PanelStat label="Paso a CRM" value={`${metrics.leadToCrmRate.toFixed(0)}%`} />
-            <PanelStat label="Leads calificados" value={metrics.crmQualified.toLocaleString()} />
-            <PanelStat label="Cierres" value={metrics.crmWon.toLocaleString()} />
+        <div className="rounded-[24px] border border-slate-800 bg-slate-900/70 p-5">
+          <h2 className="text-lg font-semibold text-white">Proximas jugadas</h2>
+          <div className="mt-4 space-y-2">
+            {actionItems.map((item) => (
+              <div key={item} className="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-3 text-sm text-slate-300">
+                {item}
+              </div>
+            ))}
           </div>
-        </div>
 
-        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-gray-900">Pipeline comercial</h2>
-          <div className="mt-6 space-y-4">
-            <PanelStat label="Valor del pipeline" value={`$${Math.round(metrics.pipelineValue).toLocaleString()}`} />
-            <PanelStat label="Forecast" value={`$${Math.round(metrics.forecast).toLocaleString()}`} />
-            <PanelStat label="Campañas activas" value={String(campaigns.filter((campaign) => campaign.status === 'active').length)} />
-          </div>
-        </div>
-      </section>
-
-      <section className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-gray-900">Distribución por plataforma</h2>
-          <div className="mt-6 space-y-4">
-            {metrics.platforms.length === 0 ? (
-              <EmptyPanel text="Todavía no hay gasto asociado a plataformas, pero esta vista ya está lista para mostrarlo en cuanto haya movimiento." />
-            ) : (
-              metrics.platforms.map(([platform, spend]) => (
-                <RowStat key={platform} label={platform} value={`$${spend.toFixed(0)}`} />
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-gray-900">Estado de campañas</h2>
-          <div className="mt-6 space-y-4">
-            {metrics.statuses.length === 0 ? (
-              <EmptyPanel text="Aún no hay campañas suficientes para agrupar por estado." />
-            ) : (
-              metrics.statuses.map(([status, count]) => (
-                <RowStat key={status} label={status} value={String(count)} />
-              ))
-            )}
+          <div className="mt-4 grid gap-2">
+            <Link href="/dashboard/connect" className="rounded-lg bg-cyan-500 px-3 py-2 text-center text-sm font-semibold text-slate-950">
+              Ir a Campanas + Canales
+            </Link>
+            <Link href="/dashboard/pipeline" className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-center text-sm font-semibold text-slate-200">
+              Abrir Motor de Ventas
+            </Link>
           </div>
         </div>
       </section>
@@ -259,33 +248,20 @@ export default function AnalyticsPage() {
   );
 }
 
-function MetricCard({ label, value }: { label: string; value: string }) {
+function Kpi({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-      <p className="text-sm text-gray-500">{label}</p>
-      <p className="mt-3 text-3xl font-semibold text-gray-900">{value}</p>
+    <div className="rounded-xl border border-slate-800 bg-slate-900/70 px-4 py-3">
+      <p className="text-xs uppercase tracking-[0.14em] text-slate-500">{label}</p>
+      <p className="mt-1 text-2xl font-semibold text-white">{value}</p>
     </div>
   );
 }
 
-function PanelStat({ label, value }: { label: string; value: string }) {
+function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-gray-50 p-5">
-      <p className="text-sm text-gray-500">{label}</p>
-      <p className="mt-2 text-3xl font-semibold text-gray-900">{value}</p>
+    <div className="rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2">
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className="text-base font-semibold text-white">{value}</p>
     </div>
   );
-}
-
-function RowStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between rounded-2xl bg-gray-50 px-5 py-4">
-      <span className="text-sm font-semibold capitalize text-gray-900">{label}</span>
-      <span className="text-sm text-gray-600">{value}</span>
-    </div>
-  );
-}
-
-function EmptyPanel({ text }: { text: string }) {
-  return <div className="rounded-2xl bg-gray-50 p-5 text-sm text-gray-600">{text}</div>;
 }

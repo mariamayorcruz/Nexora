@@ -9,13 +9,13 @@ function requireJwtSecret() {
   return secret;
 }
 
-export function signUserToken(payload: { userId: string; email?: string }) {
+export function signUserToken(payload: { userId: string; email?: string; sid?: string }) {
   return jwt.sign(payload, requireJwtSecret(), { expiresIn: '7d' });
 }
 
-export function verifyUserToken(token: string): { userId: string; email?: string } | null {
+export function verifyUserToken(token: string): { userId: string; email?: string; sid?: string } | null {
   try {
-    return jwt.verify(token, requireJwtSecret()) as { userId: string; email?: string };
+    return jwt.verify(token, requireJwtSecret()) as { userId: string; email?: string; sid?: string };
   } catch {
     return null;
   }

@@ -1,157 +1,119 @@
 'use client';
 
-import Link from 'next/link';
-import { ArrowRight, CheckCircle2, PlayCircle, ShieldCheck, Sparkles, Zap } from 'lucide-react';
+import RevealOnScroll from '@/components/ui/RevealOnScroll';
 
-const metrics = [
-  { label: 'Dashboards que reemplazas', value: '4+' },
-  { label: 'Tiempo operativo que puedes ahorrar', value: '-12h/sem' },
-  { label: 'Tiempo para activar una nueva cuenta', value: '< 10 min' },
+const quickStats = [
+  { value: '-12h', label: 'semana ahorrada' },
+  { value: '3.4x', label: 'ROAS promedio' },
+  { value: '<10 min', label: 'nueva cuenta' },
 ];
 
-const workflow = [
-  { title: 'Conecta tus cuentas', detail: 'Centraliza Meta, Google y TikTok en una sola consola.' },
-  { title: 'Revisa rendimiento en vivo', detail: 'Identifica qué campañas consumen presupuesto sin convertir.' },
-  { title: 'Activa acciones y equipo', detail: 'Coordina campañas, pagos y panel admin desde la misma base.' },
+const workspaceModules = [
+  { name: 'Meta Ads', status: 'Conectado', tone: 'emerald' },
+  { name: 'Google Ads', status: 'Conectado', tone: 'emerald' },
+  { name: 'TikTok Ads', status: 'Conectado', tone: 'emerald' },
+  { name: 'CRM', status: 'Pipeline activo', tone: 'cyan' },
+  { name: 'Facturacion', status: 'Stripe activo', tone: 'amber' },
 ];
 
 export default function Hero() {
   return (
-    <section className="hero-mesh relative overflow-hidden px-4 pb-24 pt-32 sm:px-6 lg:px-8 lg:pb-28 lg:pt-36">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.22),transparent_30%),radial-gradient(circle_at_20%_20%,rgba(56,189,248,0.14),transparent_25%)]" />
-      <div className="relative mx-auto grid max-w-7xl items-center gap-16 lg:grid-cols-[1.05fr_0.95fr]">
-        <div className="animate-fadeInUp">
-          <div className="inline-flex items-center gap-2 rounded-full border border-orange-400/25 bg-orange-400/10 px-4 py-2 text-sm font-medium text-orange-200">
-            <Sparkles className="h-4 w-4" />
-            Menos operación manual, más decisiones que sí empujan ventas
+    <section className="relative flex min-h-screen items-center overflow-hidden bg-[#060816]">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.25),transparent_40%),radial-gradient(circle_at_20%_20%,rgba(56,189,248,0.18),transparent_35%)]" />
+
+      <div className="relative z-10 mx-auto grid max-w-7xl items-center gap-12 px-6 py-20 md:grid-cols-2">
+        <div>
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm text-cyan-100 backdrop-blur-md">
+            ✅ Reemplaza 4 plataformas + Excel
           </div>
 
-          <h1 className="mt-8 max-w-4xl text-5xl font-semibold leading-tight text-white md:text-6xl lg:text-7xl">
-            La forma más clara de
-            <span className="gradient-text block"> controlar, vender y escalar tus anuncios.</span>
+          <h1 className="mb-6 text-5xl font-bold leading-tight text-white md:text-7xl">
+            Una sola plataforma.<br />
+            <span className="bg-gradient-to-r from-orange-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">
+              4 anuncios. 0 caos.
+            </span>
           </h1>
 
-          <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300 md:text-xl">
-            Nexora reúne campañas, métricas, facturación y administración en una sola experiencia.
-            Si hoy te cuesta mantener control y crecer con orden, aquí tienes una forma más clara de operar.
+          <p className="mb-8 text-xl leading-relaxed text-slate-300">
+            Centraliza Meta, Google, TikTok, CRM y facturación.<br />
+            IA que te ayuda a vender más, no solo a reportar.
           </p>
 
-          <div className="mt-10 flex flex-col gap-4 sm:flex-row">
-            <Link href="/auth/signup" className="btn-primary inline-flex items-center justify-center gap-2">
-              Crear cuenta
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-            <Link href="#diagnostico" className="btn-secondary inline-flex items-center justify-center gap-2">
-              Obtener diagnostico gratis
-            </Link>
-            <Link href="#demo" className="btn-secondary inline-flex items-center justify-center gap-2">
-              <PlayCircle className="h-4 w-4" />
-              Ver demo guiada
-            </Link>
+          <div className="flex flex-wrap gap-4">
+            <a
+              href="#diagnostico"
+              className="rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-500 px-8 py-4 text-lg font-semibold text-slate-950 transition hover:brightness-110"
+            >
+              Quiero mi auditoría gratis (7 min)
+            </a>
+            <a
+              href="#demo"
+              className="rounded-2xl border border-cyan-300/35 bg-slate-900/70 px-8 py-4 text-lg font-semibold text-cyan-100 transition hover:bg-slate-800"
+            >
+              Ver demo en vivo
+            </a>
           </div>
 
-          <div className="mt-8 flex flex-wrap items-center gap-5 text-sm text-slate-400">
-            <span className="inline-flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-              Acceso inmediato
-            </span>
-            <span className="inline-flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-cyan-400" />
-              Operación más clara y confiable
-            </span>
-            <span className="inline-flex items-center gap-2">
-              <Zap className="h-4 w-4 text-amber-300" />
-              Sin contratos anuales forzados
-            </span>
-          </div>
-
-          <div className="mt-14 grid gap-4 rounded-[2rem] border border-white/10 bg-white/5 p-6 backdrop-blur sm:grid-cols-3">
-            {metrics.map((metric) => (
-              <div key={metric.label} className="rounded-2xl border border-white/10 bg-slate-950/55 p-4">
-                <p className="text-3xl font-semibold text-white">{metric.value}</p>
-                <p className="mt-2 text-sm leading-6 text-slate-400">{metric.label}</p>
-              </div>
+          <div className="mt-12 grid grid-cols-3 gap-4 text-center">
+            {quickStats.map((item, index) => (
+              <RevealOnScroll key={item.label} delayMs={index * 100}>
+                <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-4">
+                  <p className="text-3xl font-bold text-emerald-400">{item.value}</p>
+                  <p className="text-sm text-slate-400">{item.label}</p>
+                </div>
+              </RevealOnScroll>
             ))}
           </div>
         </div>
 
-        <div className="animate-slideInRight">
-          <div className="relative">
-            <div className="absolute -inset-6 rounded-[2rem] bg-gradient-to-br from-orange-500/30 via-transparent to-cyan-400/25 blur-3xl" />
-            <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/80 p-6 shadow-[0_30px_120px_rgba(15,23,42,0.6)]">
-              <div className="mb-6 flex items-center justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.32em] text-slate-500">Live workspace</p>
-                  <p className="mt-2 text-lg font-semibold text-white">Centro operativo de campañas</p>
-                </div>
-                <div className="flex gap-2">
-                  <span className="h-3 w-3 rounded-full bg-rose-400/80" />
-                  <span className="h-3 w-3 rounded-full bg-amber-300/80" />
-                  <span className="h-3 w-3 rounded-full bg-emerald-400/80" />
-                </div>
-              </div>
+        <div className="relative space-y-4">
+          <div className="overflow-hidden rounded-3xl border border-white/10 bg-black shadow-2xl">
+            <div className="aspect-video">
+              <video
+                className="h-full w-full object-cover"
+                controls
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="metadata"
+              >
+                <source src="/videos/nexora-demo.mp4" type="video/mp4" />
+                Tu navegador no pudo cargar el video.
+              </video>
+            </div>
+          </div>
+          <div className="absolute -right-4 -top-4 rounded-2xl bg-emerald-500 px-6 py-2 text-sm font-bold text-black shadow-xl">
+            Live Workspace
+          </div>
+          <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-5 backdrop-blur">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold text-white">Nexora Live Workspace</h3>
+              <span className="rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-200">
+                4 anuncios activos
+              </span>
+            </div>
+            <p className="mt-2 text-sm leading-6 text-slate-300">
+              Vista operativa única para campañas, seguimiento comercial y facturación.
+            </p>
 
-              <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-                <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-slate-400">Pipeline semanal</p>
-                      <p className="mt-1 text-2xl font-semibold text-white">$48,920</p>
-                    </div>
-                    <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-medium text-emerald-300">
-                      +18.4% vs. semana pasada
-                    </span>
-                  </div>
-
-                  <div className="mt-8 space-y-4">
-                    {[82, 64, 91, 58].map((value, index) => (
-                      <div key={value} className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-slate-400">Canal {index + 1}</span>
-                          <span className="font-medium text-slate-200">{value}% eficiencia</span>
-                        </div>
-                        <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                          <div
-                            className="h-full rounded-full bg-[linear-gradient(90deg,#fb923c_0%,#facc15_50%,#38bdf8_100%)]"
-                            style={{ width: `${value}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+            <div className="mt-4 grid gap-2">
+              {workspaceModules.map((module) => (
+                <div key={module.name} className="flex items-center justify-between rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2">
+                  <span className="text-sm text-slate-200">{module.name}</span>
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                      module.tone === 'emerald'
+                        ? 'bg-emerald-500/15 text-emerald-300'
+                        : module.tone === 'amber'
+                          ? 'bg-amber-500/15 text-amber-300'
+                          : 'bg-cyan-500/15 text-cyan-300'
+                    }`}
+                  >
+                    {module.status}
+                  </span>
                 </div>
-
-                <div className="space-y-4">
-                  {workflow.map((item, index) => (
-                    <div key={item.title} className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-sm font-semibold text-white">
-                          0{index + 1}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-white">{item.title}</p>
-                          <p className="mt-1 text-sm leading-6 text-slate-400">{item.detail}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-5 grid gap-4 sm:grid-cols-3">
-                <div className="rounded-2xl border border-cyan-400/15 bg-cyan-400/10 p-4">
-                  <p className="text-sm text-cyan-200">Cuentas activas</p>
-                  <p className="mt-2 text-2xl font-semibold text-white">12</p>
-                </div>
-                <div className="rounded-2xl border border-orange-400/15 bg-orange-400/10 p-4">
-                  <p className="text-sm text-orange-100">Campañas monitoreadas</p>
-                  <p className="mt-2 text-2xl font-semibold text-white">38</p>
-                </div>
-                <div className="rounded-2xl border border-emerald-400/15 bg-emerald-400/10 p-4">
-                  <p className="text-sm text-emerald-200">ROAS agregado</p>
-                  <p className="mt-2 text-2xl font-semibold text-white">3.4x</p>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
         </div>

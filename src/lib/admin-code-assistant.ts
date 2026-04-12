@@ -266,18 +266,18 @@ function buildHeuristicPlan(input: AdminCodeAssistantInput) {
   const task = input.task.toLowerCase();
   const filePath = input.filePath || '';
 
-  if (/ai studio|studio ia|video studio|smart edit/.test(task)) {
+  if (/nexora studio|studio ia|video studio|smart edit/.test(task)) {
     return {
       summary:
-        'Modo local guiado: AI Code ya puede proponerte una mejora útil para AI Studio aunque no haya modelo remoto activo.',
+        'Modo local guiado: AI Code ya puede proponerte una mejora útil para Nexora Studio aunque no haya modelo remoto activo.',
       diagnosis: [
-        'AI Studio debe sentirse como un workspace único, no como muchas pantallas separadas.',
+        'Nexora Studio debe sentirse como un workspace único, no como muchas pantallas separadas.',
         'El usuario necesita control claro de la edición: silencios, música, captions, variantes y preview.',
         'La salida final debe convivir al lado del formulario y el historial debe quedar visible debajo.',
       ],
       patch: [
         '```md',
-        'Sugerencia de refactor para AI Studio:',
+        'Sugerencia de refactor para Nexora Studio:',
         '- Unificar el builder y la preview en una sola vista de dos columnas.',
         '- Mantener tabs por familia: Video Studio, Copy Lab, Sales Assets.',
         '- En Smart Edit, exponer toggles para quitar silencios, música, captions y variantes.',
@@ -325,7 +325,7 @@ function buildHeuristicPlan(input: AdminCodeAssistantInput) {
       commands: ['npm run lint', 'npm run build'],
       touchedFiles: [filePath || 'src/app/dashboard/studio/page.tsx', 'src/lib/ai-studio.ts'],
       qualityGates: [
-        'AI Studio debe quedar utilizable desde una sola pantalla.',
+        'Nexora Studio debe quedar utilizable desde una sola pantalla.',
         'Los modos de video no deben prometer render final si no existe proveedor.',
         'El historial debe verse claro y estable.',
       ],

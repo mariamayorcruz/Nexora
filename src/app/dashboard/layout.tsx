@@ -63,31 +63,34 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const menuItems = [
     { label: language === 'en' ? 'Overview' : 'Resumen', href: '/dashboard', icon: 'OV' },
-    { label: language === 'en' ? 'Pipeline' : 'Pipeline', href: '/dashboard/funnel', icon: 'PL' },
-    { label: language === 'en' ? 'Connect' : 'Conectar', href: '/dashboard/connect', icon: 'CN' },
-    { label: 'AI Studio', href: '/dashboard/studio', icon: 'IA' },
-    { label: language === 'en' ? 'Campaigns' : 'Campañas', href: '/dashboard/campaigns', icon: 'CA' },
+    { label: language === 'en' ? 'CRM + Sales Engine' : 'CRM + Motor de Ventas', href: '/dashboard/crm', icon: 'CR' },
+    { label: language === 'en' ? 'Pipeline Board' : 'Pipeline visual', href: '/dashboard/pipeline', icon: 'PL' },
+    { label: language === 'en' ? 'Campaign Hub' : 'Campañas + Canales', href: '/dashboard/connect', icon: 'CN' },
+    { label: 'Nexora Studio', href: '/dashboard/studio', icon: 'IA' },
     { label: language === 'en' ? 'Billing' : 'Facturación', href: '/dashboard/billing', icon: 'FA' },
     { label: language === 'en' ? 'Support' : 'Soporte', href: '/dashboard/support', icon: 'SP' },
     { label: language === 'en' ? 'Settings' : 'Configuración', href: '/dashboard/settings', icon: 'CO' },
   ];
 
-  if (user?.entitlements?.capabilities?.canUseRadar) {
-    menuItems.splice(4, 0, { label: language === 'en' ? 'Radar' : 'Radar', href: '/dashboard/radar', icon: 'RA' });
-  }
-
   if (user?.entitlements?.capabilities?.canUseAdvancedAnalytics) {
-    menuItems.splice(user?.entitlements?.capabilities?.canUseRadar ? 5 : 4, 0, {
+    menuItems.splice(4, 0, {
       label: language === 'en' ? 'Analytics' : 'Analítica',
       href: '/dashboard/analytics',
       icon: 'AN',
     });
   }
 
+  const isMenuItemActive = (href: string) => {
+    if (href === '/dashboard/connect') {
+      return pathname === '/dashboard/connect' || pathname.startsWith('/dashboard/campaigns');
+    }
+
+    return pathname === href;
+  };
+
   const canAccessAdminPanel = Boolean(user?.isAdmin || user?.founderAccess);
   if (canAccessAdminPanel) {
     menuItems.push({ label: language === 'en' ? 'Admin panel' : 'Panel admin', href: '/admin', icon: 'AD' });
-    menuItems.push({ label: language === 'en' ? 'AI Code' : 'IA Code', href: '/admin/code-assistant', icon: 'AI' });
   }
 
   const handleLogout = () => {
@@ -107,20 +110,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(251,146,60,0.08),transparent_24%),radial-gradient(circle_at_80%_0%,rgba(56,189,248,0.08),transparent_20%),#f8fafc]">
+    <div className="flex min-h-screen bg-slate-950">
       <aside
-        className={`fixed z-40 h-screen w-72 overflow-y-auto border-r border-slate-200/80 bg-white/95 backdrop-blur transition-transform lg:relative ${
+        className={`fixed z-40 h-screen w-72 overflow-y-auto border-r border-slate-800 bg-slate-950 transition-transform lg:relative ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
-        <div className="border-b border-slate-200/80 p-6">
+        <div className="border-b border-slate-800 p-6">
           <Link href="/dashboard" className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-400 via-amber-300 to-cyan-400 text-sm font-semibold text-slate-950">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-500 text-sm font-semibold text-slate-950">
               NX
             </div>
             <div>
-              <p className="text-lg font-bold text-slate-900">Nexora</p>
-              <p className="text-xs uppercase tracking-[0.24em] text-slate-400">
+              <p className="text-lg font-bold text-white">Nexora</p>
+              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
                 {language === 'en' ? 'Revenue Command' : 'Centro de control'}
               </p>
             </div>
@@ -134,7 +137,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 key={option}
                 onClick={() => setLanguage(option)}
                 className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] transition ${
-                  language === option ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-500'
+                  language === option ? 'bg-cyan-500 text-slate-950' : 'bg-slate-800 text-slate-400'
                 }`}
               >
                 {option}
@@ -145,11 +148,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Link
               key={item.href}
               href={item.href}
+              onClick={() => setSidebarOpen(false)}
               className={`flex items-center gap-3 rounded-2xl px-4 py-3 transition ${
-                pathname === item.href ? 'bg-slate-950 text-white' : 'text-slate-700 hover:bg-slate-100'
+                isMenuItemActive(item.href) ? 'bg-slate-900 text-white' : 'text-slate-400 hover:bg-slate-900 hover:text-white'
               }`}
             >
-              <span className={`flex h-9 w-9 items-center justify-center rounded-xl text-xs font-semibold ${pathname === item.href ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-500'}`}>
+              <span className={`flex h-9 w-9 items-center justify-center rounded-xl text-xs font-semibold ${isMenuItemActive(item.href) ? 'bg-cyan-500/20 text-cyan-300' : 'bg-slate-800 text-slate-500'}`}>
                 {item.icon}
               </span>
               <span className="font-medium">{item.label}</span>
@@ -157,10 +161,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           ))}
         </nav>
 
-        <div className="border-t border-slate-200/80 p-4">
-          <div className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-4">
-            <p className="text-sm font-medium text-slate-900">{user?.email}</p>
-            <p className="mt-1 text-xs uppercase tracking-[0.24em] text-slate-400">
+        <div className="border-t border-slate-800 p-4">
+          <div className="rounded-[20px] border border-slate-800 bg-slate-900 p-4">
+            <p className="text-sm font-medium text-white">{user?.email}</p>
+            <p className="mt-1 text-xs uppercase tracking-[0.24em] text-slate-500">
               {user?.founderAccess
                 ? language === 'en'
                   ? 'Founder plan'
@@ -169,24 +173,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </p>
           </div>
 
-          <button onClick={handleLogout} className="mt-4 w-full rounded-2xl px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100">
+          <button onClick={handleLogout} className="mt-4 w-full rounded-2xl px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-900">
             {language === 'en' ? 'Log out' : 'Cerrar sesión'}
           </button>
         </div>
       </aside>
 
       <div className="flex flex-1 flex-col">
-        <div className="flex items-center justify-between border-b border-slate-200 bg-white/95 px-6 py-4 backdrop-blur lg:hidden">
+        <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950 px-6 py-4 lg:hidden">
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="flex flex-col gap-1">
-            <span className="block h-0.5 w-6 bg-slate-900" />
-            <span className="block h-0.5 w-6 bg-slate-900" />
-            <span className="block h-0.5 w-6 bg-slate-900" />
+            <span className="block h-0.5 w-6 bg-white" />
+            <span className="block h-0.5 w-6 bg-white" />
+            <span className="block h-0.5 w-6 bg-white" />
           </button>
-          <span className="text-lg font-bold text-slate-900">Nexora</span>
+          <span className="text-lg font-bold text-white">Nexora</span>
           <div className="w-6" />
         </div>
 
-        <main className="flex-1 overflow-y-auto px-6 py-8">
+        <main className="flex-1 overflow-y-auto bg-slate-950 px-6 py-6 text-slate-200">
           <div className="mx-auto w-full max-w-[1440px]">{children}</div>
         </main>
       </div>

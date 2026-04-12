@@ -47,6 +47,14 @@ interface HistoryEntry {
   usedFallback: boolean;
 }
 
+interface ApplyResponse {
+  ok?: boolean;
+  dryRun?: boolean;
+  applied?: number;
+  files?: Array<{ path: string; action: 'create' | 'modify' | 'delete' }>;
+  error?: string;
+}
+
 const HISTORY_KEY = 'nexora-admin-ai-code-history';
 
 const MODE_LABEL: Record<AssistantMode, string> = {
@@ -73,6 +81,9 @@ export default function AdminCodeAssistantPage() {
   const [detectedMode, setDetectedMode] = useState<AssistantMode | null>(null);
   const [selectedFile, setSelectedFile] = useState<CodeFile | null>(null);
   const [copiedPath, setCopiedPath] = useState('');
+  const [applying, setApplying] = useState(false);
+  const [applyMessage, setApplyMessage] = useState('');
+  const [applyError, setApplyError] = useState('');
   const resultRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -116,6 +127,8 @@ export default function AdminCodeAssistantPage() {
     setResult(null);
     setDetectedMode(null);
     setSelectedFile(null);
+    setApplyMessage('');
+    setApplyError('');
 
     try {
       const token = localStorage.getItem('token');
@@ -165,6 +178,46 @@ export default function AdminCodeAssistantPage() {
     await navigator.clipboard.writeText(text);
     setCopiedPath(key);
     setTimeout(() => setCopiedPath(''), 2000);
+  };
+
+  const handleApplyCodeFiles = async (dryRun: boolean) => {
+    if (!result?.codeFiles?.length) {
+      return;
+    }
+
+    setApplying(true);
+    setApplyMessage('');
+    setApplyError('');
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/admin/code-assistant/apply', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          codeFiles: result.codeFiles,
+          dryRun,
+        }),
+      });
+
+      const data = (await response.json()) as ApplyResponse;
+      if (!response.ok) {
+        throw new Error(data.error || 'No se pudieron aplicar los cambios.');
+      }
+
+      if (dryRun) {
+        setApplyMessage(`Dry run OK: ${data.files?.length || 0} archivo(s) listos para aplicar.`);
+      } else {
+        setApplyMessage(`Cambios aplicados: ${data.applied || data.files?.length || 0} archivo(s).`);
+      }
+    } catch (applyRunError) {
+      setApplyError(applyRunError instanceof Error ? applyRunError.message : 'Fallo aplicando cambios.');
+    } finally {
+      setApplying(false);
+    }
   };
 
   const loadTemplate = (template: AssistantTemplate) => {
@@ -384,8 +437,41 @@ export default function AdminCodeAssistantPage() {
               {/* Code files panel */}
               {result.codeFiles && result.codeFiles.length > 0 && (
                 <div className="rounded-[22px] border border-slate-200 bg-white p-5">
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Archivos de codigo</p>
-                  <p className="mt-1 text-xs text-slate-500">Selecciona un archivo para ver el codigo y copiarlo.</p>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Archivos de codigo</p>
+                      <p className="mt-1 text-xs text-slate-500">Selecciona un archivo para ver el codigo y copiarlo o aplicarlo directo.</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => void handleApplyCodeFiles(true)}
+                        disabled={applying}
+                        className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {applying ? 'Procesando...' : 'Dry Run'}
+                      </button>
+                      <button
+                        onClick={() => void handleApplyCodeFiles(false)}
+                        disabled={applying}
+                        className="rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {applying ? 'Aplicando...' : 'Aplicar Cambios'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {applyMessage ? (
+                    <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                      {applyMessage}
+                    </div>
+                  ) : null}
+
+                  {applyError ? (
+                    <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                      {applyError}
+                    </div>
+                  ) : null}
+
                   <div className="mt-3 flex flex-wrap gap-2">
                     {result.codeFiles.map((file) => (
                       <button

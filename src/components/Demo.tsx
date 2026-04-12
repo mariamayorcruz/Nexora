@@ -1,78 +1,52 @@
 'use client';
 
-type DemoHighlight = {
-  badge: string;
-  title: string;
-  description: string;
-};
-
-const highlights: DemoHighlight[] = [
-  {
-    badge: 'Control',
-    title: 'Visión unificada del rendimiento',
-    description: 'Muestra inversión, conversiones, ROI y estado de campañas en una sola lectura.',
-  },
-  {
-    badge: 'Velocidad',
-    title: 'Decisiones más rápidas',
-    description: 'Evita saltar entre plataformas y detecta antes qué conviene escalar, pausar o corregir.',
-  },
-  {
-    badge: 'Claridad',
-    title: 'Más orden para vender mejor',
-    description: 'La experiencia está pensada para equipos, agencias y negocios que quieren operar con control real.',
-  },
-];
-
 export default function Demo() {
-  const videoUrl = process.env.NEXT_PUBLIC_DEMO_VIDEO_URL || '/videos/nexora-demo.mp4';
+  const secondCutUrl = '/videos/Nexora%20VSL_%20Escala%20tus%20anuncios%20sin%20caos_720p_caption.mp4';
 
   return (
-    <section id="demo" className="bg-slate-950 px-4 py-24 text-white sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
-        <div className="max-w-3xl">
-          <span className="section-tag section-tag-dark">Demo</span>
-          <h2 className="mt-6 text-4xl font-semibold leading-tight md:text-5xl">
-            Mira cómo se ve una operación publicitaria bien organizada.
+    <section id="demo" className="relative overflow-hidden bg-[#060816] py-16 md:py-20">
+      <div className="mx-auto max-w-7xl px-6 text-center">
+
+        {/* Heading */}
+        <div className="mb-10">
+          <h2 className="text-4xl md:text-5xl font-bold text-white mb-4 tracking-tight">
+            Nexora en acción: Todo en una sola pantalla
           </h2>
-          <p className="mt-5 text-lg leading-8 text-slate-300">
-            Este recorrido te muestra cómo centralizar campañas, leer rendimiento en segundos y tomar mejores decisiones sin saltar entre herramientas.
+          <p className="text-xl md:text-2xl text-slate-300 max-w-3xl mx-auto">
+            Centraliza Meta Ads, Google Ads, TikTok Ads, CRM y IA.<br />
+            <span className="text-orange-400 font-medium">
+              Deja de saltar entre 4 plataformas y empieza a escalar sin caos.
+            </span>
           </p>
         </div>
 
-        <div className="mt-12 grid gap-8 xl:grid-cols-[1.15fr_0.85fr]">
-          <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.04] shadow-[0_25px_80px_rgba(15,23,42,0.5)]">
+        {/* Video container */}
+        <div className="relative mx-auto max-w-5xl overflow-hidden rounded-3xl border border-cyan-400/20 bg-black shadow-2xl">
+          <div className="aspect-video">
             <video
-              className="aspect-video w-full bg-black object-cover"
+              className="h-full w-full object-cover"
               controls
+              autoPlay
+              muted
+              loop
               playsInline
               preload="metadata"
             >
-              <source src={videoUrl} type="video/mp4" />
-              Tu navegador no pudo cargar el video.
+              <source src={secondCutUrl} type="video/mp4" />
+              Tu navegador no pudo cargar el video demo.
             </video>
           </div>
 
-          <div className="space-y-4">
-            {highlights.map((item) => (
-              <div
-                key={item.title}
-                className="rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-6 transition hover:bg-white/[0.06]"
-              >
-                <p className="text-xs uppercase tracking-[0.28em] text-slate-500">{item.badge}</p>
-                <h3 className="mt-3 text-xl font-semibold text-white">{item.title}</h3>
-                <p className="mt-3 text-sm leading-7 text-slate-300">{item.description}</p>
-              </div>
-            ))}
-
-            <div className="rounded-[1.75rem] border border-orange-400/20 bg-orange-400/10 p-6">
-              <p className="text-xs uppercase tracking-[0.28em] text-orange-200">Lo que comunica</p>
-              <p className="mt-3 text-sm leading-7 text-orange-50">
-                Con Nexora puedes pasar de una operación fragmentada a una forma de trabajo más clara, medible y preparada para crecer.
-              </p>
-            </div>
+          {/* Floating badge */}
+          <div className="absolute left-6 top-6 flex items-center gap-2 rounded-2xl bg-emerald-500 px-5 py-1.5 text-sm font-bold text-black shadow-lg">
+            <span className="w-2 h-2 bg-black rounded-full animate-pulse" />
+            LIVE WORKSPACE
           </div>
         </div>
+
+        <p className="text-sm text-slate-400 mt-6">
+          Duración aproximada: ve cómo se ve el dashboard real en menos de 2 minutos
+        </p>
       </div>
     </section>
   );

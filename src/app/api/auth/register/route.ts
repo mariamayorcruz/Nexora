@@ -2,8 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { hashPassword, validateEmail, validatePassword } from '@/lib/auth';
-import { getFounderPlan, getFounderTrialDays, isFounderEmail } from '@/lib/access';
+import {
+  getFounderPlan,
+  getFounderTrialDays,
+  isAdminEmail,
+  isFounderEmail,
+} from '@/lib/access';
+import { resolveAppBaseUrl } from '@/lib/app-base-url';
 import { signUserToken } from '@/lib/jwt';
+import { dispatchOnboardingSequence } from '@/lib/crm-sequences';
+import { sendRegistrationTeamWelcome, isEmailDeliveryConfigured } from '@/lib/mailer';
+import { createSessionId, upsertUserSession } from '@/lib/user-sessions';
 
 export const dynamic = 'force-dynamic';
 
@@ -83,8 +92,45 @@ export async function POST(request: NextRequest) {
       return createdUser;
     });
 
+    try {
+      await dispatchOnboardingSequence({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        createdAt: user.createdAt,
+      });
+    } catch (sequenceError) {
+      console.error('Onboarding sequence dispatch failed:', sequenceError);
+    }
+
+    const adminOrFounder = isAdminEmail(cleanEmail) || founderAccess;
+    if (adminOrFounder && isEmailDeliveryConfigured()) {
+      try {
+        const result = await sendRegistrationTeamWelcome({
+          to: cleanEmail,
+          name: cleanName,
+          baseUrl: resolveAppBaseUrl(request),
+          founderAccess,
+          isAdmin: isAdminEmail(cleanEmail),
+        });
+        if (!result.delivered) {
+          console.warn('[register] Team welcome email not delivered:', result);
+        }
+      } catch (mailErr) {
+        console.error('[register] Team welcome email failed:', mailErr);
+      }
+    }
+
     // Generar token JWT
-    const token = signUserToken({ userId: user.id, email: user.email });
+    const sid = createSessionId();
+    await upsertUserSession({
+      userId: user.id,
+      sid,
+      userAgent: request.headers.get('user-agent'),
+      ip: request.headers.get('x-forwarded-for'),
+    });
+
+    const token = signUserToken({ userId: user.id, email: user.email, sid });
 
     return NextResponse.json({
       success: true,

@@ -7,7 +7,7 @@ import { useState } from 'react';
 const navItems = [
   { href: '#solution', label: 'Solución' },
   { href: '#demo', label: 'Demo' },
-  { href: '#masterclass', label: 'Master class' },
+  { href: '#diagnostico', label: 'Diagnóstico' },
   { href: '#pricing', label: 'Precios' },
   { href: '#faq', label: 'FAQ' },
 ];

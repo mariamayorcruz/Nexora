@@ -22,10 +22,33 @@ export interface SupportPlaybookCard {
   channel: string;
 }
 
+export interface AgentAction {
+  id: string;
+  type: 'create_draft' | 'pause_campaign' | 'open_page' | 'view_campaign' | 'adjust_budget';
+  label: string;
+  payload: Record<string, unknown>;
+}
+
 export interface SuggestedReply {
   title: string;
   message: string;
   nextSteps: string[];
+  campaignDraft?: CampaignDraftSuggestion;
+  agentActions?: AgentAction[];
+}
+
+export interface CampaignDraftSuggestion {
+  name: string;
+  objective: string;
+  channel: string;
+  budget: number;
+  status: 'draft';
+  launchWindow: string;
+  hook: string;
+  promise: string;
+  cta: string;
+  angle: string;
+  checklist: string[];
 }
 
 export interface SupportCenterSummary {
@@ -84,27 +107,171 @@ export function buildSupportCenterSummary(): SupportCenterSummary {
 }
 
 export function detectSupportIntent(message: string): SupportIntent {
-  const normalized = message.toLowerCase();
+  const normalized = normalizeSpanish(message);
 
-  if (normalized.includes('pago') || normalized.includes('factura') || normalized.includes('stripe') || normalized.includes('cobro')) {
+  if (includesAny(normalized, ['pago', 'factura', 'stripe', 'cobro', 'suscripcion', 'subscription'])) {
     return 'billing';
   }
-  if (normalized.includes('conversion') || normalized.includes('roi') || normalized.includes('campan') || normalized.includes('rendimiento')) {
+  if (
+    includesAny(normalized, [
+      'conversion',
+      'conversi',
+      'roi',
+      'campan',
+      'campa',
+      'anuncio',
+      'ads',
+      'rendimiento',
+      'lanzar',
+      'lanzamiento',
+      'trafico',
+    ])
+  ) {
     return 'campaign-performance';
   }
-  if (normalized.includes('conectar') || normalized.includes('meta') || normalized.includes('google') || normalized.includes('tiktok') || normalized.includes('cuenta')) {
+  if (includesAny(normalized, ['conectar', 'conexion', 'meta', 'google', 'tiktok', 'cuenta publicitaria'])) {
     return 'account-connection';
   }
-  if (normalized.includes('empez') || normalized.includes('bienvenida') || normalized.includes('onboarding') || normalized.includes('configurar')) {
+  if (includesAny(normalized, ['empez', 'inicio', 'arrancar', 'bienvenida', 'onboarding', 'configurar'])) {
     return 'onboarding';
   }
 
   return 'general';
 }
 
+function shouldSuggestCampaignDraft(message: string) {
+  const normalized = normalizeSpanish(message);
+  const hasCampaignIntent =
+    normalized.includes('campan') ||
+    normalized.includes('campa') ||
+    normalized.includes('anuncio') ||
+    normalized.includes('ads') ||
+    normalized.includes('trafico') ||
+    normalized.includes('lanzamiento');
+  const hasBuildIntent =
+    normalized.includes('crear') ||
+    normalized.includes('lanzar') ||
+    normalized.includes('armar') ||
+    normalized.includes('construir') ||
+    normalized.includes('empezar') ||
+    normalized.includes('empiezo') ||
+    normalized.includes('iniciar');
+  return hasCampaignIntent && hasBuildIntent;
+}
+
+function inferCampaignChannel(message: string) {
+  const normalized = normalizeSpanish(message);
+  if (normalized.includes('google')) return 'google';
+  if (normalized.includes('tiktok')) return 'tiktok';
+  if (normalized.includes('facebook') || normalized.includes('meta')) return 'facebook';
+  if (normalized.includes('instagram') || normalized.includes('ig')) return 'instagram';
+  return 'multiplataforma';
+}
+
+function inferCampaignObjective(message: string) {
+  const normalized = normalizeSpanish(message);
+  if (normalized.includes('lead') || normalized.includes('prospecto')) return 'generacion-de-leads';
+  if (normalized.includes('venta') || normalized.includes('compr')) return 'conversiones';
+  if (normalized.includes('whatsapp') || normalized.includes('mensaje')) return 'mensajes';
+  if (normalized.includes('trafico') || normalized.includes('tráfico')) return 'trafico';
+  return 'conversiones';
+}
+
+function inferCampaignBudget(message: string) {
+  const normalized = normalizeSpanish(message);
+  const match = normalized.match(/(?:\$|usd\s*)?(\d{2,6})(?:\s*(?:usd|dolares|dólares))?/i);
+  if (!match) return 250;
+  const parsed = Number(match[1]);
+  if (!Number.isFinite(parsed)) return 250;
+  return Math.max(50, Math.min(100000, parsed));
+}
+
+function inferOffer(message: string) {
+  const normalized = normalizeSpanish(message);
+  if (normalized.includes('curso') || normalized.includes('masterclass')) return 'tu masterclass';
+  if (normalized.includes('agencia')) return 'tu servicio de agencia';
+  if (normalized.includes('software') || normalized.includes('saas')) return 'tu software';
+  if (normalized.includes('ecommerce') || normalized.includes('tienda')) return 'tu producto ecommerce';
+  return 'tu oferta principal';
+}
+
+function buildChannelChecklist(channel: string) {
+  if (channel === 'google') {
+    return [
+      'Define conversion principal y configura tracking.',
+      'Crea 2 grupos de anuncios con keywords de intencion alta.',
+      'Prepara 2 variantes de anuncio con propuesta distinta.',
+      'Alinea landing y oferta con la promesa del anuncio.',
+      'Configura presupuesto diario y regla de pausa inicial.',
+    ];
+  }
+
+  if (channel === 'tiktok') {
+    return [
+      'Hook en los primeros 2 segundos con dolor claro.',
+      'Creativo vertical 9:16 con ritmo rapido y subtitulos.',
+      'CTA visible en pantalla y en copy.',
+      'Lanza 3 variaciones de intro para test rapido.',
+      'Revisa CTR y watch time a las 24 horas.',
+    ];
+  }
+
+  if (channel === 'facebook' || channel === 'instagram') {
+    return [
+      'Define angulo principal y objecion a romper.',
+      'Crea 2 anuncios: prueba social vs beneficio directo.',
+      'Usa copy corto con CTA unico y concreto.',
+      'Verifica pixel/evento de conversion activo.',
+      'Analiza CPA, frecuencia y fatiga creativa cada 48h.',
+    ];
+  }
+
+  return [
+    'Define objetivo de negocio y KPI principal.',
+    'Elige mensaje central y CTA unico.',
+    'Prepara dos variaciones de creativo para test A/B.',
+    'Asegura tracking y medicion antes de publicar.',
+    'Haz optimizacion con datos en 24-48h.',
+  ];
+}
+
+function buildCampaignDraftSuggestion(message: string): CampaignDraftSuggestion {
+  const channel = inferCampaignChannel(message);
+  const objective = inferCampaignObjective(message);
+  const budget = inferCampaignBudget(message);
+  const offer = inferOffer(message);
+  const timestamp = new Date();
+  const suffix = `${timestamp.getDate().toString().padStart(2, '0')}-${(timestamp.getMonth() + 1)
+    .toString()
+    .padStart(2, '0')}`;
+
+  const hook = `Si sigues invirtiendo sin un sistema claro, ${offer} se te escapa entre canales.`;
+  const promise = `Con una campana enfocada en ${objective}, ${offer} puede convertir mejor en menos tiempo.`;
+  const cta = channel === 'google' ? 'Solicita una demo hoy' : 'Escribenos y activalo hoy';
+  const angle = `Comparar el costo de seguir improvisando vs. implementar un sistema con foco en resultado.`;
+  const checklist = buildChannelChecklist(channel);
+
+  return {
+    name: `Campana ${objective} ${channel} ${suffix}`,
+    objective,
+    channel,
+    budget,
+    status: 'draft',
+    launchWindow: '7-dias',
+    hook,
+    promise,
+    cta,
+    angle,
+    checklist,
+  };
+}
+
 export function buildAiSupportReply(message: string, context: SupportContext): SuggestedReply {
   const intent = detectSupportIntent(message);
   const planLabel = context.founderAccess ? 'Founder / Scale' : context.plan || 'starter';
+  const campaignDraft = shouldSuggestCampaignDraft(message)
+    ? buildCampaignDraftSuggestion(message)
+    : undefined;
 
   if (intent === 'billing') {
     return {
@@ -127,6 +294,7 @@ export function buildAiSupportReply(message: string, context: SupportContext): S
         'Cambia una sola variable: hook, oferta o CTA.',
         'Si tu plan incluye radar, usa los blueprints para lanzar una nueva versión del mensaje.',
       ],
+      campaignDraft,
     };
   }
 
@@ -151,6 +319,7 @@ export function buildAiSupportReply(message: string, context: SupportContext): S
         'Revisa el dashboard para confirmar capacidad y foco.',
         'Lanza una campaña simple con una sola promesa fuerte.',
       ],
+      campaignDraft,
     };
   }
 
@@ -162,7 +331,19 @@ export function buildAiSupportReply(message: string, context: SupportContext): S
       'Comparte si afecta pagos, conexiones, campañas o configuración.',
       'Si necesitas seguimiento humano, usa el canal de soporte desde este mismo centro.',
     ],
+    campaignDraft,
   };
+}
+
+function normalizeSpanish(input: string): string {
+  return input
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function includesAny(haystack: string, needles: string[]) {
+  return needles.some((needle) => haystack.includes(needle));
 }
 
 export function buildLifecycleTemplates(supportEmail: string) {

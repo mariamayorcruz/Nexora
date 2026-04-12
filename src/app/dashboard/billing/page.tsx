@@ -203,7 +203,7 @@ export default function BillingPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
         <h2 className="mb-2 text-3xl font-bold text-gray-900">Facturación y suscripción</h2>
         <p className="text-gray-600">Gestiona tu plan, lanza upgrades y valida el estado real de Stripe.</p>

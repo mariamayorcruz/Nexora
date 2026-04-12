@@ -3,14 +3,28 @@ import { BillingPlan, getBillingPlan } from '@/lib/billing';
 export type AiToolKey =
   | 'ad-copy'
   | 'creative-brief'
-  | 'avatar-video'
-  | 'text-to-video'
-  | 'image-to-video'
-  | 'smart-edit'
   | 'ugc-script'
   | 'repurpose'
   | 'email-sequence'
   | 'pitch-deck';
+
+export type ContentTone =
+  | 'viral-aggressive'
+  | 'story-relaxed'
+  | 'ceo-direct'
+  | 'gen-z-raw'
+  | 'curiosity-gap'
+  | 'pain-pleasure';
+
+export type ContentFormat = 'hook-3s' | 'full-script' | 'storyboard' | 'caption-only';
+export type ContentPlatform = 'instagram-reels' | 'tiktok' | 'youtube-shorts';
+
+export interface GenerationConfig {
+  tone: ContentTone;
+  format: ContentFormat;
+  platform: ContentPlatform;
+  duration: 15 | 30 | 60;
+}
 
 export interface AiPlanConfig {
   monthlyCredits: number;
@@ -25,7 +39,7 @@ export interface AiToolDefinition {
   label: string;
   credits: number;
   description: string;
-  family?: 'copy' | 'video' | 'sales';
+  family?: 'copy' | 'sales';
 }
 
 export interface AiOutputSlide {
@@ -38,6 +52,16 @@ export interface AiOutputSection {
   items: string[];
 }
 
+export interface AiStoryboardBeat {
+  id: 'hook' | 'conflict' | 'resolution' | 'cta';
+  label: string;
+  timeLabel: string;
+  startSec: number;
+  endSec: number;
+  text: string;
+  visual: string;
+}
+
 export interface AiOutputPayload {
   headline: string;
   bullets: string[];
@@ -45,13 +69,8 @@ export interface AiOutputPayload {
   slides?: AiOutputSlide[];
   sections?: AiOutputSection[];
   cta?: string;
-}
-
-export interface SmartEditOptions {
-  removeSilences?: boolean;
-  addMusic?: boolean;
-  createCaptions?: boolean;
-  generateVariants?: boolean;
+  beats?: AiStoryboardBeat[];
+  generationConfig?: GenerationConfig;
 }
 
 export const AI_PLAN_CONFIG: Record<BillingPlan, AiPlanConfig> = {
@@ -65,16 +84,16 @@ export const AI_PLAN_CONFIG: Record<BillingPlan, AiPlanConfig> = {
   professional: {
     monthlyCredits: 1800,
     bonusFounderCredits: 1200,
-    canUseVideoTools: true,
+    canUseVideoTools: false,
     maxExportsPerRun: 4,
-    supportLabel: 'Bolsa sólida para operar campañas activas, presentaciones y contenido todo el mes.',
+    supportLabel: 'Bolsa sólida para campañas activas, guiones, propuestas y activos comerciales.',
   },
   enterprise: {
     monthlyCredits: 6500,
     bonusFounderCredits: 2500,
-    canUseVideoTools: true,
+    canUseVideoTools: false,
     maxExportsPerRun: 8,
-    supportLabel: 'Capacidad amplia para equipos intensivos en contenido, pitch, video y optimización continua.',
+    supportLabel: 'Capacidad amplia para equipos intensivos en contenido, pitch, seguimiento y optimización.',
   },
 };
 
@@ -83,43 +102,15 @@ export const AI_TOOL_DEFINITIONS: AiToolDefinition[] = [
     key: 'ad-copy',
     label: 'Anuncios y hooks',
     credits: 20,
-    description: 'Genera hooks, promesas, pruebas, guion visual y CTA listos para campañas serias.',
+    description: 'Genera hooks, promesas, pruebas y CTA listos para campañas serias.',
     family: 'copy',
   },
   {
     key: 'creative-brief',
     label: 'Brief creativo',
     credits: 35,
-    description: 'Transforma una oferta o servicio en ángulos, pruebas y estructura narrativa.',
+    description: 'Transforma una oferta o servicio en ángulos, objeciones y estructura narrativa.',
     family: 'copy',
-  },
-  {
-    key: 'avatar-video',
-    label: 'Avatar video',
-    credits: 90,
-    description: 'Prepara un video con avatar, voz, escenas, overlays y CTA listo para render.',
-    family: 'video',
-  },
-  {
-    key: 'text-to-video',
-    label: 'Text to video',
-    credits: 85,
-    description: 'Convierte una idea o brief en secuencia visual generada desde texto.',
-    family: 'video',
-  },
-  {
-    key: 'image-to-video',
-    label: 'Image to video',
-    credits: 95,
-    description: 'Toma una imagen base y la convierte en una pieza animada con dirección comercial.',
-    family: 'video',
-  },
-  {
-    key: 'smart-edit',
-    label: 'Smart edit',
-    credits: 75,
-    description: 'Edita un video existente con IA: silencios, captions, música, ritmo y variantes.',
-    family: 'video',
   },
   {
     key: 'ugc-script',
@@ -132,7 +123,7 @@ export const AI_TOOL_DEFINITIONS: AiToolDefinition[] = [
     key: 'repurpose',
     label: 'Repurpose multicanal',
     credits: 55,
-    description: 'Toma una pieza y la baja a carrusel, reel, email, WhatsApp y landing.',
+    description: 'Toma una idea y la baja a reel, carrusel, email, WhatsApp y landing.',
     family: 'sales',
   },
   {
@@ -171,12 +162,388 @@ function inferCategory(offer: string) {
   return offer;
 }
 
+function clampDuration(value?: number): 15 | 30 | 60 {
+  if (value === 60) return 60;
+  if (value === 15) return 15;
+  return 30;
+}
+
+function normalizeTone(value?: string): ContentTone {
+  const allowed: ContentTone[] = [
+    'viral-aggressive',
+    'story-relaxed',
+    'ceo-direct',
+    'gen-z-raw',
+    'curiosity-gap',
+    'pain-pleasure',
+  ];
+
+  return allowed.includes(value as ContentTone) ? (value as ContentTone) : 'viral-aggressive';
+}
+
+function normalizeFormat(value?: string): ContentFormat {
+  const allowed: ContentFormat[] = ['hook-3s', 'full-script', 'storyboard', 'caption-only'];
+  return allowed.includes(value as ContentFormat) ? (value as ContentFormat) : 'full-script';
+}
+
+function normalizePlatform(value?: string): ContentPlatform {
+  const allowed: ContentPlatform[] = ['instagram-reels', 'tiktok', 'youtube-shorts'];
+  return allowed.includes(value as ContentPlatform) ? (value as ContentPlatform) : 'instagram-reels';
+}
+
+function buildGenerationConfig(input?: Partial<GenerationConfig>): GenerationConfig {
+  return {
+    tone: normalizeTone(input?.tone),
+    format: normalizeFormat(input?.format),
+    platform: normalizePlatform(input?.platform),
+    duration: clampDuration(input?.duration),
+  };
+}
+
+function getBeatWindows(duration: 15 | 30 | 60) {
+  if (duration === 15) {
+    return {
+      hook: [0, 3],
+      conflict: [3, 8],
+      resolution: [8, 12],
+      cta: [12, 15],
+    } as const;
+  }
+
+  if (duration === 60) {
+    return {
+      hook: [0, 5],
+      conflict: [5, 18],
+      resolution: [18, 48],
+      cta: [48, 60],
+    } as const;
+  }
+
+  return {
+    hook: [0, 3],
+    conflict: [3, 10],
+    resolution: [10, 24],
+    cta: [24, 30],
+  } as const;
+}
+
+function buildToneLines(params: {
+  offer: string;
+  audience: string;
+  prompt: string;
+  tone: ContentTone;
+  platform: ContentPlatform;
+}) {
+  const offer = params.offer;
+  const audience = params.audience;
+  const promptHint = params.prompt || 'tu equipo sigue trabajando a ciegas';
+
+  const maps: Record<ContentTone, { hook: string; conflict: string; resolution: string; cta: string; angle: string }> = {
+    'viral-aggressive': {
+      hook: `Si sigues asi, ${audience} te ignora.`,
+      conflict: `Estás perdiendo atención por sonar igual que todos en ${offer}.`,
+      resolution: `${offer} te deja mostrar el dato, el mensaje y el cierre en un solo flujo.`,
+      cta: 'Guarda esto y pruebalo hoy.',
+      angle: 'Provocacion controlada con golpe directo al costo de seguir igual.',
+    },
+    'story-relaxed': {
+      hook: 'Ayer nos pasó algo ridículo.',
+      conflict: `Seguíamos ${promptHint} y nadie veía dónde se estaba rompiendo el proceso.`,
+      resolution: `Con ${offer} se ordenó el seguimiento y por fin todo empezó a caer en su sitio.`,
+      cta: 'Compártelo con tu equipo.',
+      angle: 'Storytelling suave con cierre práctico y cercano.',
+    },
+    'ceo-direct': {
+      hook: '3 errores te están costando pipeline.',
+      conflict: `Uno: no ves datos. Dos: el mensaje llega tarde. Tres: ${audience} ya no espera.`,
+      resolution: `${offer} junta campañas, CRM y seguimiento para que dejes de improvisar.`,
+      cta: 'Haz auditoría y corrígelo hoy.',
+      angle: 'CEO directo, sin relleno y con tensión de negocio.',
+    },
+    'gen-z-raw': {
+      hook: 'POV: sigues cerrando ventas desde Excel 😬',
+      conflict: `Literalmente ${audience} ya huele cuando una marca todavía va tarde con todo.`,
+      resolution: `${offer} conecta mensajes, leads y seguimiento en un solo lugar.`,
+      cta: 'Guárdalo para tu próximo reel.',
+      angle: 'Nativo social, ritmo rápido y vocabulario creador sin sonar infantil.',
+    },
+    'curiosity-gap': {
+      hook: 'La forma rara de recuperar ventas perdidas.',
+      conflict: `Nadie te dice que el problema casi nunca es el anuncio; es lo que pasa después.`,
+      resolution: `Con ${offer} ves qué mensaje entra, quién responde y dónde se cae el cierre.`,
+      cta: 'Comenta si quieres la parte 2.',
+      angle: 'Curiosity gap con información retenida hasta la resolución.',
+    },
+    'pain-pleasure': {
+      hook: 'Imagina vender sin perseguir a nadie.',
+      conflict: `Ahora mismo ${audience} vive apagando fuegos, contestando tarde y perdiendo contexto.`,
+      resolution: `${offer} devuelve control, claridad y seguimiento sin fricción diaria.`,
+      cta: 'Guárdalo y vuelve a verlo.',
+      angle: 'Transición clara de dolor actual a alivio inmediato.',
+    },
+  };
+
+  const selected = maps[params.tone];
+  const platformVisual =
+    params.platform === 'tiktok'
+      ? 'Plano selfie con texto grande y gesto directo a cámara.'
+      : params.platform === 'youtube-shorts'
+      ? 'Plano medio con cortes rápidos y caption centrado.'
+      : 'Plano vertical tipo Reel con subtítulo fuerte en pantalla.';
+
+  return {
+    ...selected,
+    visuals: {
+      hook: platformVisual,
+      conflict: 'Cambio rápido a pantalla saturada, inbox o tablero con ruido visual.',
+      resolution: `Demo corta mostrando ${offer} resolviendo el caos en segundos.`,
+      cta: 'Flecha al botón de guardar o comentario con gesto explícito.',
+    },
+  };
+}
+
+function buildStructuredSocialOutput(params: {
+  offer: string;
+  audience: string;
+  prompt: string;
+  config: GenerationConfig;
+}): AiOutputPayload {
+  const offer = normalizeOffer(params.offer);
+  const audience = params.audience || 'tu equipo';
+  const config = buildGenerationConfig(params.config);
+  const windows = getBeatWindows(config.duration);
+  const lines = buildToneLines({
+    offer,
+    audience,
+    prompt: params.prompt,
+    tone: config.tone,
+    platform: config.platform,
+  });
+
+  const beats: AiStoryboardBeat[] = [
+    {
+      id: 'hook',
+      label: 'HOOK',
+      timeLabel: `${windows.hook[0]}-${windows.hook[1]}s`,
+      startSec: windows.hook[0],
+      endSec: windows.hook[1],
+      text: lines.hook,
+      visual: lines.visuals.hook,
+    },
+    {
+      id: 'conflict',
+      label: 'CONFLICTO',
+      timeLabel: `${windows.conflict[0]}-${windows.conflict[1]}s`,
+      startSec: windows.conflict[0],
+      endSec: windows.conflict[1],
+      text: lines.conflict,
+      visual: lines.visuals.conflict,
+    },
+    {
+      id: 'resolution',
+      label: 'RESOLUCION',
+      timeLabel: `${windows.resolution[0]}-${windows.resolution[1]}s`,
+      startSec: windows.resolution[0],
+      endSec: windows.resolution[1],
+      text: lines.resolution,
+      visual: lines.visuals.resolution,
+    },
+    {
+      id: 'cta',
+      label: 'CTA',
+      timeLabel: `${windows.cta[0]}-${windows.cta[1]}s`,
+      startSec: windows.cta[0],
+      endSec: windows.cta[1],
+      text: lines.cta,
+      visual: lines.visuals.cta,
+    },
+  ];
+
+  const visibleBeats = config.format === 'hook-3s' ? beats.slice(0, 1) : beats;
+
+  return {
+    headline: visibleBeats[0].text,
+    bullets: visibleBeats.map((beat) => `${beat.timeLabel}: ${beat.text}`),
+    angle: lines.angle,
+    cta: lines.cta,
+    beats: visibleBeats,
+    generationConfig: config,
+    sections:
+      config.format === 'caption-only'
+        ? [
+            {
+              title: 'Caption sugerido',
+              items: beats.map((beat) => beat.text),
+            },
+          ]
+        : visibleBeats.map((beat) => ({
+            title: `${beat.label} · ${beat.timeLabel}`,
+            items: [beat.text, beat.visual],
+          })),
+  };
+}
+
+function pickDifferentOption(options: string[], current?: string) {
+  const filtered = current ? options.filter((option) => option !== current) : options;
+  const source = filtered.length > 0 ? filtered : options;
+  return source[Math.floor(Math.random() * source.length)] || current || options[0] || '';
+}
+
+function buildBeatVariantOptions(params: {
+  tone: ContentTone;
+  beatId: AiStoryboardBeat['id'];
+  offer: string;
+  audience: string;
+}) {
+  const { tone, beatId, offer, audience } = params;
+
+  const map: Record<ContentTone, Record<AiStoryboardBeat['id'], string[]>> = {
+    'viral-aggressive': {
+      hook: [
+        `Si sigues así, ${audience} te ignora.`,
+        `Tu mensaje se está muriendo en frío.`,
+        `La gente correcta ya no espera más.`,
+      ],
+      conflict: [
+        `Tu marca suena igual que todas cuando habla de ${offer}.`,
+        `El problema no es publicar más; es sonar irrelevante al segundo uno.`,
+        `Cada scroll sin tensión es dinero que se pierde en silencio.`,
+      ],
+      resolution: [
+        `${offer} convierte caos comercial en una narrativa que sí cierra.`,
+        `${offer} alinea mensaje, lead y seguimiento en un mismo movimiento.`,
+        `${offer} te deja entrar con claridad y salir con acción.`,
+      ],
+      cta: ['Guárdalo y pruébalo hoy.', 'Comenta si quieres la versión 2.', 'Compártelo con tu equipo.'],
+    },
+    'story-relaxed': {
+      hook: ['Te cuento algo que nos pasó ayer.', 'Esto empezó con un error pequeño.', 'Pensábamos que el problema era otro.'],
+      conflict: [
+        `Seguíamos perdiendo contexto justo cuando ${audience} más rápido debía reaccionar.`,
+        `Todo parecía normal hasta que vimos dónde se rompía la conversación.`,
+        `Nadie estaba viendo el mismo tablero al mismo tiempo.`,
+      ],
+      resolution: [
+        `Con ${offer} por fin todo cayó en el mismo lugar.`,
+        `${offer} nos devolvió orden y una respuesta mucho más rápida.`,
+        `Cuando ${offer} entró al flujo, el equipo dejó de improvisar.`,
+      ],
+      cta: ['Guárdalo para verlo luego.', 'Envíalo a quien necesite orden.', 'Si te resonó, compártelo.'],
+    },
+    'ceo-direct': {
+      hook: ['3 errores te están costando pipeline.', 'El dato incómodo: sigues tarde.', 'Esto te está costando más de lo que crees.'],
+      conflict: [
+        `Marketing y ventas siguen sin compartir un mismo contexto real.`,
+        `Tu operación está reaccionando tarde a señales que ya existen.`,
+        `El dinero se pierde donde nadie está mirando.`,
+      ],
+      resolution: [
+        `${offer} junta dato, mensaje y seguimiento sin relleno.`,
+        `${offer} recorta la fricción donde hoy se te escapa margen.`,
+        `${offer} pone el control donde antes había suposiciones.`,
+      ],
+      cta: ['Haz auditoría hoy.', 'Guarda esto y ejecútalo.', 'Compártelo con tu responsable comercial.'],
+    },
+    'gen-z-raw': {
+      hook: ['POV: sigues cerrando ventas desde Excel 😬', 'Literalmente esto te está frenando.', 'Plot twist: no era falta de leads.'],
+      conflict: [
+        `${audience} nota al segundo cuando sigues improvisando.`,
+        `No es por asustarte, pero el caos ya se te nota.`,
+        `El problema no era el anuncio, era todo lo que venía después.`,
+      ],
+      resolution: [
+        `${offer} conecta todo y deja de verse improvisado.`,
+        `${offer} te da contexto en tiempo real sin cambiar de app.`,
+        `${offer} ordena mensaje, leads y cierre en un solo lugar.`,
+      ],
+      cta: ['Guárdalo para tu próximo reel.', 'Comenta si quieres plantilla.', 'Mándaselo a tu socio.'],
+    },
+    'curiosity-gap': {
+      hook: ['La forma rara de recuperar ventas.', 'Lo que nadie te cuenta del cierre.', 'Hicimos esto sin subir presupuesto.'],
+      conflict: [
+        `El problema real casi nunca es donde todo el mundo está mirando.`,
+        `Hay una fuga silenciosa que no aparece en el anuncio.`,
+        `El dato importante está escondido justo después del clic.`,
+      ],
+      resolution: [
+        `${offer} te muestra el tramo oculto donde se pierde la venta.`,
+        `${offer} conecta el antes y el después del anuncio.`,
+        `${offer} deja visible el punto exacto donde se cae el cierre.`,
+      ],
+      cta: ['Comenta “parte 2”.', 'Guárdalo y vuelve luego.', 'Comparte si quieres el desglose completo.'],
+    },
+    'pain-pleasure': {
+      hook: ['Imagina vender sin perseguir a nadie.', 'Despertar sin caos comercial sí existe.', 'Piensa en cerrar sin apagar fuegos.'],
+      conflict: [
+        `${audience} sigue cargando fricción, retrasos y cero visibilidad.`,
+        `Ahora mismo todo depende de recordar, revisar y perseguir.`,
+        `Ese desgaste diario también te está costando dinero.`,
+      ],
+      resolution: [
+        `${offer} cambia desgaste por control y seguimiento claro.`,
+        `${offer} convierte fricción diaria en un flujo mucho más limpio.`,
+        `${offer} le devuelve aire al equipo y velocidad al cierre.`,
+      ],
+      cta: ['Guárdalo si quieres más paz.', 'Compártelo con tu equipo.', 'Vuelve a esto cuando quieras orden.'],
+    },
+  };
+
+  return map[tone][beatId];
+}
+
+export function regenerateAiOutputBeat(params: {
+  output: AiOutputPayload;
+  target: AiStoryboardBeat['id'];
+  offer: string;
+  audience: string;
+}): AiOutputPayload {
+  const config = buildGenerationConfig(params.output.generationConfig);
+  const beats = params.output.beats || [];
+
+  const nextBeats = beats.map((beat) => {
+    if (beat.id !== params.target) {
+      return beat;
+    }
+
+    const textOptions = buildBeatVariantOptions({
+      tone: config.tone,
+      beatId: beat.id,
+      offer: normalizeOffer(params.offer),
+      audience: params.audience || 'tu equipo',
+    });
+
+    const visualOptions = [
+      'Primer plano vertical con subtitulo grande y gesto a cámara.',
+      'Corte rápido a dashboard, inbox o tablero con tensión visual.',
+      'Plano selfie con texto en pantalla y señalando el caption.',
+    ];
+
+    return {
+      ...beat,
+      text: pickDifferentOption(textOptions, beat.text),
+      visual: pickDifferentOption(visualOptions, beat.visual),
+    };
+  });
+
+  return {
+    ...params.output,
+    headline: nextBeats[0]?.text || params.output.headline,
+    bullets: nextBeats.map((beat) => `${beat.timeLabel}: ${beat.text}`),
+    beats: nextBeats,
+    sections: nextBeats.map((beat) => ({
+      title: `${beat.label} · ${beat.timeLabel}`,
+      items: [beat.text, beat.visual],
+    })),
+    cta: nextBeats.find((beat) => beat.id === 'cta')?.text || params.output.cta,
+  };
+}
+
 function buildInstagramAdCopy(params: {
   offer: string;
   audience: string;
   channel: string;
   prompt: string;
-}) {
+}): AiOutputPayload {
   const offer = normalizeOffer(params.offer);
   const audience = params.audience || 'equipos, negocios y marketers que quieren vender mejor';
   const category = inferCategory(offer);
@@ -184,283 +551,66 @@ function buildInstagramAdCopy(params: {
   const prompt = params.prompt || '';
   const offerDisplay = toTitleCase(offer);
   const promise = /nexora/i.test(offer)
-    ? 'centralizar campañas, creatividad, seguimiento comercial y decisiones de crecimiento en un solo sistema'
+    ? 'centralizar campañas, CRM, funnel y decisiones comerciales en un solo sistema'
     : `hacer más simple y más rentable el crecimiento con ${offer}`;
   const proof = /nexora/i.test(offer)
-    ? 'ves inversión, conversiones, ROI, leads y pipeline sin saltar entre herramientas'
+    ? 'ves inversión, conversiones, leads y pipeline sin saltar entre herramientas'
     : 'el usuario siente más claridad, control y velocidad desde el primer uso';
-  const urgency = /instagram/i.test(channel.toLowerCase())
-    ? 'en Instagram gana quien hace entendible el resultado antes de pedir atención'
-    : `en ${channel} gana quien reduce fricción y deja claro el siguiente resultado`;
+  const wantsWalkthrough = /bluehost|ecommerce|tienda|woocommerce|setup|paso a paso|onboarding/i.test(
+    `${prompt} ${offer} ${channel}`
+  );
+
+  if (wantsWalkthrough) {
+    return {
+      headline: `${offerDisplay}: anuncio tipo walkthrough para ${channel}`,
+      bullets: [
+        `Hook 1: "Deja de complicar tu setup: en menos de 30 segundos ves tu tienda en vivo."`,
+        `Hook 2: "${offerDisplay} te lleva de configuracion a venta con pasos claros, sin friccion tecnica."`,
+        `Promesa: tutorial visual por pasos que muestra progreso real en pantalla.`,
+        `Prueba sugerida: capturas del flujo (configuracion -> productos -> pago -> sitio live).`,
+        'CTA: compra, prueba o agenda demo con una accion unica y directa.',
+      ],
+      angle:
+        prompt ||
+        `Narrativa de onboarding guiado para ${audience}. Mostrar avance paso a paso y terminar con una accion inmediata.`,
+      sections: [
+        {
+          title: 'Storyboard recomendado (reel 20-30s)',
+          items: [
+            'Escena 1 (0-3s): dolor -> "deja de complicar tu ecommerce".',
+            'Escena 2 (3-10s): elegir tipo de negocio y setup inicial.',
+            'Escena 3 (10-18s): agregar productos y activar pagos.',
+            'Escena 4 (18-24s): cambiar estado a live y mostrar panel final.',
+            'Escena 5 (24-30s): CTA corto con accion unica (comprar/demo/probar).',
+          ],
+        },
+      ],
+      cta: 'Cierra con una accion unica: comprar, probar o agendar demo.',
+    };
+  }
 
   return {
     headline: `${offerDisplay}: anuncio experto listo para vender en ${channel}`,
     bullets: [
-      `Hook premium 1: “Si tu marketing vive repartido en cinco herramientas, no estás creciendo: estás improvisando. ${offerDisplay} reúne campañas, datos y seguimiento en un solo sistema.”`,
-      `Hook premium 2: “La mayoría no necesita más tráfico; necesita una operación que convierta la atención en decisiones y ventas. Ahí es donde ${offerDisplay} cambia el juego.”`,
-      `Hook premium 3: “Cuando por fin ves anuncios, leads y pipeline en el mismo lugar, dejas de adivinar y empiezas a escalar con criterio.”`,
-      `Promesa central: “${offerDisplay} ayuda a ${audience} a ${promise}. Deja de operar a ciegas y empieza a decidir con una lectura real del negocio.”`,
-      `Copy principal: “${offerDisplay} no nació para sumar otra pestaña a tu operación. Nació para darle orden, velocidad y claridad a una parte del negocio que normalmente vive fragmentada. Si hoy inviertes en anuncios, generas contactos y aun así sientes que todo depende de intuición, ${offerDisplay} te devuelve control sobre lo que está funcionando y sobre lo que conviene hacer después.”`,
-      `Prueba y credibilidad: “La ventaja real de ${offerDisplay} es que ${proof}. Eso baja el caos operativo, mejora la lectura del rendimiento y hace que cada campaña se sienta más accionable.”`,
-      `Guion visual recomendado: abre con una escena de caos entre múltiples plataformas, corta a una vista limpia del dashboard, muestra una mejora visible y remata con una toma donde el usuario entiende qué hacer a continuación.`,
-      `CTA experto: “Empieza tu prueba, agenda una demo y descubre cómo se ve una operación publicitaria cuando por fin trabaja como un sistema.”`,
-      `Dirección estratégica: vende ${offerDisplay} como ${category} premium, no como software genérico. ${urgency}. ${prompt ? `Usa este matiz adicional como capa narrativa: ${prompt}.` : 'Prioriza claridad, autoridad y resultado visible antes que promesas genéricas.'}`,
+      `Hook 1: “Si ${audience} sigue operando sin sistema, está perdiendo margen antes de darse cuenta.”`,
+      `Hook 2: “${offerDisplay} no vende más cuando explica más; vende más cuando deja claro qué cambia desde el primer impacto.”`,
+      `Promesa: ${promise}.`,
+      `Prueba sugerida: ${proof}.`,
+      'CTA: agenda demo, prueba o diagnóstico con un siguiente paso simple.',
     ],
-    angle: `${offerDisplay} debe venderse como un sistema de control y crecimiento, no como otra herramienta más.`,
-    cta: 'Empieza tu prueba o agenda una demo para ver cómo Nexora convierte claridad en decisiones más rentables.',
+    angle: prompt || `Vender ${category} con una narrativa clara, premium y orientada a conversión.`,
     sections: [
       {
-        title: 'Primary text',
+        title: 'Framework',
         items: [
-          `${offerDisplay} ayuda a ${audience} a ${promise}. Si hoy inviertes en anuncios, generas contactos y aun así sientes que todo depende de intuición, ${offerDisplay} te devuelve control sobre lo que está funcionando y sobre lo que conviene hacer después.`,
-        ],
-      },
-      {
-        title: 'Headlines',
-        items: [
-          'Centraliza ads, leads y pipeline en un solo sistema',
-          'Menos caos operativo. Más claridad para vender.',
-          'Haz crecer tu operación con una lectura real del negocio',
+          'Abre con dolor o fricción real.',
+          'Muestra el cambio concreto.',
+          'Introduce la prueba o mecanismo.',
+          'Cierra con una sola acción.',
         ],
       },
     ],
-  };
-}
-
-function buildVideoStudioOutput(params: {
-  tool: AiToolKey;
-  offer: string;
-  audience: string;
-  channel: string;
-  prompt: string;
-  sourceAsset?: string;
-  outputFormat?: string;
-  captionStyle?: string;
-  smartEditOptions?: SmartEditOptions;
-}) {
-  const offer = normalizeOffer(params.offer);
-  const audience = params.audience || 'tu audiencia ideal';
-  const channel = params.channel || 'video';
-  const sourceAsset = params.sourceAsset || 'sin asset especificado';
-  const outputFormat = params.outputFormat || 'vertical 9:16';
-  const captionStyle = params.captionStyle || 'bold clean';
-  const smartEditOptions = params.smartEditOptions || {};
-
-  const commonSections: AiOutputSection[] = [
-    {
-      title: 'Creative direction',
-      items: [
-        `Audiencia principal: ${audience}.`,
-        `Formato recomendado: ${outputFormat}.`,
-        `Canal objetivo: ${channel}.`,
-      ],
-    },
-    {
-      title: 'Conversion layer',
-      items: [
-        'Abrir con un problema visible, no con una introduccion lenta.',
-        'Mostrar producto, mecanismo o resultado antes del segundo 8.',
-        'Cerrar con una sola accion concreta y sin CTA difuso.',
-      ],
-    },
-    {
-      title: 'Delivery checklist',
-      items: [
-        'Abre con dolor o tensión en los primeros 2 segundos.',
-        'Muestra mecanismo o producto antes del segundo 8.',
-        'Cierra con una sola acción y sin CTA ambiguo.',
-      ],
-    },
-  ];
-
-  if (params.tool === 'avatar-video') {
-    return {
-      headline: `Avatar video listo para producir sobre ${offer}`,
-      bullets: [
-        'Hook con autoridad tranquila y promesa clara.',
-        'Presentación con avatar profesional y ritmo de venta consultiva.',
-        'Escenas cortas con prueba visible y CTA final único.',
-      ],
-      angle: `El avatar debe vender ${offer} como una solución seria, visible y fácil de entender para ${audience}.`,
-      cta: `Termina invitando a demo, prueba o contacto directo con una sola acción.`,
-      sections: [
-        {
-          title: 'Avatar setup',
-          items: [
-            'Avatar ejecutivo, confiable y moderno.',
-            'Voz en español neutro con ritmo ágil.',
-            'Fondo premium alineado con la categoría del negocio.',
-          ],
-        },
-        {
-          title: 'Storyboard',
-          items: [
-            '0-3s: problema visible y costo de seguir igual.',
-            '3-8s: promesa concreta y por qué importa hoy.',
-            '8-16s: recorrido visual o demostración del producto.',
-            '16-25s: prueba, alivio o señal de credibilidad.',
-            '25-35s: CTA limpio y accionable.',
-          ],
-        },
-        {
-          title: 'On-screen copy',
-          items: [
-            'Overlay 1: dolor o perdida que el usuario reconoce enseguida.',
-            'Overlay 2: promesa concreta con lenguaje entendible.',
-            'Overlay 3: CTA de prueba, demo o contacto guiado.',
-          ],
-        },
-        ...commonSections,
-      ],
-    };
-  }
-
-  if (params.tool === 'text-to-video') {
-    return {
-      headline: `Text-to-video para ${offer}`,
-      bullets: [
-        'Secuencia visual generada a partir del prompt principal.',
-        'Cadencia de escenas pensada para ads y reels.',
-        'Narrativa visual construida desde beneficio, prueba y CTA.',
-      ],
-      angle: `El video debe sentirse aspiracional, claro y orientado a conversión para ${audience}.`,
-      cta: 'Cierra con una invitación concreta a probar, reservar demo o solicitar más información.',
-      sections: [
-        {
-          title: 'Prompt master',
-          items: [
-            params.prompt || `Construye una pieza visual de alto impacto para vender ${offer}.`,
-            'Mantén estética limpia, moderna y pensada para performance.',
-          ],
-        },
-        {
-          title: 'Scene map',
-          items: [
-            'Escena 1: captar atención con tensión o contraste.',
-            'Escena 2: introducir la oportunidad o el cambio.',
-            'Escena 3: mostrar mecanismo o transformación.',
-            'Escena 4: aterrizar prueba y cierre.',
-          ],
-        },
-        {
-          title: 'Render notes',
-          items: [
-            'Movimiento de camara limpio y energia premium.',
-            'Luz alta, foco en contraste y legibilidad del mensaje.',
-            'Evitar visuales genericos; priorizar escenas que apoyen la promesa.',
-          ],
-        },
-        ...commonSections,
-      ],
-    };
-  }
-
-  if (params.tool === 'image-to-video') {
-    return {
-      headline: `Image-to-video para ${offer}`,
-      bullets: [
-        'Animación comercial pensada desde una imagen base.',
-        'Movimiento suave, foco en producto y ritmo de conversión.',
-        'Versión preparada para reel, story o anuncio corto.',
-      ],
-      angle: `La imagen base debe evolucionar a una pieza dinámica que haga más entendible el valor de ${offer}.`,
-      cta: 'Cierra con CTA de prueba, contacto o demostración.',
-      sections: [
-        {
-          title: 'Source image',
-          items: [
-            `Asset base: ${sourceAsset}.`,
-            'Usa una imagen con producto, rostro o resultado visible.',
-          ],
-        },
-        {
-          title: 'Motion plan',
-          items: [
-            'Entrada con push-in o paneo ligero.',
-            'Foco en el elemento principal del frame.',
-            'Salida con texto de cierre y CTA.',
-          ],
-        },
-        {
-          title: 'Creative upgrades',
-          items: [
-            'Agregar profundidad, micro-movimiento y ritmo de anuncio.',
-            'Acompanarlo con captions cortos y contraste alto.',
-            'Preparar una variante corta para story y otra para reel.',
-          ],
-        },
-        ...commonSections,
-      ],
-    };
-  }
-
-  return {
-    headline: `Smart edit para ${offer}`,
-    bullets: [
-      smartEditOptions.removeSilences
-        ? 'Corte inteligente de silencios y pausas débiles activado.'
-        : 'Mapa de pausas y momentos lentos identificado para edición manual o asistida.',
-      smartEditOptions.createCaptions
-        ? 'Captions automáticos con estilos orientados a performance.'
-        : 'Sistema de captions listo para activarse con un estilo de subtítulos más vendedor.',
-      smartEditOptions.addMusic
-        ? 'Sugerencia de música, ritmo, highlights y variantes de salida.'
-        : 'Ritmo, estructura y highlights preparados incluso si todavía no quieres añadir música.',
-    ],
-    angle: `La edición debe hacer que el video se sienta más corto, más claro y más vendedor para ${audience}.`,
-    cta: 'Exporta una versión principal y una variante con hook más agresivo para test A/B.',
-    sections: [
-      {
-        title: 'Edit operations',
-        items: [
-          smartEditOptions.removeSilences
-            ? 'Eliminar silencios largos y respiraciones innecesarias.'
-            : 'Detectar silencios largos y dejar marcadas las zonas que conviene cortar.',
-          'Acelerar bloques lentos sin perder naturalidad.',
-          'Detectar frases fuertes para convertirlas en hook o opener.',
-          'Preparar cortes para formatos vertical y horizontal.',
-        ],
-      },
-      {
-        title: 'Caption system',
-        items: [
-          `Estilo sugerido: ${captionStyle}.`,
-          smartEditOptions.createCaptions
-            ? 'Generar captions automáticos con resaltado de palabras clave.'
-            : 'Dejar el caption system preparado para activarse con un clic.',
-          'Crear al menos 3 estilos: clean, ads bold y creator native.',
-        ],
-      },
-      {
-        title: 'Music and pacing',
-        items: [
-          smartEditOptions.addMusic
-            ? 'Música suave con energía comercial, sin tapar la voz.'
-            : 'Dejar recomendación de música opcional sin incrustarla todavía.',
-          'Subir ritmo en transiciones donde cae la atencion.',
-          'Crear una variante mas agresiva para ads y otra mas premium para organic.',
-        ],
-      },
-      {
-        title: 'Media layer',
-        items: [
-          `Asset a editar: ${sourceAsset}.`,
-          'Música suave con energía comercial.',
-          'Hooks alternativos para opening de 2 segundos.',
-        ],
-      },
-      {
-        title: 'Export package',
-        items: [
-          'Version principal subtitulada.',
-          'Version sin subtitulos para reutilizar.',
-          smartEditOptions.generateVariants
-            ? 'Versión corta de 15 segundos y otra de 30 segundos para test rápido.'
-            : 'Versión corta de 15 segundos sugerida para test rápido.',
-        ],
-      },
-      ...commonSections,
-    ],
+    cta: 'Invita a una sola acción clara y de bajo riesgo.',
   };
 }
 
@@ -490,30 +640,26 @@ export function buildAiOutput(params: {
   offer: string;
   audience: string;
   channel: string;
+  tone?: ContentTone;
+  format?: ContentFormat;
+  platform?: ContentPlatform;
+  duration?: 15 | 30 | 60;
   sourceAsset?: string;
   outputFormat?: string;
   captionStyle?: string;
-  smartEditOptions?: SmartEditOptions;
+  smartEditOptions?: unknown;
 }): AiOutputPayload {
-  const { tool, prompt, offer, audience, channel, sourceAsset, outputFormat, captionStyle, smartEditOptions } = params;
+  const { tool, prompt, offer, audience, channel } = params;
   const trimmedOffer = normalizeOffer(offer);
   const trimmedAudience = audience || 'tu audiencia ideal';
   const trimmedChannel = channel || 'paid media';
   const basePromise = `Ayuda a ${trimmedAudience} a avanzar con ${trimmedOffer}`;
-
-  if (tool === 'avatar-video' || tool === 'text-to-video' || tool === 'image-to-video' || tool === 'smart-edit') {
-    return buildVideoStudioOutput({
-      tool,
-      offer: trimmedOffer,
-      audience: trimmedAudience,
-      channel: trimmedChannel,
-      prompt,
-      sourceAsset,
-      outputFormat,
-      captionStyle,
-      smartEditOptions,
-    });
-  }
+  const generationConfig = buildGenerationConfig({
+    tone: params.tone,
+    format: params.format,
+    platform: params.platform,
+    duration: params.duration,
+  });
 
   switch (tool) {
     case 'creative-brief':
@@ -522,34 +668,19 @@ export function buildAiOutput(params: {
         bullets: [
           `Problema visible: ${trimmedAudience} siente fricción al intentar crecer sin sistema.`,
           `Promesa principal: ${basePromise} con más claridad, control y velocidad.`,
-          `Prueba sugerida: mostrar antes y después, captura del dashboard o caso rápido.`,
+          'Prueba sugerida: mostrar antes y después, una captura o un caso corto.',
           'Objeción a resolver: “ya probé otras herramientas y no tuve visibilidad real”.',
           'CTA: invita a demo o prueba guiada con un siguiente paso muy concreto.',
         ],
         angle: `Usa ${trimmedChannel} para mostrar producto primero y beneficios después.`,
       };
     case 'ugc-script':
-      return {
-        headline: `Guion UGC para ${trimmedOffer}`,
-        bullets: [
-          `Hook: “Si ${trimmedAudience} sigue haciendo esto así, está perdiendo margen”.`,
-          'Contexto: muestra una escena cotidiana donde el problema ya se note.',
-          `Prueba: enseña cómo ${trimmedOffer} simplifica la operación o acelera resultados.`,
-          'Cierre: refuerza control, tranquilidad y una acción específica.',
-        ],
-        angle: 'Haz que suene nativo y conversacional, no como un anuncio leído.',
-        sections: [
-          {
-            title: 'Estructura',
-            items: [
-              'Hook directo con objeción o dolor reconocible.',
-              'Demostración breve de producto o experiencia.',
-              'Resultado visible o alivio inmediato.',
-              'CTA corto y claro.',
-            ],
-          },
-        ],
-      };
+      return buildStructuredSocialOutput({
+        offer: trimmedOffer,
+        audience: trimmedAudience,
+        prompt,
+        config: generationConfig,
+      });
     case 'repurpose':
       return {
         headline: 'Repurpose multicanal desde una sola idea',
@@ -627,6 +758,15 @@ export function buildAiOutput(params: {
       };
     case 'ad-copy':
     default:
+      if (generationConfig.format || generationConfig.tone || generationConfig.platform) {
+        return buildStructuredSocialOutput({
+          offer: trimmedOffer,
+          audience: trimmedAudience,
+          prompt,
+          config: generationConfig,
+        });
+      }
+
       if (/instagram/i.test(trimmedChannel) || /nexora/i.test(trimmedOffer) || /gotnexora\.com/i.test(prompt)) {
         return buildInstagramAdCopy({
           offer: trimmedOffer,

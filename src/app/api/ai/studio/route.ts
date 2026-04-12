@@ -3,9 +3,13 @@ import { prisma } from '@/lib/prisma';
 import {
   AI_TOOL_DEFINITIONS,
   buildAiOutput,
+  type ContentFormat,
+  type ContentPlatform,
+  type ContentTone,
   getAiPlanConfig,
   getAiToolDefinition,
   getCurrentCycleRange,
+  regenerateAiOutputBeat,
   type AiToolKey,
 } from '@/lib/ai-studio';
 import { getFounderPlan, isFounderEmail } from '@/lib/access';
@@ -13,24 +17,6 @@ import { getBearerToken, verifyUserToken } from '@/lib/jwt';
 import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
-
-function getVideoRenderStatus() {
-  const provider =
-    process.env.VIDEO_RENDER_PROVIDER ||
-    (process.env.HEYGEN_API_KEY ? 'heygen' : '') ||
-    (process.env.RUNWAY_API_KEY ? 'runway' : '') ||
-    (process.env.OPENAI_API_KEY ? 'openai' : '');
-  const apiKey =
-    process.env.VIDEO_RENDER_API_KEY ||
-    process.env.HEYGEN_API_KEY ||
-    process.env.RUNWAY_API_KEY ||
-    process.env.OPENAI_API_KEY;
-
-  return {
-    ready: Boolean(provider && apiKey),
-    provider: provider || null,
-  };
-}
 
 function getUserIdFromRequest(request: NextRequest) {
   const token = getBearerToken(request.headers.get('authorization'));
@@ -93,7 +79,6 @@ export async function GET(request: NextRequest) {
       take: 8,
     });
     const creditsTotal = usage.creditsIncluded + usage.creditsPurchased;
-    const videoRender = getVideoRenderStatus();
 
     return NextResponse.json({
       usage: {
@@ -106,17 +91,13 @@ export async function GET(request: NextRequest) {
         creditsRemaining: Math.max(0, creditsTotal - usage.creditsUsed),
         creditsTotal,
         supportLabel: planConfig.supportLabel,
-        canUseVideoTools: planConfig.canUseVideoTools,
-        maxExportsPerRun: planConfig.maxExportsPerRun,
-        videoRenderReady: videoRender.ready,
-        videoRenderProvider: videoRender.provider,
       },
       tools: AI_TOOL_DEFINITIONS,
       jobs,
     });
   } catch (error) {
-    console.error('Error fetching AI studio data:', error);
-    return NextResponse.json({ error: 'Error fetching AI studio data' }, { status: 500 });
+    console.error('Error fetching Nexora Studio data:', error);
+    return NextResponse.json({ error: 'Error fetching Nexora Studio data' }, { status: 500 });
   }
 }
 
@@ -142,9 +123,16 @@ export async function POST(request: NextRequest) {
     const offer = String(body.offer || '').trim();
     const audience = String(body.audience || '').trim();
     const channel = String(body.channel || '').trim();
+    const tone = String(body.tone || 'viral-aggressive') as ContentTone;
+    const format = String(body.format || 'full-script') as ContentFormat;
+    const platform = String(body.platform || 'instagram-reels') as ContentPlatform;
+    const duration = Number(body.duration || 30) as 15 | 30 | 60;
+    const regenerate = String(body.regenerate || '').trim() as 'hook' | 'conflict' | 'resolution' | 'cta' | '';
+    const currentOutput = body.currentOutput as Prisma.JsonObject | undefined;
     const sourceAsset = String(body.sourceAsset || '').trim();
     const outputFormat = String(body.outputFormat || '').trim();
     const captionStyle = String(body.captionStyle || '').trim();
+    const storedPrompt = [prompt, `tone:${tone}`, `format:${format}`, `platform:${platform}`, `duration:${duration}`].join(' | ');
     const smartEditOptions = {
       removeSilences: Boolean(body.removeSilences),
       addMusic: Boolean(body.addMusic),
@@ -158,49 +146,80 @@ export async function POST(request: NextRequest) {
 
     const founderAccess = isFounderEmail(user.email);
     const founderPlan = founderAccess ? getFounderPlan() : null;
-    const { usage, planConfig } = await getUsageBucket(user.id, founderPlan || user.subscription?.plan, founderAccess);
+    const { usage } = await getUsageBucket(user.id, founderPlan || user.subscription?.plan, founderAccess);
     const toolDefinition = getAiToolDefinition(tool);
-    const videoRender = getVideoRenderStatus();
-    const isVideoTool = ['avatar-video', 'text-to-video', 'image-to-video', 'smart-edit'].includes(tool);
-
-    if (isVideoTool && !planConfig.canUseVideoTools) {
-      return NextResponse.json(
-        { error: 'Las herramientas de video con IA están disponibles desde Growth en adelante.' },
-        { status: 403 }
-      );
-    }
-
-    if (isVideoTool && !videoRender.ready) {
-      return NextResponse.json(
-        {
-          error:
-            'El motor de render para video todavía no está conectado. No se consumieron créditos. Configura VIDEO_RENDER_PROVIDER y la API key del proveedor para habilitar avatar video, text-to-video, image-to-video o smart edit real.',
-        },
-        { status: 412 }
-      );
-    }
+    const creditsCost = regenerate ? 5 : toolDefinition.credits;
 
     const creditsTotal = usage.creditsIncluded + usage.creditsPurchased;
     const creditsRemaining = Math.max(0, creditsTotal - usage.creditsUsed);
 
-    if (creditsRemaining < toolDefinition.credits) {
+    if (!regenerate) {
+      const duplicateWindowMs = 90 * 1000;
+      const duplicateCandidate = await prisma.aiWorkspaceJob.findFirst({
+        where: {
+          userId: user.id,
+          tool,
+          prompt: storedPrompt,
+          channel: channel || null,
+          createdAt: {
+            gte: new Date(Date.now() - duplicateWindowMs),
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (duplicateCandidate) {
+        return NextResponse.json({
+          reused: true,
+          job: duplicateCandidate,
+          usage: {
+            cycleKey: usage.cycleKey,
+            creditsIncluded: usage.creditsIncluded,
+            creditsPurchased: usage.creditsPurchased,
+            creditsUsed: usage.creditsUsed,
+            creditsRemaining,
+          },
+        });
+      }
+    }
+
+    if (creditsRemaining < creditsCost) {
       return NextResponse.json(
         { error: 'No tienes créditos suficientes para esta acción. Sube de plan o espera al próximo ciclo.' },
         { status: 402 }
       );
     }
 
-    const output = buildAiOutput({
-      tool,
-      prompt,
-      offer,
-      audience,
-      channel,
-      sourceAsset,
-      outputFormat,
-      captionStyle,
-      smartEditOptions,
-    });
+    const output = regenerate
+      ? regenerateAiOutputBeat({
+          output: currentOutput as unknown as Parameters<typeof regenerateAiOutputBeat>[0]['output'],
+          target: regenerate,
+          offer,
+          audience,
+        })
+      : buildAiOutput({
+          tool,
+          prompt,
+          offer,
+          audience,
+          channel,
+          tone,
+          format,
+          platform,
+          duration,
+          sourceAsset,
+          outputFormat,
+          captionStyle,
+          smartEditOptions,
+        });
+
+    if (!output?.headline || (!output?.bullets?.length && !output?.slides?.length && !output?.sections?.length)) {
+      return NextResponse.json(
+        { error: 'No se pudo construir una respuesta valida. Intenta con un brief mas especifico.' },
+        { status: 422 }
+      );
+    }
+
     const serializedOutput = JSON.parse(JSON.stringify(output)) as Prisma.InputJsonValue;
 
     const result = await prisma.$transaction(async (tx) => {
@@ -209,9 +228,9 @@ export async function POST(request: NextRequest) {
           userId: user.id,
           tool,
           title: output.headline,
-          prompt,
+          prompt: regenerate ? `${storedPrompt} | regenerate:${regenerate}` : storedPrompt,
           channel: channel || null,
-          creditsUsed: toolDefinition.credits,
+          creditsUsed: creditsCost,
           output: serializedOutput,
         },
       });
@@ -225,7 +244,7 @@ export async function POST(request: NextRequest) {
         },
         data: {
           creditsUsed: {
-            increment: toolDefinition.credits,
+            increment: creditsCost,
           },
           lastJobAt: new Date(),
         },
@@ -235,6 +254,7 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({
+      reused: false,
       job: result.job,
       usage: {
         cycleKey: result.updatedUsage.cycleKey,
@@ -248,7 +268,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Error generating AI studio result:', error);
-    return NextResponse.json({ error: 'Error generating AI studio result' }, { status: 500 });
+    console.error('Error generating Nexora Studio result:', error);
+    return NextResponse.json({ error: 'Error generating Nexora Studio result' }, { status: 500 });
   }
 }

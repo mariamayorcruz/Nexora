@@ -138,15 +138,15 @@ function getPlatformCatalog(platform: TrendPlatform) {
   switch (platform) {
     case 'instagram':
       return {
-        title: 'UGC con transformación visible',
+        title: 'Walkthrough de setup con transformacion visible',
         summary:
-          'Los anuncios con rostro humano, promesa concreta y prueba rápida siguen ganando clic cuando muestran antes y después, objeción y resultado en una sola pieza.',
+          'Los anuncios tipo tutorial con pantalla real y progreso por pasos ganan clic cuando muestran avance concreto, no solo promesas.',
         whyNow:
-          'Instagram está premiando secuencias cortas que parecen contenido nativo y reducen la distancia entre descubrimiento y confianza.',
-        hook: 'Deja de explicar tu servicio como si fuera una lista. Muéstralo resolviendo un problema en tiempo real.',
-        formats: ['Reel vertical de 20s', 'Carrusel problema-solución', 'Historia con CTA directo'],
+          'Instagram está premiando secuencias cortas estilo onboarding que se sienten nativas y demuestran resultado en pantalla.',
+        hook: 'Deja de explicar tu servicio con teoria. Muestra el setup real y el resultado en vivo.',
+        formats: ['Reel walkthrough 20-30s', 'Carrusel paso a paso', 'Historia con CTA directo'],
         objective: 'captación de leads templados',
-        angle: 'demostración + autoridad amable',
+        angle: 'demostracion guiada + autoridad amable',
       };
     case 'facebook':
       return {
@@ -156,7 +156,7 @@ function getPlatformCatalog(platform: TrendPlatform) {
         whyNow:
           'La plataforma sigue recompensando anuncios que se sienten claros para audiencias maduras y con intención de compra más reflexiva.',
         hook: 'Si tu anuncio no responde en 5 segundos por qué alguien debería confiar en ti, está dejando dinero sobre la mesa.',
-        formats: ['Imagen estática con titular fuerte', 'Video testimonial', 'Lead magnet con formulario'],
+        formats: ['Video tutorial por pasos', 'Imagen estática con titular fuerte', 'Lead magnet con formulario'],
         objective: 'generación de prospectos calificados',
         angle: 'prueba social + llamada directa',
       };

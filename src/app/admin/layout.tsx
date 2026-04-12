@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { Command, Settings, Users, Wand2, Zap } from 'lucide-react';
 
 interface AdminProfile {
   email: string;
@@ -50,19 +51,11 @@ export default function AdminLayout({
   }, [router]);
 
   const menuItems = [
-    { label: 'Dashboard', href: '/admin', icon: 'DA' },
-    { label: 'Volver al panel', href: '/dashboard', icon: 'NX' },
-    { label: 'AI Code', href: '/admin/code-assistant', icon: 'AI' },
-    { label: 'Funnel', href: '/admin/funnel', icon: 'FU' },
-    { label: 'Usuarios', href: '/admin/users', icon: 'US' },
-    { label: 'Suscripciones', href: '/admin/subscriptions', icon: 'SU' },
-    { label: 'Campañas', href: '/admin/campaigns', icon: 'CA' },
-    { label: 'Analíticas', href: '/admin/analytics', icon: 'AN' },
-    { label: 'Automatización', href: '/admin/automation', icon: 'AU' },
-    { label: 'Soporte', href: '/admin/support', icon: 'SO' },
-    { label: 'Emails', href: '/admin/emails', icon: 'EM' },
-    { label: 'Pagos', href: '/admin/payments', icon: 'PA' },
-    { label: 'Configuración', href: '/admin/settings', icon: 'CO' },
+    { label: 'Operación', href: '/admin/operacion', icon: Command, badge: 'live' },
+    { label: 'Clientes & Ingresos', href: '/admin/clientes', icon: Users },
+    { label: 'Automation & Funnel', href: '/admin/automation', icon: Zap },
+    { label: 'Nexora Studio', href: '/admin/studio', icon: Wand2 },
+    { label: 'Configuración', href: '/admin/settings', icon: Settings },
   ];
 
   const handleLogout = () => {
@@ -82,29 +75,29 @@ export default function AdminLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-slate-950 text-slate-200">
       <aside
-        className={`fixed z-40 h-screen w-72 overflow-y-auto border-r border-gray-200 bg-white transition-transform lg:relative ${
+        className={`fixed z-40 h-screen w-72 overflow-y-auto border-r border-slate-800 bg-slate-950 transition-transform lg:relative ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
-        <div className="border-b border-gray-200 p-6">
-          <Link href="/admin" className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-950 text-sm font-semibold text-white">
+        <div className="border-b border-slate-800 p-6">
+          <Link href="/admin/operacion" className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500 text-sm font-semibold text-slate-950">
               AD
             </div>
             <div>
-              <p className="text-lg font-bold text-gray-900">Nexora Admin</p>
-              <p className="text-xs uppercase tracking-[0.24em] text-gray-400">Control Center</p>
+              <p className="text-lg font-bold text-white">Nexora Admin</p>
+              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Mission Control</p>
             </div>
           </Link>
 
           <Link
             href="/dashboard"
-            className="mt-5 flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-white"
+            className="mt-5 flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm font-medium text-slate-300 transition hover:border-slate-700 hover:bg-slate-900/80"
           >
             <span>Ir al panel principal</span>
-            <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-500">NX</span>
+            <span className="rounded-full bg-slate-800 px-2 py-1 text-xs font-semibold text-slate-400">NX</span>
           </Link>
         </div>
 
@@ -113,32 +106,33 @@ export default function AdminLayout({
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 rounded-2xl px-4 py-3 transition ${
-                pathname === item.href ? 'bg-slate-950 text-white shadow-lg shadow-slate-950/10' : 'text-gray-700 hover:bg-gray-100'
+              className={`flex items-center gap-3 rounded-xl px-4 py-3 transition ${
+                pathname === item.href ? 'bg-slate-900 text-white shadow-lg shadow-black/20' : 'text-slate-400 hover:bg-slate-900 hover:text-white'
               }`}
             >
+              <item.icon className="h-4 w-4" />
               <span
-                className={`flex h-9 w-9 items-center justify-center rounded-xl text-xs font-semibold ${
-                  pathname === item.href ? 'bg-white/10 text-white' : 'bg-gray-100 text-gray-500'
-                }`}
+                className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] ${
+                  pathname === item.href ? 'bg-cyan-500/20 text-cyan-300' : 'bg-slate-800 text-slate-500'
+                } ${item.badge ? '' : 'hidden'}`}
               >
-                {item.icon}
+                {item.badge}
               </span>
               <span className="font-medium">{item.label}</span>
             </Link>
           ))}
         </nav>
 
-        <div className="border-t border-gray-200 p-4">
-          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-            <p className="text-sm font-medium text-gray-900">{admin?.name || 'Admin principal'}</p>
-            <p className="mt-1 text-sm text-gray-500">{admin?.email}</p>
-            <p className="mt-2 text-xs font-semibold uppercase tracking-[0.24em] text-primary">Acceso total</p>
+        <div className="border-t border-slate-800 p-4">
+          <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
+            <p className="text-sm font-medium text-white">{admin?.name || 'Admin principal'}</p>
+            <p className="mt-1 text-sm text-slate-500">{admin?.email}</p>
+            <p className="mt-2 text-xs font-semibold uppercase tracking-[0.24em] text-cyan-400">Acceso total</p>
           </div>
 
           <button
             onClick={handleLogout}
-            className="mt-4 w-full rounded-2xl px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
+            className="mt-4 w-full rounded-xl px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-900"
           >
             Cerrar sesión
           </button>
@@ -146,17 +140,17 @@ export default function AdminLayout({
       </aside>
 
       <div className="flex flex-1 flex-col">
-        <div className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4 lg:hidden">
+        <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950 px-6 py-4 lg:hidden">
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="flex flex-col gap-1">
-            <span className="block h-0.5 w-6 bg-gray-900" />
-            <span className="block h-0.5 w-6 bg-gray-900" />
-            <span className="block h-0.5 w-6 bg-gray-900" />
+            <span className="block h-0.5 w-6 bg-white" />
+            <span className="block h-0.5 w-6 bg-white" />
+            <span className="block h-0.5 w-6 bg-white" />
           </button>
-          <span className="text-lg font-bold text-gray-900">Nexora Admin</span>
+          <span className="text-lg font-bold text-white">Nexora Admin</span>
           <div className="w-6" />
         </div>
 
-        <main className="flex-1 overflow-y-auto px-6 py-8">{children}</main>
+        <main className="flex-1 overflow-y-auto bg-slate-950 px-6 py-8">{children}</main>
       </div>
 
       {sidebarOpen && (

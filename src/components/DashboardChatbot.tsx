@@ -1,12 +1,27 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
+
+interface CampaignDraft {
+  name: string;
+  objective: string;
+  channel: string;
+  budget: number;
+  status: 'draft';
+  launchWindow: string;
+  hook: string;
+  promise: string;
+  cta: string;
+  angle: string;
+  checklist: string[];
+}
 
 interface SupportReply {
   title: string;
   message: string;
   nextSteps: string[];
+  campaignDraft?: CampaignDraft;
 }
 
 interface ChatEntry {
@@ -14,27 +29,30 @@ interface ChatEntry {
   text: string;
   steps?: string[];
   title?: string;
+  campaignDraft?: CampaignDraft;
 }
 
 const STARTERS = [
-  '¿Qué debería revisar si mi campaña tiene gasto pero no convierte?',
-  'Ayúdame a priorizar Instagram, Facebook o Google para vender mejor.',
-  '¿Cómo debería enfocar mi próxima campaña esta semana?',
+  'Quiero lanzar una campaña esta semana, ¿por dónde empiezo?',
+  'Mi campaña tiene gasto pero no convierte, ¿qué reviso primero?',
+  'Ayúdame a definir hook, promesa y CTA para mi próxima campaña.',
 ];
 
 export default function DashboardChatbot() {
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [creatingDraft, setCreatingDraft] = useState(false);
   const [messages, setMessages] = useState<ChatEntry[]>([
     {
       role: 'assistant',
       title: 'Asistente Nexora',
-      text: 'Puedo ayudarte con campañas, creatividad, conexiones, funnel, CRM, soporte y facturación sin salir del panel.',
+      text: 'Puedo ayudarte a pensar campañas, mensajes, conexiones, funnel, CRM, soporte y facturación sin salir del panel.',
       steps: [
-        'Pregunta en lenguaje natural.',
-        'Te devuelvo diagnóstico y siguiente paso.',
+        'Pregunta en lenguaje natural lo que quieres lanzar o corregir.',
+        'Te devuelvo diagnóstico, enfoque y siguiente paso.',
         'Uso el contexto de la pantalla actual para darte una respuesta más útil.',
       ],
     },
@@ -50,13 +68,20 @@ export default function DashboardChatbot() {
 
     try {
       const token = localStorage.getItem('token');
+      const aiProvider = localStorage.getItem('nexora_ai_provider') || 'auto';
+      const aiApiKey = localStorage.getItem('nexora_ai_api_key') || '';
       const response = await fetch('/api/support/assistant', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ message: trimmed, page: pathname }),
+        body: JSON.stringify({
+          message: trimmed,
+          page: pathname,
+          aiProvider,
+          aiApiKey: aiApiKey.trim() || undefined,
+        }),
       });
 
       const data = await response.json();
@@ -72,6 +97,7 @@ export default function DashboardChatbot() {
           title: reply.title,
           text: reply.message,
           steps: reply.nextSteps,
+          campaignDraft: reply.campaignDraft,
         },
       ]);
     } catch (error) {
@@ -87,6 +113,65 @@ export default function DashboardChatbot() {
       ]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCreateCampaignDraft = async (draft: CampaignDraft) => {
+    setCreatingDraft(true);
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/campaigns/draft', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(draft),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        if (data?.code === 'NO_CONNECTED_AD_ACCOUNT' || data?.code === 'NO_CONNECTED_ACCOUNTS') {
+          setMessages((current) => [
+            ...current,
+            {
+              role: 'assistant',
+              title: 'Primero conecta una cuenta',
+              text: 'Necesitas conectar al menos una cuenta publicitaria antes de crear una campana.',
+              steps: ['Abre Conectar redes.', 'Conecta Meta, Google o TikTok.', 'Vuelve al chat y crea el borrador.'],
+            },
+          ]);
+          router.push('/dashboard/connect');
+          return;
+        }
+
+        throw new Error(data.error || 'No se pudo crear el borrador.');
+      }
+
+      setMessages((current) => [
+        ...current,
+        {
+          role: 'assistant',
+          title: 'Borrador creado',
+          text: `Listo: cree la campana "${data.campaign?.name || draft.name}" con estado draft.`,
+          steps: ['Abre Campanas para revisarla.', 'Ajusta presupuesto y mensaje.', 'Luego publicala en tu plataforma conectada.'],
+        },
+      ]);
+      router.push('/dashboard/campaigns');
+    } catch (error) {
+      console.error('Error creating campaign draft from chatbot:', error);
+      setMessages((current) => [
+        ...current,
+        {
+          role: 'assistant',
+          title: 'No pude crear el borrador',
+          text: 'Hubo un problema creando la campana desde el chat. Puedes intentar de nuevo en unos segundos.',
+          steps: ['Verifica que tu sesion siga activa.', 'Reintenta desde el mismo mensaje.', 'Si persiste, usa Soporte.'],
+        },
+      ]);
+    } finally {
+      setCreatingDraft(false);
     }
   };
 
@@ -135,6 +220,35 @@ export default function DashboardChatbot() {
                     ))}
                   </div>
                 )}
+
+                {message.role === 'assistant' && message.campaignDraft ? (
+                  <div className="mt-3 rounded-xl border border-cyan-200 bg-cyan-50 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-700">Borrador sugerido</p>
+                    <p className="mt-2 text-sm text-cyan-950">
+                      {message.campaignDraft.name} · {message.campaignDraft.channel} · ${message.campaignDraft.budget}
+                    </p>
+                    <p className="mt-2 text-xs text-cyan-900"><strong>Hook:</strong> {message.campaignDraft.hook}</p>
+                    <p className="mt-1 text-xs text-cyan-900"><strong>Promesa:</strong> {message.campaignDraft.promise}</p>
+                    <p className="mt-1 text-xs text-cyan-900"><strong>CTA:</strong> {message.campaignDraft.cta}</p>
+                    <p className="mt-1 text-xs text-cyan-900"><strong>Angulo:</strong> {message.campaignDraft.angle}</p>
+                    {message.campaignDraft.checklist?.length ? (
+                      <div className="mt-2 space-y-1">
+                        {message.campaignDraft.checklist.slice(0, 5).map((item) => (
+                          <div key={item} className="rounded-lg bg-white/70 px-2 py-1 text-[11px] text-cyan-950">
+                            {item}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                    <button
+                      onClick={() => handleCreateCampaignDraft(message.campaignDraft as CampaignDraft)}
+                      disabled={creatingDraft}
+                      className="mt-3 rounded-lg bg-slate-950 px-3 py-2 text-xs font-semibold text-white disabled:opacity-60"
+                    >
+                      {creatingDraft ? 'Creando...' : 'Crear borrador en Campanas'}
+                    </button>
+                  </div>
+                ) : null}
               </div>
             ))}
 

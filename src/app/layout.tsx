@@ -1,16 +1,24 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import '@/styles/globals.css';
+import PWARegister from '@/components/PWARegister';
 
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
+  applicationName: 'Nexora Studio',
   title: 'Nexora | Plataforma para operar y vender mejor tus anuncios',
   description:
     'Nexora centraliza campañas, analítica, administración y cobros en una sola experiencia para equipos que necesitan una operación publicitaria más ordenada.',
   metadataBase: new URL(`https://${process.env.NEXT_PUBLIC_DOMAIN || 'gotnexora.com'}`),
+  manifest: '/manifest.webmanifest',
   icons: {
-    icon: '/favicon.ico',
+    icon: ['/favicon.ico', '/icon.svg'],
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Nexora',
   },
   openGraph: {
     title: 'Nexora | Plataforma para operar y vender mejor tus anuncios',
@@ -26,6 +34,11 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  themeColor: '#06b6d4',
+  colorScheme: 'dark',
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -33,7 +46,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <PWARegister />
+        {children}
+      </body>
     </html>
   );
 }

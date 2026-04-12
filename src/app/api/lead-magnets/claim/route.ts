@@ -11,6 +11,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const email = String(body.email || '').trim().toLowerCase();
     const name = String(body.name || '').trim();
+    const niche = String(body.niche || '').trim().toLowerCase();
     const source = String(body.source || 'masterclass').trim() || 'masterclass';
     const resource = String(body.resource || 'nexora-decision-map').trim() || 'nexora-decision-map';
 
@@ -48,12 +49,13 @@ export async function POST(request: NextRequest) {
 
     if (isEmailDeliveryConfigured()) {
       try {
-        const emailPayload = buildMasterclassEmail({ name, email });
+        const emailPayload = await buildMasterclassEmail({ name, email, niche });
         await sendTransactionalEmail({
           to: email,
           subject: emailPayload.subject,
           html: emailPayload.html,
           text: emailPayload.text,
+          attachments: emailPayload.attachments,
         });
         deliveryStatus = 'sent';
       } catch (emailError) {
@@ -67,7 +69,7 @@ export async function POST(request: NextRequest) {
       leadCaptureId: leadCapture.id,
       resource,
       deliveryStatus,
-      redirectUrl: `/masterclass/gracias?resource=${resource}&delivery=${deliveryStatus}&email=${encodeURIComponent(email)}`,
+      redirectUrl: `/masterclass/gracias?resource=${resource}&delivery=${deliveryStatus}&email=${encodeURIComponent(email)}&niche=${encodeURIComponent(niche || 'servicios')}`,
     });
   } catch (error) {
     console.error('Lead magnet claim error:', error);
