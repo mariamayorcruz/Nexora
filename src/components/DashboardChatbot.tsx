@@ -45,6 +45,10 @@ export default function DashboardChatbot() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [creatingDraft, setCreatingDraft] = useState(false);
+  const [showApiConfig, setShowApiConfig] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [providerInput, setProviderInput] = useState<'auto' | 'claude' | 'gemini' | 'openrouter'>('auto');
+  const [aiActive, setAiActive] = useState(false);
   const [messages, setMessages] = useState<ChatEntry[]>([
     {
       role: 'assistant',
@@ -57,6 +61,23 @@ export default function DashboardChatbot() {
       ],
     },
   ]);
+
+  // Cargar configuración de API key guardada
+  useState(() => {
+    const savedKey = localStorage.getItem('nexora_ai_api_key') || '';
+    const savedProvider = (localStorage.getItem('nexora_ai_provider') || 'auto') as typeof providerInput;
+    setApiKeyInput(savedKey);
+    setProviderInput(savedProvider);
+    setAiActive(Boolean(savedKey));
+  });
+
+  const saveApiConfig = () => {
+    const key = apiKeyInput.trim();
+    localStorage.setItem('nexora_ai_api_key', key);
+    localStorage.setItem('nexora_ai_provider', providerInput);
+    setAiActive(Boolean(key));
+    setShowApiConfig(false);
+  };
 
   const askAssistant = async (question: string) => {
     const trimmed = question.trim();
@@ -90,12 +111,13 @@ export default function DashboardChatbot() {
       }
 
       const reply = data.reply as SupportReply;
+      const isHeuristic = data.ai?.providerUsed === 'heuristic';
       setMessages((current) => [
         ...current,
         {
           role: 'assistant',
           title: reply.title,
-          text: reply.message,
+          text: reply.message + (isHeuristic ? '\n\n[Modo básico — configura una API key para respuestas con IA real]' : ''),
           steps: reply.nextSteps,
           campaignDraft: reply.campaignDraft,
         },
@@ -190,11 +212,62 @@ export default function DashboardChatbot() {
       {open && (
         <div className="fixed bottom-24 right-6 z-40 w-[min(420px,calc(100vw-2rem))] overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_30px_120px_rgba(15,23,42,0.22)]">
           <div className="bg-[linear-gradient(135deg,#0f172a_0%,#111827_58%,#0b3b52_100%)] px-5 py-5 text-white">
-            <p className="text-xs uppercase tracking-[0.3em] text-cyan-300">Chatbot Nexora</p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs uppercase tracking-[0.3em] text-cyan-300">Chatbot Nexora</p>
+              <div className="flex items-center gap-2">
+                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${aiActive ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${aiActive ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                  {aiActive ? 'IA activa' : 'Modo básico'}
+                </span>
+                <button
+                  onClick={() => setShowApiConfig((v) => !v)}
+                  className="rounded px-2 py-0.5 text-[10px] text-slate-400 hover:text-white"
+                  title="Configurar API key"
+                >
+                  ⚙ API Key
+                </button>
+              </div>
+            </div>
             <h3 className="mt-2 text-xl font-semibold">Asistencia estratégica dentro del panel</h3>
             <p className="mt-2 text-sm leading-6 text-slate-300">
               Resuelve dudas de campañas, creatividad, propuestas, facturación y conexiones sin salir de tu flujo.
             </p>
+
+            {showApiConfig && (
+              <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-3">
+                <p className="mb-2 text-xs font-medium text-slate-200">Conecta tu propia API key para activar IA real</p>
+                <select
+                  value={providerInput}
+                  onChange={(e) => setProviderInput(e.target.value as typeof providerInput)}
+                  className="mb-2 w-full rounded-lg border border-white/10 bg-slate-800 px-2 py-1.5 text-xs text-white"
+                >
+                  <option value="auto">Auto (Claude → Gemini → OpenRouter)</option>
+                  <option value="claude">Claude (Anthropic)</option>
+                  <option value="gemini">Gemini (Google)</option>
+                  <option value="openrouter">OpenRouter (gratis disponible)</option>
+                </select>
+                <input
+                  type="password"
+                  value={apiKeyInput}
+                  onChange={(e) => setApiKeyInput(e.target.value)}
+                  placeholder="sk-ant-... / AIza... / sk-or-..."
+                  className="w-full rounded-lg border border-white/10 bg-slate-800 px-2 py-1.5 text-xs text-white placeholder-slate-500"
+                />
+                <div className="mt-2 flex gap-2">
+                  <button onClick={saveApiConfig} className="rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-cyan-500">
+                    Guardar
+                  </button>
+                  {aiActive && (
+                    <button
+                      onClick={() => { setApiKeyInput(''); localStorage.removeItem('nexora_ai_api_key'); setAiActive(false); setShowApiConfig(false); }}
+                      className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-300 hover:text-white"
+                    >
+                      Quitar key
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="max-h-[420px] space-y-4 overflow-y-auto bg-slate-50 px-4 py-4">

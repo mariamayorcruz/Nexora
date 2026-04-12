@@ -43,6 +43,7 @@ export default function DashboardPage() {
   const [user, setUser] = useState<DashboardUser | null>(null);
   const [adAccounts, setAdAccounts] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [crmStats, setCrmStats] = useState<{ totalPipelineValue: number; wonValue: number; totalLeads: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [compactView, setCompactView] = useState(true);
 
@@ -67,18 +68,24 @@ export default function DashboardPage() {
 
     const fetchUserData = async () => {
       try {
-        const response = await fetch('/api/users/me', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const [meResponse, statsResponse] = await Promise.all([
+          fetch('/api/users/me', { headers: { Authorization: `Bearer ${token}` } }),
+          fetch('/api/crm/stats', { headers: { Authorization: `Bearer ${token}` } }),
+        ]);
 
-        if (!response.ok) {
+        if (!meResponse.ok) {
           throw new Error('Failed to fetch user');
         }
 
-        const data = await response.json();
+        const data = await meResponse.json();
         setUser(data.user);
         setAdAccounts(data.adAccounts || []);
         setCampaigns(data.campaigns || []);
+
+        if (statsResponse.ok) {
+          const stats = await statsResponse.json();
+          setCrmStats(stats);
+        }
       } catch (error) {
         console.error('Error fetching user:', error);
         window.location.href = '/auth/login';
@@ -91,12 +98,9 @@ export default function DashboardPage() {
   }, []);
 
   const activeCampaigns = campaigns.filter((campaign) => campaign.status === 'active');
-  const totalSpend = campaigns.reduce((sum, campaign) => sum + (campaign.analytics?.spend || 0), 0);
-  const totalRevenue = campaigns.reduce((sum, campaign) => sum + (campaign.analytics?.revenue || 0), 0);
   const totalClicks = campaigns.reduce((sum, campaign) => sum + (campaign.analytics?.clicks || 0), 0);
   const totalConversions = campaigns.reduce((sum, campaign) => sum + (campaign.analytics?.conversions || 0), 0);
-  const roi = totalSpend > 0 ? Math.round(((totalRevenue - totalSpend) / totalSpend) * 100) : 0;
-  const estimatedLeads = totalConversions > 0 ? totalConversions : Math.max(1, Math.round(totalClicks * 0.08));
+  const estimatedLeads = crmStats?.totalLeads ?? (totalConversions > 0 ? totalConversions : Math.max(1, Math.round(totalClicks * 0.08)));
   const estimatedWins = Math.max(0, Math.round(estimatedLeads * 0.18));
   const entitlements = user?.entitlements;
 
@@ -106,7 +110,7 @@ export default function DashboardPage() {
     try {
       const token = localStorage.getItem('token');
       const autopilotMessage = [
-        `Analiza mi cuenta: tengo ${adAccounts.length} cuentas conectadas, ${activeCampaigns.length} campañas activas, ROI estimado de ${roi}%.`,
+        `Analiza mi cuenta: tengo ${adAccounts.length} cuentas conectadas, ${activeCampaigns.length} campañas activas, pipeline CRM de $${(crmStats?.totalPipelineValue ?? 0).toLocaleString()}.`,
         'Dame el diagnóstico más útil ahora mismo y si puedes, genera un borrador de campaña concreto.',
         'Sé directo y accionable en español.',
       ].join(' ');
@@ -254,13 +258,18 @@ export default function DashboardPage() {
           <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-500">{language === 'en' ? 'Based on clicks and conversions' : 'Basados en clics y conversiones'}</p>
         </div>
         <div className="rounded-[30px] border border-slate-800 bg-slate-900/70 p-5 shadow-[0_16px_55px_rgba(2,6,23,0.5)] transition-shadow hover:shadow-cyan-500/10">
-          <p className="text-sm text-slate-400">{language === 'en' ? 'Estimated ROI' : 'ROI estimado'}</p>
-          <p className="mt-3 text-4xl font-semibold text-white">{roi}%</p>
+          <p className="text-sm text-slate-400">{language === 'en' ? 'Pipeline value' : 'Valor del pipeline'}</p>
+          <p className="mt-3 text-4xl font-semibold text-emerald-400">
+            ${(crmStats?.totalPipelineValue ?? 0).toLocaleString()}
+          </p>
+          <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-500">CRM · todos los stages</p>
         </div>
         <div className="rounded-[30px] border border-slate-800 bg-slate-900/70 p-5 shadow-[0_16px_55px_rgba(2,6,23,0.5)] transition-shadow hover:shadow-cyan-500/10">
-          <p className="text-sm text-slate-400">{language === 'en' ? 'Likely sales' : 'Ventas probables'}</p>
-          <p className="mt-3 text-4xl font-semibold text-white">{estimatedWins}</p>
-          <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-500">Lectura rápida del embudo</p>
+          <p className="text-sm text-slate-400">{language === 'en' ? 'Closed / Won' : 'Cerrado / Won'}</p>
+          <p className="mt-3 text-4xl font-semibold text-cyan-300">
+            ${(crmStats?.wonValue ?? 0).toLocaleString()}
+          </p>
+          <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-500">Ingresos confirmados</p>
         </div>
       </section>
 

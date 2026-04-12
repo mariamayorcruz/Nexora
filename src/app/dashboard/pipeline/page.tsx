@@ -161,6 +161,7 @@ export default function PipelineUnifiedPage() {
   const [queueFilter, setQueueFilter] = useState<QueueFilter>('all');
   const [newLeadName, setNewLeadName] = useState('');
   const [newLeadEmail, setNewLeadEmail] = useState('');
+  const [pipelineStats, setPipelineStats] = useState<{ totalPipelineValue: number; wonValue: number } | null>(null);
 
   const fetchLeads = async () => {
     setLoading(true);
@@ -168,20 +169,23 @@ export default function PipelineUnifiedPage() {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/crm/leads', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        cache: 'no-store',
-      });
+      const [leadsResponse, statsResponse] = await Promise.all([
+        fetch('/api/crm/leads', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }),
+        fetch('/api/crm/stats', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }),
+      ]);
 
-      const data = (await response.json()) as { leads?: CrmLeadResponse[]; error?: string };
-      if (!response.ok) {
+      const data = (await leadsResponse.json()) as { leads?: CrmLeadResponse[]; error?: string };
+      if (!leadsResponse.ok) {
         throw new Error(data.error || 'No se pudieron cargar los leads.');
       }
 
       const mapped = (data.leads || []).map(mapLead);
       setLeads(mapped);
+
+      if (statsResponse.ok) {
+        const stats = await statsResponse.json() as { totalPipelineValue: number; wonValue: number };
+        setPipelineStats(stats);
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'No se pudieron cargar los leads.');
     } finally {
@@ -367,6 +371,24 @@ export default function PipelineUnifiedPage() {
           </button>
         </div>
       </header>
+
+      {pipelineStats && (
+        <section className="flex items-center gap-6 border-b border-slate-800 bg-slate-900/50 px-4 py-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs uppercase tracking-[0.18em] text-slate-400">Pipeline total</span>
+            <span className="font-mono text-base font-semibold text-emerald-400">
+              ${pipelineStats.totalPipelineValue.toLocaleString()}
+            </span>
+          </div>
+          <div className="h-4 w-px bg-slate-700" />
+          <div className="flex items-center gap-2">
+            <span className="text-xs uppercase tracking-[0.18em] text-slate-400">Cerrado / Won</span>
+            <span className="font-mono text-base font-semibold text-cyan-300">
+              ${pipelineStats.wonValue.toLocaleString()}
+            </span>
+          </div>
+        </section>
+      )}
 
       <section className="grid gap-3 border-b border-slate-800 bg-slate-900/30 px-4 py-3 md:grid-cols-3">
         <button

@@ -1,7 +1,7 @@
 'use client';
 
 export default function Demo() {
-  const secondCutUrl = '/videos/Nexora%20VSL_%20Escala%20tus%20anuncios%20sin%20caos_720p_caption.mp4';
+  const secondCutUrl = '/videos/nexora-vsl-demo.mp4';
 
   return (
     <section id="demo" className="relative overflow-hidden bg-[#060816] py-16 md:py-20">

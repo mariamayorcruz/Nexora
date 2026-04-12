@@ -22,23 +22,6 @@ const previewCards = [
   },
 ];
 
-const proofCases = [
-  {
-    title: 'Estudio creativo (servicios)',
-    result: '+31% en leads calificados en 45 dias',
-    detail: 'Unificaron campañas y seguimiento comercial para dejar de perder prospectos entre canales.',
-  },
-  {
-    title: 'Ecommerce niche',
-    result: '-22% en costo por adquisición en 6 semanas',
-    detail: 'Reasignaron presupuesto con lectura diaria de rendimiento y pausaron campañas de bajo retorno.',
-  },
-  {
-    title: 'Consultoría B2B',
-    result: '+18% en cierres desde pipeline en 2 meses',
-    detail: 'Pasaron de seguimiento manual a un flujo consistente con etapas y siguientes acciones claras.',
-  },
-];
 
 export default function MasterclassLead() {
   const [form, setForm] = useState({ name: '', email: '', niche: 'servicios' });
@@ -163,22 +146,6 @@ export default function MasterclassLead() {
             </form>
           </RevealOnScroll>
 
-          <RevealOnScroll delayMs={320}>
-            <div className="mt-8 rounded-[2rem] border border-white/10 bg-slate-900/70 p-6 shadow-[0_10px_40px_rgba(2,6,23,0.4)]">
-              <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Prueba social</p>
-              <div className="mt-4 grid gap-4 sm:grid-cols-3">
-                {proofCases.map((item, index) => (
-                  <RevealOnScroll key={item.title} delayMs={380 + index * 90}>
-                    <div className="rounded-2xl border border-white/10 bg-slate-950/80 p-4">
-                      <p className="text-sm font-semibold text-white">{item.title}</p>
-                      <p className="mt-2 text-base font-semibold text-emerald-700">{item.result}</p>
-                      <p className="mt-2 text-sm leading-6 text-slate-300">{item.detail}</p>
-                    </div>
-                  </RevealOnScroll>
-                ))}
-              </div>
-            </div>
-          </RevealOnScroll>
         </div>
 
         <RevealOnScroll delayMs={180}>

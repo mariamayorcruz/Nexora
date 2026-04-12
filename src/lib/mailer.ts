@@ -4,7 +4,8 @@ import { resolveAppBaseUrlFromEnv } from '@/lib/app-base-url';
 
 function readEnv(name: string) {
   const value = process.env[name];
-  const trimmed = value?.trim();
+  // Vercel CLI sometimes exports values with literal \r\n — strip them
+  const trimmed = value?.replace(/\\r\\n/g, '').replace(/\r\n/g, '').trim();
   return trimmed ? trimmed : undefined;
 }
 
