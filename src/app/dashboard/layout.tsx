@@ -3,8 +3,22 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { BarChart2, KanbanSquare, LayoutDashboard, LifeBuoy, Megaphone, Receipt, Settings2, ShieldCheck, Users, Wand2 } from 'lucide-react';
 import DashboardChatbot from '@/components/DashboardChatbot';
 import { useAppLanguage } from '@/hooks/use-app-language';
+
+const SIDEBAR_ICONS: Record<string, React.ElementType> = {
+  OV: LayoutDashboard,
+  CR: Users,
+  PL: KanbanSquare,
+  CN: Megaphone,
+  IA: Wand2,
+  FA: Receipt,
+  SP: LifeBuoy,
+  CO: Settings2,
+  AN: BarChart2,
+  AD: ShieldCheck,
+};
 
 interface DashboardUser {
   email: string;
@@ -112,7 +126,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex min-h-screen bg-slate-950">
       <aside
-        className={`fixed z-40 h-screen w-72 overflow-y-auto border-r border-slate-800 bg-slate-950 transition-transform lg:relative ${
+        className={`fixed z-40 h-screen w-60 overflow-y-auto border-r border-slate-800 bg-slate-950 transition-transform lg:relative ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
@@ -144,21 +158,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </button>
             ))}
           </div>
-          {menuItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setSidebarOpen(false)}
-              className={`flex items-center gap-3 rounded-2xl px-4 py-3 transition ${
-                isMenuItemActive(item.href) ? 'bg-slate-900 text-white' : 'text-slate-400 hover:bg-slate-900 hover:text-white'
-              }`}
-            >
-              <span className={`flex h-9 w-9 items-center justify-center rounded-xl text-xs font-semibold ${isMenuItemActive(item.href) ? 'bg-cyan-500/20 text-cyan-300' : 'bg-slate-800 text-slate-500'}`}>
-                {item.icon}
-              </span>
-              <span className="font-medium">{item.label}</span>
-            </Link>
-          ))}
+          {menuItems.map((item) => {
+            const active = isMenuItemActive(item.href);
+            const IconComponent = SIDEBAR_ICONS[item.icon] ?? LayoutDashboard;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition ${
+                  active ? 'bg-slate-900 text-white' : 'text-slate-400 hover:bg-slate-900/60 hover:text-white'
+                }`}
+              >
+                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${active ? 'bg-cyan-500/20 text-cyan-300' : 'text-slate-500'}`}>
+                  <IconComponent size={16} />
+                </span>
+                <span className="text-sm font-medium">{item.label}</span>
+              </Link>
+            );
+          })}
         </nav>
 
         <div className="border-t border-slate-800 p-4">

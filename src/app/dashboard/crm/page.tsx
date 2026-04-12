@@ -209,7 +209,7 @@ export default function DashboardCrmPage() {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
-  const [viewMode, setViewMode] = useState<'crm' | 'motor'>('motor');
+  const [viewMode, setViewMode] = useState<'crm' | 'motor'>('crm');
   const [selectedDateKey, setSelectedDateKey] = useState<string>(() => toLocalDateKey(new Date()));
   const [appointmentForm, setAppointmentForm] = useState({
     title: 'Reunión comercial',
@@ -743,55 +743,58 @@ export default function DashboardCrmPage() {
   }
 
   return (
-    <div className="space-y-5">
-      <section className="rounded-[28px] border border-slate-800 bg-slate-900/70 p-6 shadow-[0_16px_55px_rgba(2,6,23,0.45)]">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-cyan-300">Success CRM</p>
-            <h1 className="mt-2 text-3xl font-semibold text-white">CRM de cierre limpio y accionable</h1>
+    <div className="space-y-4">
+      {/* ── Header ─────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.22em] text-cyan-400">CRM Comercial</p>
+          <h1 className="mt-0.5 text-xl font-semibold text-white">Motor de ventas</h1>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-2">
+            <span className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Pipeline</span>
+            <span className="font-mono text-sm font-bold text-emerald-400">${Math.round(metrics.pipeline).toLocaleString()}</span>
+            <span className="text-slate-700">·</span>
+            <span className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Ganado</span>
+            <span className="font-mono text-sm font-bold text-cyan-300">${Math.round(metrics.won).toLocaleString()}</span>
+            <span className="text-slate-700">·</span>
+            <span className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Tareas</span>
+            <span className="font-mono text-sm font-bold text-white">{metrics.tasks}</span>
           </div>
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Buscar por nombre, empresa o fuente"
-            className="w-full max-w-sm rounded-xl border border-slate-700 bg-slate-950 px-4 py-2 text-sm text-slate-100"
+            placeholder="Buscar..."
+            className="w-52 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-cyan-600 focus:outline-none"
           />
         </div>
-
-        <div className="mt-5 grid gap-3 md:grid-cols-4">
-          <KpiCard label="Pipeline" value={`$${Math.round(metrics.pipeline).toLocaleString()}`} />
-          <KpiCard label="Forecast" value={`$${Math.round(metrics.forecast).toLocaleString()}`} />
-          <KpiCard label="Ganado" value={`$${Math.round(metrics.won).toLocaleString()}`} />
-          <KpiCard label="Tareas activas" value={String(metrics.tasks)} />
-        </div>
-      </section>
+      </div>
 
       {message ? (
         <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-200">{message}</div>
       ) : null}
 
-      <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-2">
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => setViewMode('motor')}
-            className={`rounded-xl px-3 py-2 text-sm font-semibold ${
-              viewMode === 'motor' ? 'bg-cyan-500 text-slate-950' : 'bg-slate-800 text-slate-200'
-            }`}
-          >
-            Motor IA + Calendario
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('crm')}
-            className={`rounded-xl px-3 py-2 text-sm font-semibold ${
-              viewMode === 'crm' ? 'bg-cyan-500 text-slate-950' : 'bg-slate-800 text-slate-200'
-            }`}
-          >
-            CRM comercial
-          </button>
-        </div>
-      </section>
+      {/* ── View tabs ──────────────────────────────────── */}
+      <div className="flex items-center gap-1 rounded-xl border border-slate-800 bg-slate-900/60 p-1 w-fit">
+        <button
+          type="button"
+          onClick={() => setViewMode('crm')}
+          className={`rounded-lg px-4 py-1.5 text-xs font-semibold transition ${
+            viewMode === 'crm' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          CRM comercial
+        </button>
+        <button
+          type="button"
+          onClick={() => setViewMode('motor')}
+          className={`rounded-lg px-4 py-1.5 text-xs font-semibold transition ${
+            viewMode === 'motor' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          Motor IA + Calendario
+        </button>
+      </div>
 
       <section className={`rounded-[28px] border border-slate-800 bg-slate-900/70 p-4 shadow-[0_16px_55px_rgba(2,6,23,0.45)] ${viewMode === 'crm' ? '' : 'hidden'}`}>
         <div className="mb-4 flex items-center justify-between">
@@ -821,27 +824,19 @@ export default function DashboardCrmPage() {
                         <p className="mt-2 text-xs text-slate-300">${Math.round(lead.value || 0).toLocaleString()} · {lead.confidence || 0}%</p>
                         <p className="mt-2 line-clamp-2 text-xs text-slate-400">{lead.nextAction || 'Definir siguiente acción'}</p>
 
-                        <div className="mt-3 grid grid-cols-1 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => void applyPlaybook(lead)}
-                            disabled={busyLeadId === lead.id}
-                            className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-200 hover:border-cyan-500"
-                          >
-                            Playbook
-                          </button>
+                        <div className="mt-3 flex items-center gap-2">
                           <button
                             type="button"
                             onClick={() => void sendFollowUp(lead)}
                             disabled={sendingFollowUpId === lead.id}
-                            className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5 text-xs text-emerald-200 disabled:opacity-50"
+                            className="flex-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5 text-xs font-medium text-emerald-200 disabled:opacity-50"
                           >
-                            {sendingFollowUpId === lead.id ? 'Enviando follow-up...' : 'Enviar follow-up'}
+                            {sendingFollowUpId === lead.id ? 'Enviando...' : 'Follow-up'}
                           </button>
                           <select
                             value={lead.stage}
                             onChange={(event) => void moveLead(lead, event.target.value)}
-                            className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-200"
+                            className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-200 focus:outline-none"
                           >
                             {STAGES.map((option) => (
                               <option key={option.key} value={option.key}>
@@ -849,6 +844,15 @@ export default function DashboardCrmPage() {
                               </option>
                             ))}
                           </select>
+                          <button
+                            type="button"
+                            onClick={() => void applyPlaybook(lead)}
+                            disabled={busyLeadId === lead.id}
+                            className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-400 hover:border-cyan-500 hover:text-cyan-300"
+                            title="Aplicar playbook"
+                          >
+                            ✦
+                          </button>
                         </div>
                       </article>
                     ))
