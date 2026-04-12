@@ -39,27 +39,27 @@ export default function Hero() {
             IA que te ayuda a vender más, no solo a reportar.
           </p>
 
-          <div className="flex flex-wrap gap-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
             <a
               href="#diagnostico"
-              className="rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-500 px-8 py-4 text-lg font-semibold text-slate-950 transition hover:brightness-110"
+              className="w-full rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-500 px-8 py-4 text-center text-lg font-semibold text-slate-950 transition hover:brightness-110 sm:w-auto"
             >
               Quiero mi auditoría gratis (7 min)
             </a>
             <a
               href="#demo"
-              className="rounded-2xl border border-cyan-300/35 bg-slate-900/70 px-8 py-4 text-lg font-semibold text-cyan-100 transition hover:bg-slate-800"
+              className="w-full rounded-2xl border border-cyan-300/35 bg-slate-900/70 px-8 py-4 text-center text-lg font-semibold text-cyan-100 transition hover:bg-slate-800 sm:w-auto"
             >
               Ver demo en vivo
             </a>
           </div>
 
-          <div className="mt-12 grid grid-cols-3 gap-4 text-center">
+          <div className="mt-12 grid grid-cols-3 gap-2 text-center sm:gap-4">
             {quickStats.map((item, index) => (
               <RevealOnScroll key={item.label} delayMs={index * 100}>
-                <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-4">
-                  <p className="text-3xl font-bold text-emerald-400">{item.value}</p>
-                  <p className="text-sm text-slate-400">{item.label}</p>
+                <div className="rounded-2xl border border-white/10 bg-white/5 px-2 py-3 sm:px-3 sm:py-4">
+                  <p className="text-2xl font-bold text-emerald-400 sm:text-3xl">{item.value}</p>
+                  <p className="text-xs text-slate-400 sm:text-sm">{item.label}</p>
                 </div>
               </RevealOnScroll>
             ))}
@@ -83,7 +83,7 @@ export default function Hero() {
               </video>
             </div>
           </div>
-          <div className="absolute -right-4 -top-4 rounded-2xl bg-emerald-500 px-6 py-2 text-sm font-bold text-black shadow-xl">
+          <div className="absolute right-3 top-3 rounded-2xl bg-emerald-500 px-6 py-2 text-sm font-bold text-black shadow-xl">
             Live Workspace
           </div>
           <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-5 backdrop-blur">

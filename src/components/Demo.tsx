@@ -13,7 +13,7 @@ export default function Demo() {
             Nexora en acción: Todo en una sola pantalla
           </h2>
           <p className="text-xl md:text-2xl text-slate-300 max-w-3xl mx-auto">
-            Centraliza Meta Ads, Google Ads, TikTok Ads, CRM y IA.<br />
+            Centraliza Meta Ads, Google Ads, TikTok Ads, CRM y IA.{' '}
             <span className="text-orange-400 font-medium">
               Deja de saltar entre 4 plataformas y empieza a escalar sin caos.
             </span>
@@ -38,7 +38,7 @@ export default function Demo() {
           </div>
 
           {/* Floating badge */}
-          <div className="absolute left-6 top-6 flex items-center gap-2 rounded-2xl bg-emerald-500 px-5 py-1.5 text-sm font-bold text-black shadow-lg">
+          <div className="pointer-events-none absolute left-6 top-6 flex items-center gap-2 rounded-2xl bg-emerald-500 px-5 py-1.5 text-sm font-bold text-black shadow-lg">
             <span className="w-2 h-2 bg-black rounded-full animate-pulse" />
             LIVE WORKSPACE
           </div>

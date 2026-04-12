@@ -139,7 +139,7 @@ export default function MasterclassLead() {
                 <p className="text-sm leading-6 text-slate-400">
                   Te enviaremos el diagnóstico y una ruta recomendada para empezar en Nexora según tu caso.
                 </p>
-                <button type="submit" disabled={loading} className="btn-primary disabled:opacity-60">
+                <button type="submit" disabled={loading} className="btn-primary w-full sm:w-auto disabled:opacity-60">
                   {loading ? 'Procesando...' : 'Quiero mi auditoria gratis'}
                 </button>
               </div>

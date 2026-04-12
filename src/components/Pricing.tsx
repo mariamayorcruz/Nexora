@@ -37,7 +37,7 @@ export default function Pricing() {
             </p>
           </div>
 
-          <div className="inline-flex rounded-full border border-white/15 bg-slate-900/80 p-1 shadow-[0_8px_30px_rgba(2,6,23,0.45)]">
+          <div className="inline-flex self-start rounded-full border border-white/15 bg-slate-900/80 p-1 shadow-[0_8px_30px_rgba(2,6,23,0.45)] lg:self-auto">
             <button
               type="button"
               onClick={() => setBilling('monthly')}
@@ -68,7 +68,7 @@ export default function Pricing() {
             return (
               <RevealOnScroll key={plan.key} delayMs={index * 110}>
                 <article
-                  className={`relative flex h-full flex-col rounded-[2rem] border p-8 transition duration-300 ${
+                  className={`relative flex h-full flex-col rounded-[2rem] border p-6 sm:p-8 transition duration-300 ${
                     featured
                       ? 'border-orange-300 bg-slate-950 text-white shadow-[0_30px_100px_rgba(249,115,22,0.18)]'
                       : 'border-white/10 bg-slate-900/75 text-slate-100 shadow-[0_16px_50px_rgba(2,6,23,0.45)]'

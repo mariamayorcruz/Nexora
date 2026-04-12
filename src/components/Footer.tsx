@@ -8,8 +8,8 @@ export default function Footer() {
   return (
     <footer className="bg-[#050816] px-4 pb-10 pt-20 text-white sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl rounded-[2rem] border border-white/10 bg-white/[0.04] px-6 py-10 sm:px-8">
-        <div className="grid gap-10 lg:grid-cols-[1.2fr_0.7fr_0.7fr_0.9fr_1fr]">
-          <div>
+        <div className="grid grid-cols-2 gap-8 lg:grid-cols-[1.2fr_0.7fr_0.7fr_0.9fr_1fr]">
+          <div className="col-span-2 lg:col-span-1">
             <Link href="/" className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-400 via-amber-300 to-rose-500 text-slate-950">
                 <Sparkles className="h-5 w-5" />
