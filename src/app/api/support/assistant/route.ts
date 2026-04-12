@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     const { message, page, aiProvider, aiApiKey } = (await request.json()) as {
       message?: string;
       page?: string;
-      aiProvider?: 'auto' | 'heuristic' | 'claude' | 'gemini' | 'openrouter';
+      aiProvider?: 'auto' | 'heuristic' | 'claude' | 'gemini' | 'openrouter' | 'groq';
       aiApiKey?: string;
     };
 

@@ -39,6 +39,10 @@ export interface AutomationConfig {
   crmSyncEnabled: boolean;
   escalationEnabled: boolean;
   notes: string;
+  metaIaEnabled?: boolean;
+  metaIaMode?: 'auto' | 'semi';
+  metaIaProvider?: 'claude' | 'gemini' | 'openrouter' | 'grok' | 'all';
+  metaIaMaxMonthlyBudget?: number;
 }
 
 export interface FunnelConfig {
@@ -104,6 +108,10 @@ const DEFAULT_AUTOMATION: AutomationConfig = {
   phoneRoutingEnabled: false,
   crmSyncEnabled: false,
   escalationEnabled: true,
+  metaIaEnabled: true,
+  metaIaMode: 'auto',
+  metaIaProvider: 'claude',
+  metaIaMaxMonthlyBudget: 500,
   notes:
     'La siguiente fase ideal es conectar WhatsApp y telefonía opcional para seguimiento, recuperación y cierre más rápido cuando el cliente lo autorice.',
 };
@@ -247,6 +255,55 @@ export async function saveAdminWorkspacePartial(
       ),
       automationConfig: toJson(partial.automationConfig ?? DEFAULT_AUTOMATION),
       roadmapConfig: toJson(partial.roadmapConfig ?? DEFAULT_ROADMAP),
+    },
+  });
+}
+
+type PlatformConfigRecord = Record<string, unknown>;
+
+export async function getPlatformConfig(): Promise<PlatformConfigRecord> {
+  const config = await prisma.adminWorkspaceConfig.findUnique({
+    where: { key: 'main' },
+    select: { platformConfig: true },
+  });
+
+  if (!config?.platformConfig || typeof config.platformConfig !== 'object') {
+    return {};
+  }
+
+  return config.platformConfig as PlatformConfigRecord;
+}
+
+export async function getClaudeApiKey() {
+  const platformConfig = await getPlatformConfig();
+  return String(platformConfig.anthropicApiKey || process.env.ANTHROPIC_API_KEY || '').trim();
+}
+
+export async function getIaAutomationConfig() {
+  const snapshot = await getAdminWorkspaceSnapshot();
+  return {
+    enabled: snapshot.automation.metaIaEnabled ?? true,
+    mode: snapshot.automation.metaIaMode ?? 'auto',
+    provider: snapshot.automation.metaIaProvider ?? 'claude',
+    maxMonthlyBudget: snapshot.automation.metaIaMaxMonthlyBudget ?? 500,
+  };
+}
+
+export async function saveIaAutomationConfig(input: {
+  enabled: boolean;
+  mode: 'auto' | 'semi';
+  provider: 'claude' | 'gemini' | 'openrouter' | 'grok' | 'all';
+  maxMonthlyBudget: number;
+}) {
+  const snapshot = await getAdminWorkspaceSnapshot();
+
+  await saveAdminWorkspacePartial({
+    automationConfig: {
+      ...snapshot.automation,
+      metaIaEnabled: input.enabled,
+      metaIaMode: input.mode,
+      metaIaProvider: input.provider,
+      metaIaMaxMonthlyBudget: input.maxMonthlyBudget,
     },
   });
 }

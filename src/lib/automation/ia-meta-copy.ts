@@ -1,7 +1,19 @@
 // Llama a Claude para generar copies y sugerir ubicaciones
 import { getClaudeApiKey } from '@/lib/admin-config';
 
-export async function callClaudeForAdCopyAndPlacement({ business, campaignGoal, budget, platform }) {
+type AdCopyParams = {
+  business: string;
+  campaignGoal: string;
+  budget: number;
+  platform: string;
+};
+
+export async function callClaudeForAdCopyAndPlacement({
+  business,
+  campaignGoal,
+  budget,
+  platform,
+}: AdCopyParams) {
   const apiKey = await getClaudeApiKey();
   if (!apiKey) return { error: 'Claude API key missing' };
 
