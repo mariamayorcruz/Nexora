@@ -1,93 +1,6 @@
-import { useEffect } from 'react';
-  // Estado para automatización IA
-  const [iaMode, setIaMode] = useState<'auto' | 'semi'>('auto');
-  const [iaProvider, setIaProvider] = useState<'claude' | 'gemini' | 'openrouter' | 'grok'>('claude');
-  const [maxBudget, setMaxBudget] = useState(500);
-  const [savingIaConfig, setSavingIaConfig] = useState(false);
-  const [iaConfigStatus, setIaConfigStatus] = useState<string>('');
-
-  // Cargar configuración IA actual
-  useEffect(() => {
-    const fetchIaConfig = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const res = await fetch('/api/automation/ia-meta', {
-          method: 'GET',
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setIaMode(data.mode || 'auto');
-          setIaProvider(data.provider || 'claude');
-          setMaxBudget(data.maxBudget || 500);
-        }
-      } catch {}
-    };
-    fetchIaConfig();
-  }, []);
-
-  // Guardar configuración IA
-  const saveIaConfig = async () => {
-    setSavingIaConfig(true);
-    setIaConfigStatus('');
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/automation/ia-meta', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          enabled: true,
-          mode: iaMode,
-          provider: iaProvider,
-          maxMonthlyBudget: maxBudget,
-        }),
-      });
-      if (res.ok) {
-        setIaConfigStatus('Configuración guardada');
-      } else {
-        setIaConfigStatus('Error al guardar');
-      }
-    } catch {
-      setIaConfigStatus('Error al guardar');
-    } finally {
-      setSavingIaConfig(false);
-    }
-  };
-      {/* IA Automation Config */}
-      <section className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 p-6 mb-8">
-        <h2 className="text-xl font-bold text-cyan-300 mb-2">Automatización IA de Campañas</h2>
-        <div className="flex flex-col md:flex-row gap-6 md:items-end">
-          <div>
-            <label className="block text-sm font-medium text-cyan-200 mb-1">Modo de automatización</label>
-            <select value={iaMode} onChange={e => setIaMode(e.target.value as 'auto' | 'semi')} className="rounded-lg border border-cyan-400 bg-slate-900 px-3 py-2 text-cyan-100">
-              <option value="auto">100% Automático (la IA ejecuta todo)</option>
-              <option value="semi">Semiautomático (la IA sugiere, tú apruebas)</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-cyan-200 mb-1">Proveedor IA</label>
-            <select value={iaProvider} onChange={e => setIaProvider(e.target.value as 'claude' | 'gemini' | 'openrouter' | 'grok')} className="rounded-lg border border-cyan-400 bg-slate-900 px-3 py-2 text-cyan-100">
-              <option value="claude">Claude (Anthropic)</option>
-              <option value="gemini">Gemini (Google)</option>
-              <option value="openrouter">OpenRouter</option>
-              <option value="grok">Grok (xAI, gratuito)</option>
-              <option value="all">Mejor resultado (todas las IAs)</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-cyan-200 mb-1">Presupuesto mensual máximo (USD)</label>
-            <input type="number" min={50} value={maxBudget} onChange={e => setMaxBudget(Number(e.target.value))} className="rounded-lg border border-cyan-400 bg-slate-900 px-3 py-2 text-cyan-100 w-32" />
-          </div>
-          <button onClick={saveIaConfig} disabled={savingIaConfig} className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-500 disabled:opacity-60 mt-4 md:mt-0">
-            {savingIaConfig ? 'Guardando...' : 'Guardar'}
-          </button>
-        </div>
-        {iaConfigStatus && <p className="mt-2 text-cyan-300">{iaConfigStatus}</p>}
-        <p className="mt-2 text-xs text-cyan-200">Puedes cambiar el modo y el proveedor IA en cualquier momento. El modo automático ejecuta cambios sin preguntar; el modo semi te permite aprobar cada acción sugerida.<br/>Si eliges "Mejor resultado (todas las IAs)", Nexora combinará las respuestas de Claude, Gemini, OpenRouter y Grok, y elegirá la mejor sugerencia automáticamente.</p>
-      </section>
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 
 type ProductType = 'saas' | 'ecommerce' | 'infoproduct' | 'services' | 'app';
@@ -124,6 +37,60 @@ const PLATFORM_LABEL: Record<Recommendation['platform'], string> = {
 };
 
 export default function SmartCampaignPage() {
+  // ── IA Automation state ───────────────────────────────────────────────────
+  const [iaMode, setIaMode] = useState<'auto' | 'semi'>('auto');
+  const [iaProvider, setIaProvider] = useState<'claude' | 'gemini' | 'openrouter' | 'grok'>('claude');
+  const [maxBudget, setMaxBudget] = useState(500);
+  const [savingIaConfig, setSavingIaConfig] = useState(false);
+  const [iaConfigStatus, setIaConfigStatus] = useState<string>('');
+
+  useEffect(() => {
+    const fetchIaConfig = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/automation/ia-meta', {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setIaMode(data.mode || 'auto');
+          setIaProvider(data.provider || 'claude');
+          setMaxBudget(data.maxBudget || 500);
+        }
+      } catch {}
+    };
+    fetchIaConfig();
+  }, []);
+
+  const saveIaConfig = async () => {
+    setSavingIaConfig(true);
+    setIaConfigStatus('');
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/automation/ia-meta', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          enabled: true,
+          mode: iaMode,
+          provider: iaProvider,
+          maxMonthlyBudget: maxBudget,
+        }),
+      });
+      if (res.ok) {
+        setIaConfigStatus('Configuración guardada');
+      } else {
+        setIaConfigStatus('Error al guardar');
+      }
+    } catch {
+      setIaConfigStatus('Error al guardar');
+    } finally {
+      setSavingIaConfig(false);
+    }
+  };
+
+  // ── Smart Campaign state ──────────────────────────────────────────────────
   const [description, setDescription] = useState('');
   const [website, setWebsite] = useState('');
   const [budget, setBudget] = useState(120);
@@ -219,6 +186,42 @@ export default function SmartCampaignPage() {
 
   return (
     <div className="space-y-6">
+      {/* IA Automation Config */}
+      <section className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 p-6 mb-8">
+        <h2 className="text-xl font-bold text-cyan-300 mb-2">Automatización IA de Campañas</h2>
+        <div className="flex flex-col md:flex-row gap-6 md:items-end">
+          <div>
+            <label className="block text-sm font-medium text-cyan-200 mb-1">Modo de automatización</label>
+            <select value={iaMode} onChange={e => setIaMode(e.target.value as 'auto' | 'semi')} className="rounded-lg border border-cyan-400 bg-slate-900 px-3 py-2 text-cyan-100">
+              <option value="auto">100% Automático (la IA ejecuta todo)</option>
+              <option value="semi">Semiautomático (la IA sugiere, tú apruebas)</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-cyan-200 mb-1">Proveedor IA</label>
+            <select value={iaProvider} onChange={e => setIaProvider(e.target.value as 'claude' | 'gemini' | 'openrouter' | 'grok')} className="rounded-lg border border-cyan-400 bg-slate-900 px-3 py-2 text-cyan-100">
+              <option value="claude">Claude (Anthropic)</option>
+              <option value="gemini">Gemini (Google)</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="grok">Grok (xAI, gratuito)</option>
+              <option value="all">Mejor resultado (todas las IAs)</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-cyan-200 mb-1">Presupuesto mensual máximo (USD)</label>
+            <input type="number" min={50} value={maxBudget} onChange={e => setMaxBudget(Number(e.target.value))} className="rounded-lg border border-cyan-400 bg-slate-900 px-3 py-2 text-cyan-100 w-32" />
+          </div>
+          <button onClick={saveIaConfig} disabled={savingIaConfig} className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-500 disabled:opacity-60 mt-4 md:mt-0">
+            {savingIaConfig ? 'Guardando...' : 'Guardar'}
+          </button>
+        </div>
+        {iaConfigStatus && <p className="mt-2 text-cyan-300">{iaConfigStatus}</p>}
+        <p className="mt-2 text-xs text-cyan-200">
+          Puedes cambiar el modo y el proveedor IA en cualquier momento. El modo automático ejecuta cambios sin preguntar; el modo semi te permite aprobar cada acción sugerida.<br />
+          Si eliges &quot;Mejor resultado (todas las IAs)&quot;, Nexora combinará las respuestas de Claude, Gemini, OpenRouter y Grok, y elegirá la mejor sugerencia automáticamente.
+        </p>
+      </section>
+
       <section className="rounded-[28px] border border-gray-200 bg-white p-8 shadow-sm">
         <p className="text-xs uppercase tracking-[0.24em] text-gray-500">Smart Dispatcher</p>
         <h1 className="mt-3 text-3xl font-semibold text-gray-900">Decide canal, divide presupuesto y crea borradores en un solo flujo.</h1>
