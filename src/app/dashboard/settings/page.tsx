@@ -8,47 +8,10 @@ type IntegrationStatus = {
   aiProvider: string;
   aiConnected: boolean;
 };
-  const [integrationStatus, setIntegrationStatus] = useState<IntegrationStatus | null>(null);
-  const [loadingIntegration, setLoadingIntegration] = useState(true);
-  // Carga estado de integraciones (Meta y AI)
-  useEffect(() => {
-    const fetchIntegrationStatus = async () => {
-      setLoadingIntegration(true);
-      try {
-        const res = await fetch('/api/admin/settings');
-        const data = await res.json();
-        const s = data.settings || {};
-        // Meta
-        const metaConnected = Boolean(s.metaAppId && s.metaAppId.length > 10 && !s.metaAppId.includes('example'));
-        // AI
-        let aiProvider = '';
-        let aiConnected = false;
-        if (s.anthropicApiKey && s.anthropicApiKey.length > 10) {
-          aiProvider = 'Claude (Anthropic)';
-          aiConnected = true;
-        } else if (s.openRouterApiKey && s.openRouterApiKey.length > 10) {
-          aiProvider = 'OpenRouter';
-          aiConnected = true;
-        } else if (s.geminiApiKey && s.geminiApiKey.length > 10) {
-          aiProvider = 'Gemini';
-          aiConnected = true;
-        }
-        setIntegrationStatus({
-          metaConnected,
-          metaAppId: s.metaAppId || '',
-          aiProvider,
-          aiConnected,
-        });
-      } catch {
-        setIntegrationStatus(null);
-      } finally {
-        setLoadingIntegration(false);
-      }
-    };
-    fetchIntegrationStatus();
-  }, []);
 
 export default function SettingsPage() {
+  const [integrationStatus, setIntegrationStatus] = useState<IntegrationStatus | null>(null);
+  const [loadingIntegration, setLoadingIntegration] = useState(true);
   const [sessions, setSessions] = useState<Array<{
     id: string;
     userAgent: string;
@@ -91,6 +54,38 @@ export default function SettingsPage() {
   };
 
   useEffect(() => {
+    const fetchIntegrationStatus = async () => {
+      setLoadingIntegration(true);
+      try {
+        const res = await fetch('/api/admin/settings');
+        const data = await res.json();
+        const s = data.settings || {};
+        const metaConnected = Boolean(s.metaAppId && s.metaAppId.length > 10 && !s.metaAppId.includes('example'));
+        let aiProvider = '';
+        let aiConnected = false;
+        if (s.anthropicApiKey && s.anthropicApiKey.length > 10) {
+          aiProvider = 'Claude (Anthropic)';
+          aiConnected = true;
+        } else if (s.openRouterApiKey && s.openRouterApiKey.length > 10) {
+          aiProvider = 'OpenRouter';
+          aiConnected = true;
+        } else if (s.geminiApiKey && s.geminiApiKey.length > 10) {
+          aiProvider = 'Gemini';
+          aiConnected = true;
+        }
+        setIntegrationStatus({
+          metaConnected,
+          metaAppId: s.metaAppId || '',
+          aiProvider,
+          aiConnected,
+        });
+      } catch {
+        setIntegrationStatus(null);
+      } finally {
+        setLoadingIntegration(false);
+      }
+    };
+
     const fetchUser = async () => {
       try {
         const token = localStorage.getItem('token');
@@ -111,7 +106,8 @@ export default function SettingsPage() {
       }
     };
 
-    fetchUser();
+    void fetchIntegrationStatus();
+    void fetchUser();
   }, []);
 
   const showStatus = (message: string) => {

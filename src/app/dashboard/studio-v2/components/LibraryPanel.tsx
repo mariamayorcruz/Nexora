@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { GenerationConfig } from '@/lib/ai-studio';
 import type { FreeAudioTrack, StockClip } from '../hooks/useAIStudio';
 import { ToneSelector } from './ToneSelector';
@@ -128,7 +128,7 @@ export function LibraryPanel({
   const [stockSource, setStockSource] = useState<'stock' | 'meta'>('stock');
   const [stockMessage, setStockMessage] = useState('');
 
-  const loadTracks = async (query: string) => {
+  const loadTracks = useCallback(async (query: string) => {
     setAudioLoading(true);
     try {
       const response = await fetch(`/api/music/trending-free?q=${encodeURIComponent(query)}`, {
@@ -141,13 +141,13 @@ export function LibraryPanel({
     } finally {
       setAudioLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     void loadTracks('trending');
-  }, []);
+  }, [loadTracks]);
 
-  const loadStock = async (query: string, source: 'stock' | 'meta' = stockSource) => {
+  const loadStock = useCallback(async (query: string, source: 'stock' | 'meta') => {
     setStockLoading(true);
     setStockMessage('');
     try {
@@ -196,11 +196,11 @@ export function LibraryPanel({
     } finally {
       setStockLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     void loadStock('marketing', 'stock');
-  }, []);
+  }, [loadStock]);
 
   const filteredTracks = useMemo(() => {
     const query = audioQuery.trim().toLowerCase();

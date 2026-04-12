@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import { useEditor } from '../store/EditorContext';
 import { Segment } from '../types/editor';
@@ -182,10 +183,12 @@ export function Canvas() {
             ) : null}
 
             {segment.properties.mediaUrl && segment.properties.mediaType === 'image' ? (
-              <img
+              <Image
                 src={segment.properties.mediaUrl}
                 alt={segment.properties.text || 'Media'}
                 className="h-full w-full rounded-lg"
+                width={640}
+                height={640}
                 style={{ objectFit: segment.properties.objectFit || 'contain' }}
               />
             ) : null}

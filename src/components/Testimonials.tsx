@@ -76,7 +76,7 @@ export default function Testimonials() {
                 </div>
 
                 {/* Quote */}
-                <p className="flex-1 text-sm leading-7 text-slate-300">"{item.quote}"</p>
+                <p className="flex-1 text-sm leading-7 text-slate-300">&ldquo;{item.quote}&rdquo;</p>
 
                 {/* Attribution */}
                 <div className="mt-6 flex items-center gap-3 border-t border-white/10 pt-5">

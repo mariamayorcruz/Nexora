@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { Edit3, Globe2, Pause, Play, Search } from 'lucide-react';
 import type { UnifiedCampaign } from '@/types/command-center';
 
@@ -51,7 +52,13 @@ export function CampaignCard({
     >
       <div className="relative h-40 overflow-hidden bg-slate-950">
         {campaign.creative.thumbnail ? (
-          <img src={campaign.creative.thumbnail} alt={campaign.name} className="h-full w-full object-cover opacity-80 transition group-hover:opacity-100" />
+          <Image
+            src={campaign.creative.thumbnail}
+            alt={campaign.name}
+            fill
+            sizes="(max-width: 768px) 100vw, 33vw"
+            className="object-cover opacity-80 transition group-hover:opacity-100"
+          />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
             <span className="text-xs font-semibold uppercase tracking-widest text-slate-600">{campaign.channel.platform}</span>
