@@ -1,15 +1,10 @@
+import type { Prisma } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getBearerToken, verifyUserToken } from '@/lib/jwt';
+import { normalizeNexoraCreative } from '@/lib/nexora-creative';
+import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 
 export const dynamic = 'force-dynamic';
-
-function getUserIdFromRequest(request: NextRequest) {
-  const token = getBearerToken(request.headers.get('authorization'));
-  if (!token) return null;
-  const decoded = verifyUserToken(token);
-  return decoded?.userId || null;
-}
 
 function normalizeBudget(value: unknown) {
   const numeric = Number(value);
@@ -19,13 +14,14 @@ function normalizeBudget(value: unknown) {
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const userId = getUserIdFromRequest(request);
+    const userId = getUserIdFromAuthorizationHeader(request.headers.get('authorization'));
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const campaign = await prisma.campaign.findFirst({
       where: { id: params.id, userId },
+      include: { adAccount: true },
     });
 
     if (!campaign) {
@@ -37,6 +33,14 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       description?: string;
       budget?: number;
       status?: string;
+      creative?: {
+        imageUrl?: string;
+        primaryText?: string;
+        headline?: string;
+        description?: string;
+        cta?: string;
+        variant?: string;
+      };
     };
 
     const nextBudget = body.budget !== undefined ? normalizeBudget(body.budget) : null;
@@ -47,6 +51,54 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const nextStatus = String(body.status || '').trim().toLowerCase();
     const allowedStatus = new Set(['active', 'paused', 'completed']);
 
+    let resolvedAdAccountId: string | undefined;
+    if (
+      campaign.status === 'draft' &&
+      nextStatus === 'active' &&
+      allowedStatus.has(nextStatus) &&
+      !campaign.adAccount.connected
+    ) {
+      const connectedAccounts = await prisma.adAccount.findMany({
+        where: {
+          userId,
+          connected: true,
+          NOT: { accountId: { startsWith: 'demo-' } },
+        },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      const p = campaign.adAccount.platform;
+      const match = connectedAccounts.find((a) => {
+        if (p === 'google') return a.platform === 'google';
+        if (p === 'tiktok') return a.platform === 'tiktok';
+        return a.platform === 'instagram' || a.platform === 'facebook';
+      });
+
+      if (!match) {
+        return NextResponse.json(
+          {
+            error:
+              'Conecta un canal publicitario compatible (Meta, Google o TikTok) antes de activar este borrador.',
+          },
+          { status: 400 }
+        );
+      }
+
+      resolvedAdAccountId = match.id;
+    }
+
+    let nextTargeting: Prisma.InputJsonValue | undefined;
+    if (body.creative !== undefined) {
+      const base =
+        campaign.targeting !== null &&
+        typeof campaign.targeting === 'object' &&
+        !Array.isArray(campaign.targeting)
+          ? { ...(campaign.targeting as Record<string, unknown>) }
+          : {};
+      const nexoraCreative = normalizeNexoraCreative(body.creative);
+      nextTargeting = { ...base, nexoraCreative } as Prisma.InputJsonValue;
+    }
+
     const updated = await prisma.campaign.update({
       where: { id: campaign.id },
       data: {
@@ -54,10 +106,19 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         description: body.description?.trim() || campaign.description,
         budget: nextBudget ?? campaign.budget,
         status: allowedStatus.has(nextStatus) ? nextStatus : campaign.status,
+        ...(nextTargeting !== undefined ? { targeting: nextTargeting } : {}),
+        ...(resolvedAdAccountId !== undefined ? { adAccountId: resolvedAdAccountId } : {}),
       },
     });
 
-    return NextResponse.json({ ok: true, campaign: updated });
+    return NextResponse.json({
+      ok: true,
+      campaign: updated,
+      message:
+        campaign.status === 'draft' && allowedStatus.has(nextStatus) && nextStatus === 'active'
+          ? 'Campaña activada.'
+          : undefined,
+    });
   } catch (error) {
     console.error('Error updating campaign:', error);
     return NextResponse.json({ error: 'Error updating campaign' }, { status: 500 });
@@ -66,7 +127,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const userId = getUserIdFromRequest(request);
+    const userId = getUserIdFromAuthorizationHeader(request.headers.get('authorization'));
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

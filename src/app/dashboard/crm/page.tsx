@@ -1,7 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { suggestConfidence, suggestNextAction } from '@/lib/sales-playbook';
+import {
+  SALES_STAGE_ORDER,
+  suggestConfidence,
+  suggestNextAction,
+  type SalesStage,
+} from '@/lib/sales-playbook';
+import { DEFAULT_SALES_ENGINE } from '@/lib/crm-sales-engine-defaults';
 
 interface CrmLead {
   id: string;
@@ -73,50 +79,18 @@ interface SalesEngineSettings {
   }>;
 }
 
-const DEFAULT_SALES_ENGINE: SalesEngineSettings = {
-  calendar: {
-    connected: false,
-    provider: 'google',
-    weeklyCapacity: 20,
-    bookedThisWeek: 0,
-  },
-  meetingLinks: {
-    calendlyUrl: '',
-    zoomUrl: '',
-  },
-  followUpTemplates: [
-    {
-      id: 'welcome-0h',
-      name: 'Bienvenida inmediata',
-      trigger: 'on_signup',
-      delayHours: 0,
-      active: true,
-      attachments: [],
-      subject: 'Gracias por elegir GotNexora, {{name}}',
-      body: 'Hola {{name}},\n\nGracias por elegir GotNexora. Tu acceso ya está activo: {{dashboard_url}}\n\nPasos recomendados:\n1) Conecta tu primer canal.\n2) Crea tu primera campaña.\n3) Configura tu Motor de Ventas.\n\nEquipo GotNexora',
-    },
-    {
-      id: 'lead-first-touch',
-      name: 'Primer contacto comercial',
-      trigger: 'lead_followup',
-      delayHours: 0,
-      active: true,
-      attachments: [],
-      subject: 'Seguimiento de tu solicitud en GotNexora',
-      body: 'Hola {{name}},\n\nGracias por tu interés. Te comparto mi enlace para agendar una reunión:\n{{meeting_link}}\n\nEquipo GotNexora',
-    },
-  ],
-  sentLogs: [],
-  appointments: [],
+const CRM_STAGE_LABELS: Record<SalesStage, string> = {
+  lead: 'Entrantes',
+  contacted: 'Contacto',
+  qualified: 'Calificados',
+  proposal: 'Propuesta',
+  won: 'Ganados',
 };
 
-const STAGES = [
-  { key: 'lead', label: 'Entrantes' },
-  { key: 'contacted', label: 'Contacto' },
-  { key: 'qualified', label: 'Calificados' },
-  { key: 'proposal', label: 'Propuesta' },
-  { key: 'won', label: 'Ganados' },
-] as const;
+const STAGES = SALES_STAGE_ORDER.map((key) => ({
+  key,
+  label: CRM_STAGE_LABELS[key],
+}));
 
 function stageLabel(stage: string) {
   return STAGES.find((item) => item.key === stage)?.label || stage;

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getBearerToken, verifyUserToken } from '@/lib/jwt';
+import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
@@ -13,13 +13,6 @@ interface TimelineScene {
   text: string;
   durationSec: number;
   assetUrl?: string;
-}
-
-function ensureUser(request: NextRequest) {
-  const token = getBearerToken(request.headers.get('authorization'));
-  if (!token) return null;
-  const decoded = verifyUserToken(token);
-  return decoded?.userId || null;
 }
 
 function hasFfmpeg() {
@@ -65,7 +58,7 @@ async function downloadAsset(url: string, outputPath: string, origin: string) {
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = ensureUser(request);
+    const userId = getUserIdFromAuthorizationHeader(request.headers.get('authorization'));
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

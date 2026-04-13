@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { getBearerToken, verifyUserToken } from '@/lib/jwt';
+import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 import { resolveMetaClientId } from '@/lib/meta-ads';
 import { prisma } from '@/lib/prisma';
 
@@ -9,16 +9,6 @@ export const dynamic = 'force-dynamic';
 type Platform = 'instagram' | 'facebook' | 'google' | 'tiktok';
 
 const ALLOWED_PLATFORMS = new Set<Platform>(['instagram', 'facebook', 'google', 'tiktok']);
-
-function getUserIdFromRequest(request: NextRequest) {
-  const token = getBearerToken(request.headers.get('authorization'));
-  if (!token) {
-    return null;
-  }
-
-  const decoded = verifyUserToken(token);
-  return decoded?.userId || null;
-}
 
 function encodeState(payload: Record<string, string>) {
   return Buffer.from(JSON.stringify(payload), 'utf-8').toString('base64url');
@@ -89,7 +79,7 @@ async function resolveMetaClientIdFromWorkspace() {
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = getUserIdFromRequest(request);
+    const userId = getUserIdFromAuthorizationHeader(request.headers.get('authorization'));
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

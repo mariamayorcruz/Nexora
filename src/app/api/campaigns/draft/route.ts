@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getBearerToken, verifyUserToken } from '@/lib/jwt';
+import { getBearerToken, getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,13 +25,13 @@ function inferPlatformFromChannel(channel: string) {
 
 export async function POST(request: NextRequest) {
   try {
-    const token = getBearerToken(request.headers.get('authorization'));
-    if (!token) {
+    const authHeader = request.headers.get('authorization');
+    if (!getBearerToken(authHeader)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const decoded = verifyUserToken(token);
-    if (!decoded?.userId) {
+    const userId = getUserIdFromAuthorizationHeader(authHeader);
+    if (!userId) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     };
 
     const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
+      where: { id: userId },
       select: { id: true },
     });
 

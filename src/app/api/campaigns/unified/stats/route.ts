@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getBearerToken, verifyUserToken } from '@/lib/jwt';
+import { getBearerToken, getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,22 +23,60 @@ function normalizeStatus(status: string): 'active' | 'paused' | 'review' | 'ende
   return 'review';
 }
 
+function nexoraCreativeFromTargeting(targeting: unknown) {
+  const empty = {
+    imageUrl: undefined as string | undefined,
+    primaryText: undefined as string | undefined,
+    headline: undefined as string | undefined,
+    description: undefined as string | undefined,
+    cta: undefined as string | undefined,
+    variant: undefined as 'feed' | 'story' | undefined,
+  };
+
+  if (!targeting || typeof targeting !== 'object') {
+    return empty;
+  }
+
+  const raw = (targeting as Record<string, unknown>).nexoraCreative;
+  if (!raw || typeof raw !== 'object') {
+    return empty;
+  }
+
+  const c = raw as Record<string, unknown>;
+  const variantRaw = String(c.variant || '').toLowerCase();
+  const variant = variantRaw === 'story' ? ('story' as const) : variantRaw === 'feed' ? ('feed' as const) : undefined;
+
+  const str = (v: unknown) => {
+    const s = String(v ?? '').trim();
+    return s || undefined;
+  };
+
+  return {
+    imageUrl: str(c.imageUrl),
+    primaryText: str(c.primaryText),
+    headline: str(c.headline),
+    description: str(c.description),
+    cta: str(c.cta),
+    variant,
+  };
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const token = getBearerToken(request.headers.get('authorization'));
-    if (!token) {
+    const authHeader = request.headers.get('authorization');
+    if (!getBearerToken(authHeader)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const decoded = verifyUserToken(token);
-    if (!decoded?.userId) {
+    const userId = getUserIdFromAuthorizationHeader(authHeader);
+    if (!userId) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
     const [adAccounts, campaigns] = await Promise.all([
       prisma.adAccount.findMany({
         where: {
-          userId: decoded.userId,
+          userId,
           connected: true,
           NOT: { accountId: { startsWith: 'demo-' } },
         },
@@ -46,7 +84,7 @@ export async function GET(request: NextRequest) {
       }),
       prisma.campaign.findMany({
         where: {
-          userId: decoded.userId,
+          userId,
           NOT: { status: 'draft' },
           adAccount: {
             connected: true,
@@ -66,6 +104,9 @@ export async function GET(request: NextRequest) {
       const roas = spend > 0 ? revenue / spend : 0;
       const cpa = conversions > 0 ? spend / conversions : spend;
       const scheduleEnd = campaign.endDate || new Date(campaign.startDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const fromTargeting = nexoraCreativeFromTargeting(campaign.targeting);
+      const imageUrl = fromTargeting.imageUrl;
+      const thumbnail = imageUrl || null;
 
       return {
         id: campaign.id,
@@ -86,8 +127,14 @@ export async function GET(request: NextRequest) {
         },
         creative: {
           type: 'video' as const,
-          thumbnail: null,
+          thumbnail,
           studioProjectId: undefined,
+          imageUrl,
+          primaryText: fromTargeting.primaryText,
+          headline: fromTargeting.headline,
+          description: fromTargeting.description,
+          cta: fromTargeting.cta,
+          variant: fromTargeting.variant,
         },
         budget: {
           daily: campaign.budget,

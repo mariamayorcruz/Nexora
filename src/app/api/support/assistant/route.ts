@@ -3,19 +3,19 @@ import { prisma } from '@/lib/prisma';
 import { isFounderEmail } from '@/lib/access';
 import { buildAiSupportReply } from '@/lib/customer-success';
 import { buildClaudeSupportReply, buildGeminiSupportReply, buildGroqSupportReply, buildOpenRouterSupportReply } from '@/lib/support-llm';
-import { getBearerToken, verifyUserToken } from '@/lib/jwt';
+import { getBearerToken, getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
-    const token = getBearerToken(request.headers.get('authorization'));
-    if (!token) {
+    const authHeader = request.headers.get('authorization');
+    if (!getBearerToken(authHeader)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const decoded = verifyUserToken(token);
-    if (!decoded?.userId) {
+    const userId = getUserIdFromAuthorizationHeader(authHeader);
+    if (!userId) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
     const { message, page, aiProvider, aiApiKey } = (await request.json()) as {
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
+      where: { id: userId },
       include: {
         subscription: true,
         adAccounts: true,

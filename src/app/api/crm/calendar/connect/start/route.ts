@@ -1,16 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { getBearerToken, verifyUserToken } from '@/lib/jwt';
+import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 import { calendarOAuthRedirectUri } from '@/lib/app-base-url';
 
 export const dynamic = 'force-dynamic';
-
-function getUserIdFromRequest(request: NextRequest) {
-  const token = getBearerToken(request.headers.get('authorization'));
-  if (!token) return null;
-  const decoded = verifyUserToken(token);
-  return decoded?.userId || null;
-}
 
 function encodeState(payload: Record<string, string>) {
   return Buffer.from(JSON.stringify(payload), 'utf-8').toString('base64url');
@@ -18,7 +11,7 @@ function encodeState(payload: Record<string, string>) {
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = getUserIdFromRequest(request);
+    const userId = getUserIdFromAuthorizationHeader(request.headers.get('authorization'));
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

@@ -1,9 +1,11 @@
 export type CommandPlatform = 'meta' | 'google' | 'tiktok';
 
+export type UnifiedCreativeVariant = 'feed' | 'story';
+
 export interface UnifiedCampaign {
   id: string;
   name: string;
-  status: 'active' | 'paused' | 'review' | 'ended';
+  status: 'active' | 'paused' | 'review' | 'ended' | 'draft';
   channel: {
     platform: CommandPlatform;
     accountName: string;
@@ -22,6 +24,12 @@ export interface UnifiedCampaign {
     type: 'video' | 'image' | 'carousel';
     thumbnail: string | null;
     studioProjectId?: string;
+    imageUrl?: string;
+    primaryText?: string;
+    headline?: string;
+    description?: string;
+    cta?: string;
+    variant?: UnifiedCreativeVariant;
   };
   budget: {
     daily: number;

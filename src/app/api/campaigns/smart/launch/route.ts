@@ -1,16 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getBearerToken, verifyUserToken } from '@/lib/jwt';
+import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 import type { BudgetAllocation } from '@/lib/ai/budgetOptimizer';
 
 export const dynamic = 'force-dynamic';
-
-function ensureAuth(request: NextRequest) {
-  const token = getBearerToken(request.headers.get('authorization'));
-  if (!token) return null;
-  const decoded = verifyUserToken(token);
-  return decoded?.userId || null;
-}
 
 function mapPlatformToAccounts(platform: BudgetAllocation['platform']) {
   if (platform === 'meta') return ['facebook', 'instagram'];
@@ -22,7 +15,7 @@ function mapPlatformToAccounts(platform: BudgetAllocation['platform']) {
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = ensureAuth(request);
+    const userId = getUserIdFromAuthorizationHeader(request.headers.get('authorization'));
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

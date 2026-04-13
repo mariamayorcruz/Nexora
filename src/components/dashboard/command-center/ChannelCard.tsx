@@ -30,9 +30,12 @@ function getPlatformStyle(platform: ConnectedChannel['platform']) {
 
 export function ChannelCard({
   channel,
+  limitedConnection = false,
   onConnect,
 }: {
   channel: ConnectedChannel;
+  /** Google/TikTok without full Ads API token (placeholder accountId). */
+  limitedConnection?: boolean;
   onConnect: (platform: ConnectedChannel['platform']) => void;
 }) {
   const style = getPlatformStyle(channel.platform);
@@ -48,8 +51,20 @@ export function ChannelCard({
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-white">{channel.accountName}</p>
-          <span className={`text-xs ${channel.connected ? 'text-emerald-400' : 'text-amber-400'}`}>
-            {channel.connected ? '● Conectado' : '● Desconectado'}
+          <span
+            className={`text-xs ${
+              channel.connected
+                ? limitedConnection
+                  ? 'text-amber-400'
+                  : 'text-emerald-400'
+                : 'text-amber-400'
+            }`}
+          >
+            {channel.connected
+              ? limitedConnection
+                ? '● Conexión limitada'
+                : '● Conectado'
+              : '● Desconectado'}
           </span>
         </div>
       </div>
@@ -79,7 +94,7 @@ export function ChannelCard({
         </button>
       )}
 
-      {channel.connected ? (
+      {channel.connected && !limitedConnection ? (
         <div className="mt-3 flex items-center gap-1 text-[11px] text-emerald-400">
           <TrendingUp size={12} />
           Datos sincronizados

@@ -2,12 +2,14 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { MousePointer2, Plus, Plug, RefreshCw, TrendingUp } from 'lucide-react';
+import { MousePointer2, Plus, Plug, RefreshCw, TrendingUp, X } from 'lucide-react';
+import { AdPreviewCard } from '@/components/AdPreviewCard';
+import type { AdPreviewVariant } from '@/components/AdPreviewCard';
 import { CampaignCard } from '@/components/dashboard/command-center/CampaignCard';
 import { ChannelCard } from '@/components/dashboard/command-center/ChannelCard';
 import { IntelligenceFeed } from '@/components/dashboard/command-center/IntelligenceFeed';
 import type { IntelligenceFeedItem } from '@/components/dashboard/command-center/IntelligenceFeed';
-import type { UnifiedCampaign, UnifiedStatsResponse } from '@/types/command-center';
+import type { CommandPlatform, ConnectedChannel, UnifiedCampaign, UnifiedStatsResponse } from '@/types/command-center';
 
 type FilterKey = 'all' | 'active' | 'paused' | 'review';
 type SortKey = 'spend' | 'roas' | 'updated';
@@ -58,8 +60,165 @@ function mapInsightPlatformToStudio(platform: string) {
   return 'instagram-reels';
 }
 
+/** Single form value: maps to Marketing API channel + AdPreviewCard Meta placement. */
+type CreateFlowPlatform = 'meta-instagram' | 'meta-facebook' | 'google' | 'tiktok';
+
+function createFlowToApiPlatforms(key: CreateFlowPlatform): Array<'meta' | 'google' | 'tiktok'> {
+  if (key === 'meta-instagram' || key === 'meta-facebook') return ['meta'];
+  return [key];
+}
+
+function createFlowToAdPreviewPlatform(key: CreateFlowPlatform): 'facebook' | 'instagram' {
+  if (key === 'meta-facebook') return 'facebook';
+  return 'instagram';
+}
+
+function createFlowToAssistChannelLabel(key: CreateFlowPlatform): string {
+  if (key === 'meta-instagram') return 'Meta · Instagram';
+  if (key === 'meta-facebook') return 'Meta · Facebook';
+  if (key === 'google') return 'Google Ads';
+  return 'TikTok Ads';
+}
+
+function unifiedChannelToCreateFlowPlatform(platform: CommandPlatform): CreateFlowPlatform {
+  if (platform === 'google') return 'google';
+  if (platform === 'tiktok') return 'tiktok';
+  return 'meta-instagram';
+}
+
+/** Google/TikTok OAuth placeholder accounts use accountId `oauth-{platform}-{ts}` — no full Ads API token in Nexora yet. */
+function isLimitedChannelConnection(channel: ConnectedChannel): boolean {
+  if (!channel.connected) return false;
+  if (channel.platform !== 'google' && channel.platform !== 'tiktok') return false;
+  return channel.accountId.startsWith('oauth-');
+}
+
+function normalizePlatformForDraft(platform: string): CommandPlatform {
+  if (platform === 'instagram' || platform === 'facebook') return 'meta';
+  if (platform === 'google') return 'google';
+  return 'tiktok';
+}
+
+function nexoraCreativeFromTargetingClient(targeting: unknown) {
+  const empty = {
+    imageUrl: undefined as string | undefined,
+    primaryText: undefined as string | undefined,
+    headline: undefined as string | undefined,
+    description: undefined as string | undefined,
+    cta: undefined as string | undefined,
+    variant: undefined as 'feed' | 'story' | undefined,
+  };
+
+  if (!targeting || typeof targeting !== 'object') {
+    return empty;
+  }
+
+  const raw = (targeting as Record<string, unknown>).nexoraCreative;
+  if (!raw || typeof raw !== 'object') {
+    return empty;
+  }
+
+  const c = raw as Record<string, unknown>;
+  const variantRaw = String(c.variant || '').toLowerCase();
+  const variant = variantRaw === 'story' ? ('story' as const) : variantRaw === 'feed' ? ('feed' as const) : undefined;
+
+  const str = (v: unknown) => {
+    const s = String(v ?? '').trim();
+    return s || undefined;
+  };
+
+  return {
+    imageUrl: str(c.imageUrl),
+    primaryText: str(c.primaryText),
+    headline: str(c.headline),
+    description: str(c.description),
+    cta: str(c.cta),
+    variant,
+  };
+}
+
+function meApiRowToUnifiedDraft(c: Record<string, unknown>): UnifiedCampaign {
+  const id = String(c.id || '');
+  const name = String(c.name || '');
+  const budget = Number(c.budget);
+  const budgetSafe = Number.isFinite(budget) ? budget : 0;
+  const startRaw = c.startDate;
+  const start =
+    startRaw instanceof Date
+      ? startRaw.toISOString()
+      : typeof startRaw === 'string'
+        ? startRaw
+        : new Date(String(startRaw)).toISOString();
+  const endRaw = c.endDate;
+  const end =
+    endRaw == null || endRaw === ''
+      ? new Date(new Date(start).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      : endRaw instanceof Date
+        ? endRaw.toISOString()
+        : String(endRaw);
+
+  const adAccount = c.adAccount as { platform?: string; accountName?: string } | undefined;
+  const platform = normalizePlatformForDraft(adAccount?.platform || 'instagram');
+  const accountName = String(adAccount?.accountName || 'Cuenta');
+  const accountId = String(c.adAccountId || 'nexora-borrador');
+
+  const analytics = c.analytics as Record<string, unknown> | null | undefined;
+  const spend = Number(analytics?.spend) || 0;
+  const revenue = Number(analytics?.revenue) || 0;
+  const conversions = Number(analytics?.conversions) || 0;
+  const roas = spend > 0 ? revenue / spend : 0;
+  const cpa = conversions > 0 ? spend / conversions : spend;
+
+  const fromTargeting = nexoraCreativeFromTargetingClient(c.targeting);
+  const imageUrl = fromTargeting.imageUrl;
+  const thumbnail = imageUrl || null;
+
+  return {
+    id,
+    name,
+    status: 'draft',
+    channel: {
+      platform,
+      accountName,
+      accountId,
+    },
+    metrics: {
+      spend,
+      impressions: Number(analytics?.impressions) || 0,
+      clicks: Number(analytics?.clicks) || 0,
+      conversions,
+      roas,
+      cpa,
+    },
+    creative: {
+      type: 'video' as const,
+      thumbnail,
+      studioProjectId: undefined,
+      imageUrl,
+      primaryText: fromTargeting.primaryText,
+      headline: fromTargeting.headline,
+      description: fromTargeting.description,
+      cta: fromTargeting.cta,
+      variant: fromTargeting.variant,
+    },
+    budget: {
+      daily: budgetSafe,
+      total: budgetSafe * 30,
+      spent: spend,
+      remaining: Math.max(0, budgetSafe - spend),
+    },
+    schedule: {
+      start,
+      end,
+    },
+    actions: ['pause', 'resume', 'duplicate', 'edit', 'delete'],
+  };
+}
+
 export default function CommandCenterPage() {
   const [stats, setStats] = useState<UnifiedStatsResponse>(EMPTY_STATS);
+  const [draftCampaigns, setDraftCampaigns] = useState<UnifiedCampaign[]>([]);
+  const [statsFetchedAt, setStatsFetchedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [filter, setFilter] = useState<FilterKey>('all');
@@ -67,7 +226,26 @@ export default function CommandCenterPage() {
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [syncingCampaignId, setSyncingCampaignId] = useState<string | null>(null);
+  const [duplicatingCampaignId, setDuplicatingCampaignId] = useState<string | null>(null);
+  const [activatingCampaignId, setActivatingCampaignId] = useState<string | null>(null);
   const [showConnectPicker, setShowConnectPicker] = useState(false);
+
+  const [showCreateCampaignModal, setShowCreateCampaignModal] = useState(false);
+  const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
+  const [campaignName, setCampaignName] = useState('');
+  const [createPlatform, setCreatePlatform] = useState<CreateFlowPlatform>('meta-instagram');
+  const [budgetDaily, setBudgetDaily] = useState(400);
+  const [imageUrl, setImageUrl] = useState('');
+  const [primaryText, setPrimaryText] = useState('');
+  const [headline, setHeadline] = useState('');
+  const [description, setDescription] = useState('');
+  const [cta, setCta] = useState('Ver más');
+  const [variant, setVariant] = useState<AdPreviewVariant>('feed');
+  const [copyAssistLoading, setCopyAssistLoading] = useState<'primaryText' | 'headline' | 'cta' | null>(null);
+  const [copyAssistSuggestion, setCopyAssistSuggestion] = useState<{
+    field: 'primaryText' | 'headline' | 'cta';
+    text: string;
+  } | null>(null);
 
   const fetchStats = useCallback(async () => {
     setLoading(true);
@@ -75,21 +253,42 @@ export default function CommandCenterPage() {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/campaigns/unified/stats', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        cache: 'no-store',
-      });
+      const authHeaders = { Authorization: `Bearer ${token}` };
+      const [statsResponse, meResponse] = await Promise.all([
+        fetch('/api/campaigns/unified/stats', {
+          headers: authHeaders,
+          cache: 'no-store',
+        }),
+        fetch('/api/users/me', {
+          headers: authHeaders,
+          cache: 'no-store',
+        }),
+      ]);
 
-      const data = (await response.json()) as UnifiedStatsResponse & { error?: string };
-      if (!response.ok) {
+      const data = (await statsResponse.json()) as UnifiedStatsResponse & { error?: string };
+      if (!statsResponse.ok) {
         throw new Error(data.error || 'No se pudieron cargar las métricas del Command Center.');
       }
 
+      let drafts: UnifiedCampaign[] = [];
+      if (meResponse.ok) {
+        const me = (await meResponse.json()) as { campaigns?: Array<Record<string, unknown>> };
+        const rows = Array.isArray(me.campaigns) ? me.campaigns : [];
+        const draftRows = rows
+          .filter((row) => String(row.status || '').toLowerCase() === 'draft')
+          .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+        drafts = draftRows.map((row) => meApiRowToUnifiedDraft(row));
+      }
+
       setStats(data);
-      if (!selectedCampaignId && data.campaigns.length > 0) {
-        setSelectedCampaignId(data.campaigns[0].id);
+      setDraftCampaigns(drafts);
+      setStatsFetchedAt(new Date().toISOString());
+      if (!selectedCampaignId) {
+        if (data.campaigns.length > 0) {
+          setSelectedCampaignId(data.campaigns[0].id);
+        } else if (drafts.length > 0) {
+          setSelectedCampaignId(drafts[0].id);
+        }
       }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'No se pudo cargar la vista unificada.');
@@ -117,6 +316,18 @@ export default function CommandCenterPage() {
     }
   }, [fetchStats]);
 
+  useEffect(() => {
+    if (!showCreateCampaignModal) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isCreating) {
+        setShowCreateCampaignModal(false);
+        setEditingCampaignId(null);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [showCreateCampaignModal, isCreating]);
+
   const filteredCampaigns = useMemo(() => {
     let campaigns = stats.campaigns;
 
@@ -135,10 +346,13 @@ export default function CommandCenterPage() {
     return [...campaigns].sort((a, b) => b.metrics.spend - a.metrics.spend);
   }, [filter, sort, stats.campaigns]);
 
-  const selectedCampaign = useMemo(
-    () => stats.campaigns.find((campaign) => campaign.id === selectedCampaignId) || null,
-    [selectedCampaignId, stats.campaigns]
-  );
+  const selectedCampaign = useMemo(() => {
+    return (
+      stats.campaigns.find((campaign) => campaign.id === selectedCampaignId) ||
+      draftCampaigns.find((campaign) => campaign.id === selectedCampaignId) ||
+      null
+    );
+  }, [selectedCampaignId, stats.campaigns, draftCampaigns]);
 
   const handleConnect = async (platform: 'meta' | 'google' | 'tiktok') => {
     setMessage('');
@@ -165,44 +379,202 @@ export default function CommandCenterPage() {
     }
   };
 
-  const handleCreateUnifiedCampaign = async () => {
-    const connectedPlatforms = Array.from(new Set(stats.channels.filter((c) => c.connected).map((c) => c.platform)));
+  const closeCampaignModal = () => {
+    setShowCreateCampaignModal(false);
+    setEditingCampaignId(null);
+    setCopyAssistLoading(null);
+    setCopyAssistSuggestion(null);
+  };
+
+  const runCopyAssist = useCallback(
+    async (field: 'primaryText' | 'headline' | 'cta') => {
+      setCopyAssistLoading(field);
+      setCopyAssistSuggestion(null);
+      try {
+        const token = localStorage.getItem('token');
+        const task = field === 'primaryText' ? 'improve-primary' : field === 'headline' ? 'headline' : 'cta';
+        const response = await fetch('/api/ai/campaign-copy-assist', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            task,
+            campaignName: campaignName.trim(),
+            description: description.trim(),
+            primaryText: primaryText.trim(),
+            headline: headline.trim(),
+            cta: cta.trim(),
+            channelLabel: createFlowToAssistChannelLabel(createPlatform),
+          }),
+        });
+        const data = (await response.json()) as { suggestion?: string; error?: string };
+        if (!response.ok) {
+          throw new Error(data.error || 'No se pudo generar el texto.');
+        }
+        const text = String(data.suggestion || '').trim();
+        if (!text) {
+          throw new Error('La IA devolvió un texto vacío.');
+        }
+        setCopyAssistSuggestion({ field, text });
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : 'Error al usar la asistencia IA.');
+      } finally {
+        setCopyAssistLoading(null);
+      }
+    },
+    [campaignName, createPlatform, cta, description, headline, primaryText]
+  );
+
+  const openCreateCampaignModal = () => {
+    setEditingCampaignId(null);
+    const dateLabel = new Date().toLocaleDateString('es-ES');
+    setCampaignName(`Campaña Multi-canal ${dateLabel}`);
+    setCreatePlatform('meta-instagram');
+    setBudgetDaily(400);
+    setImageUrl('');
+    setPrimaryText('');
+    setHeadline('');
+    setDescription('');
+    setCta('Ver más');
+    setVariant('feed');
+    setShowCreateCampaignModal(true);
+  };
+
+  const openEditCampaignModal = (campaign: UnifiedCampaign) => {
+    setEditingCampaignId(campaign.id);
+    setSelectedCampaignId(campaign.id);
+    setCampaignName(campaign.name);
+    setCreatePlatform(unifiedChannelToCreateFlowPlatform(campaign.channel.platform));
+    setBudgetDaily(campaign.budget.daily);
+    setImageUrl(campaign.creative.imageUrl ?? '');
+    setPrimaryText(campaign.creative.primaryText ?? '');
+    setHeadline(campaign.creative.headline ?? '');
+    setDescription(campaign.creative.description ?? '');
+    setCta(campaign.creative.cta?.trim() ? campaign.creative.cta : 'Ver más');
+    setVariant(campaign.creative.variant ?? 'feed');
+    setShowCreateCampaignModal(true);
+  };
+
+  const submitCreateCampaignModal = async () => {
+    const name = campaignName.trim();
+    if (!name) {
+      setMessage('Indica un nombre de campaña.');
+      return;
+    }
 
     setIsCreating(true);
     setMessage('');
 
     try {
       const token = localStorage.getItem('token');
-      const payload = {
-        name: `Campaña Multi-canal ${new Date().toLocaleDateString('es-ES')}`,
-        platforms: connectedPlatforms.length > 0 ? connectedPlatforms : ['meta'],
-        budgetDaily: 400,
+      const creative = {
+        imageUrl: imageUrl.trim(),
+        primaryText: primaryText.trim(),
+        headline: headline.trim(),
+        description: description.trim(),
+        cta: cta.trim(),
+        variant,
       };
+      const raw = Number.isFinite(budgetDaily) ? budgetDaily : 400;
+      const budgetValue = Math.max(50, Math.min(50000, raw));
 
-      const response = await fetch('/api/campaigns/unified/create', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
+      if (editingCampaignId) {
+        const response = await fetch(`/api/campaigns/${editingCampaignId}`, {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name,
+            budget: budgetValue,
+            creative,
+          }),
+        });
 
-      const data = (await response.json()) as { message?: string; error?: string };
-      if (!response.ok) {
-        throw new Error(data.error || 'No se pudo crear campaña multi-canal.');
+        const data = (await response.json()) as { error?: string };
+        if (!response.ok) {
+          throw new Error(data.error || 'No se pudo guardar la campaña.');
+        }
+
+        setMessage('Campaña actualizada.');
+        closeCampaignModal();
+        await fetchStats();
+      } else {
+        const payload = {
+          name,
+          platforms: createFlowToApiPlatforms(createPlatform),
+          budgetDaily: budgetValue,
+          creative,
+        };
+
+        const response = await fetch('/api/campaigns/unified/create', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+
+        const data = (await response.json()) as { message?: string; error?: string };
+        if (!response.ok) {
+          throw new Error(data.error || 'No se pudo crear campaña multi-canal.');
+        }
+
+        setMessage(data.message || 'Campaña creada correctamente.');
+        closeCampaignModal();
+        await fetchStats();
       }
-
-      setMessage(data.message || 'Campaña creada correctamente.');
-      await fetchStats();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No se pudo crear campaña multi-canal.');
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : editingCampaignId
+            ? 'No se pudo guardar la campaña.'
+            : 'No se pudo crear campaña multi-canal.'
+      );
     } finally {
       setIsCreating(false);
     }
   };
 
+  const handleActivateCampaign = async (campaign: UnifiedCampaign) => {
+    if (campaign.status !== 'draft') return;
+
+    setActivatingCampaignId(campaign.id);
+    setMessage('');
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/campaigns/${campaign.id}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: 'active' }),
+      });
+
+      const data = (await response.json()) as { message?: string; error?: string };
+      if (!response.ok) {
+        throw new Error(data.error || 'No se pudo activar la campaña.');
+      }
+
+      setMessage(data.message || 'Campaña activada.');
+      await fetchStats();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No se pudo activar la campaña.');
+    } finally {
+      setActivatingCampaignId(null);
+    }
+  };
+
   const handleToggleCampaign = async (campaign: UnifiedCampaign) => {
+    if (campaign.status === 'draft') {
+      return;
+    }
     try {
       const token = localStorage.getItem('token');
       const action = campaign.status === 'active' ? 'pause' : 'resume';
@@ -252,14 +624,32 @@ export default function CommandCenterPage() {
     }
   };
 
-  const handleDuplicateCampaign = async (campaignId: string) => {
+  const handleDuplicateCampaign = async (campaign: UnifiedCampaign) => {
+    setDuplicatingCampaignId(campaign.id);
+    setMessage('');
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/campaigns/${campaignId}/duplicate`, {
+      const creative = {
+        imageUrl: (campaign.creative.imageUrl || campaign.creative.thumbnail || '').trim(),
+        primaryText: (campaign.creative.primaryText || '').trim(),
+        headline: (campaign.creative.headline || '').trim(),
+        description: (campaign.creative.description || '').trim(),
+        cta: (campaign.creative.cta || '').trim(),
+        variant: campaign.creative.variant ?? 'feed',
+      };
+
+      const response = await fetch('/api/campaigns/unified/create', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          name: `${campaign.name.trim()} (copia)`,
+          platforms: [campaign.channel.platform],
+          budgetDaily: campaign.budget.daily,
+          creative,
+        }),
       });
 
       const data = (await response.json()) as { message?: string; error?: string };
@@ -271,6 +661,8 @@ export default function CommandCenterPage() {
       await fetchStats();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'No se pudo duplicar campaña.');
+    } finally {
+      setDuplicatingCampaignId(null);
     }
   };
 
@@ -300,37 +692,8 @@ export default function CommandCenterPage() {
     }
   };
 
-  const handleEditCampaign = async (campaign: UnifiedCampaign) => {
-    const nextName = window.prompt('Nuevo nombre de campaña', campaign.name);
-    if (!nextName || !nextName.trim()) return;
-
-    const nextBudgetRaw = window.prompt('Nuevo presupuesto diario (USD)', String(campaign.budget.daily));
-    const nextBudget = Number(nextBudgetRaw || campaign.budget.daily);
-
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/campaigns/${campaign.id}`, {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: nextName.trim(),
-          budget: Number.isFinite(nextBudget) ? nextBudget : campaign.budget.daily,
-        }),
-      });
-
-      const data = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        throw new Error(data.error || 'No se pudo editar campaña.');
-      }
-
-      setMessage('Campaña actualizada.');
-      await fetchStats();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No se pudo editar campaña.');
-    }
+  const handleEditCampaign = (campaign: UnifiedCampaign) => {
+    openEditCampaignModal(campaign);
   };
 
   const handleOpenStudio = (campaign: UnifiedCampaign) => {
@@ -390,9 +753,17 @@ export default function CommandCenterPage() {
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-slate-950 text-slate-200">
       <header className="flex h-16 items-center justify-between border-b border-slate-800 bg-slate-900/50 px-6 backdrop-blur">
-        <div className="flex items-center gap-4">
+        <div className="flex items-baseline gap-4">
           <h1 className="text-xl font-bold text-white">Nexora Command Center</h1>
-          <span className="rounded bg-cyan-500/20 px-2 py-0.5 font-mono text-xs text-cyan-400">LIVE DATA</span>
+          <div className="flex flex-col gap-0.5">
+            <span className="rounded bg-cyan-500/20 px-2 py-0.5 font-mono text-xs text-cyan-400">Datos en Nexora</span>
+            {statsFetchedAt ? (
+              <span className="text-[11px] text-slate-500">
+                {'\u00DAltima actualizaci\u00f3n: '}
+                {new Date(statsFetchedAt).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}
+              </span>
+            ) : null}
+          </div>
         </div>
 
         <div className="flex items-center gap-3">
@@ -403,12 +774,13 @@ export default function CommandCenterPage() {
             Actualizar
           </button>
           <button
-            onClick={handleCreateUnifiedCampaign}
+            type="button"
+            onClick={openCreateCampaignModal}
             disabled={isCreating}
             className="flex items-center gap-2 rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-cyan-400 disabled:opacity-60"
           >
             <Plus size={16} />
-            {isCreating ? 'Creando...' : 'Nueva Campaña'}
+            Nueva Campaña
           </button>
         </div>
       </header>
@@ -425,7 +797,12 @@ export default function CommandCenterPage() {
 
           <div className="flex-1 space-y-3 overflow-y-auto p-4">
             {stats.channels.map((channel) => (
-              <ChannelCard key={channel.id} channel={channel} onConnect={handleConnect} />
+              <ChannelCard
+                key={channel.id}
+                channel={channel}
+                limitedConnection={isLimitedChannelConnection(channel)}
+                onConnect={handleConnect}
+              />
             ))}
 
             <button
@@ -470,6 +847,9 @@ export default function CommandCenterPage() {
         </aside>
 
         <main className="flex-1 overflow-y-auto p-6">
+          <p className="mb-4 rounded-lg border border-slate-700/80 bg-slate-900/40 px-3 py-2 text-xs text-slate-400">
+            La vista principal muestra campañas en canales conectados. Los borradores aparecen en la sección inferior.
+          </p>
           <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
             <div className="flex gap-2">
               {FILTERS.map((item) => (
@@ -507,45 +887,79 @@ export default function CommandCenterPage() {
                 <div key={idx} className="h-64 animate-pulse rounded-xl border border-slate-800 bg-slate-900/60" />
               ))}
             </div>
-          ) : filteredCampaigns.length === 0 ? (
-            <div className="flex min-h-[380px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-700 text-slate-500">
-              <Plus size={28} className="mb-2" />
-              {totalConnectedChannels === 0 ? (
-                <>
-                  <p className="font-medium text-slate-300">Conecta tu primer canal publicitario</p>
-                  <p className="mt-1 max-w-xs text-center text-xs text-slate-500">Conecta Meta, Google Ads o TikTok Ads desde el panel izquierdo para empezar a gestionar campañas reales.</p>
-                  <button
-                    onClick={() => setShowConnectPicker(true)}
-                    className="mt-4 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm text-cyan-300"
-                  >
-                    Conectar canal →
-                  </button>
-                </>
-              ) : (
-                <>
-                  <p className="font-medium">No hay campañas para este filtro</p>
-                  <button
-                    onClick={handleCreateUnifiedCampaign}
-                    className="mt-4 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm text-cyan-300"
-                  >
-                    Crear campaña multi-canal
-                  </button>
-                </>
-              )}
-            </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
-              {filteredCampaigns.map((campaign) => (
-                <CampaignCard
-                  key={campaign.id}
-                  campaign={campaign}
-                  selected={campaign.id === selectedCampaignId}
-                  onSelect={(value) => setSelectedCampaignId(value.id)}
-                  onToggleStatus={handleToggleCampaign}
-                  onOpenStudio={handleOpenStudio}
-                />
-              ))}
-            </div>
+            <>
+              {filteredCampaigns.length === 0 ? (
+                <div className="flex min-h-[380px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-700 text-slate-500">
+                  <Plus size={28} className="mb-2" />
+                  {totalConnectedChannels === 0 ? (
+                    <>
+                      <p className="font-medium text-slate-300">Conecta tu primer canal publicitario</p>
+                      <p className="mt-1 max-w-xs text-center text-xs text-slate-500">
+                        Conecta Meta, Google Ads o TikTok Ads desde el panel izquierdo para empezar a gestionar campañas reales.
+                      </p>
+                      <button
+                        onClick={() => setShowConnectPicker(true)}
+                        className="mt-4 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm text-cyan-300"
+                      >
+                        Conectar canal →
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-medium">No hay campañas para este filtro</p>
+                      <button
+                        type="button"
+                        onClick={openCreateCampaignModal}
+                        className="mt-4 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm text-cyan-300"
+                      >
+                        Crear campaña multi-canal
+                      </button>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+                  {filteredCampaigns.map((campaign) => (
+                    <CampaignCard
+                      key={campaign.id}
+                      campaign={campaign}
+                      selected={campaign.id === selectedCampaignId}
+                      onSelect={openEditCampaignModal}
+                      onToggleStatus={handleToggleCampaign}
+                      onOpenStudio={handleOpenStudio}
+                      onActivate={handleActivateCampaign}
+                      activating={activatingCampaignId === campaign.id}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {draftCampaigns.length > 0 ? (
+                <section className="mt-10 border-t border-slate-800 pt-8">
+                  <div className="mb-4">
+                    <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-violet-300">Borradores</h2>
+                    <p className="mt-1 max-w-2xl text-xs text-slate-500">
+                      Campañas guardadas en Nexora que aún no están en la vista principal (canal sin conectar o estado borrador).
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+                    {draftCampaigns.map((campaign) => (
+                      <CampaignCard
+                        key={campaign.id}
+                        campaign={campaign}
+                        selected={campaign.id === selectedCampaignId}
+                        onSelect={openEditCampaignModal}
+                        onToggleStatus={handleToggleCampaign}
+                        onOpenStudio={handleOpenStudio}
+                        onActivate={handleActivateCampaign}
+                        activating={activatingCampaignId === campaign.id}
+                      />
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+            </>
           )}
         </main>
 
@@ -595,23 +1009,37 @@ export default function CommandCenterPage() {
                   Editar creativo en Nexora Studio
                 </button>
                 <button
-                  onClick={() => void handleEditCampaign(selectedCampaign)}
+                  onClick={() => handleEditCampaign(selectedCampaign)}
                   className="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-slate-200"
                 >
                   Editar campaña
                 </button>
+                {selectedCampaign.status === 'draft' ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleActivateCampaign(selectedCampaign)}
+                    disabled={activatingCampaignId === selectedCampaign.id}
+                    className="w-full rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-emerald-300 disabled:opacity-60"
+                  >
+                    {activatingCampaignId === selectedCampaign.id ? 'Activando…' : 'Activar campaña'}
+                  </button>
+                ) : null}
                 <button
-                  onClick={() => void handleDuplicateCampaign(selectedCampaign.id)}
-                  className="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-slate-200"
+                  type="button"
+                  onClick={() => void handleDuplicateCampaign(selectedCampaign)}
+                  disabled={duplicatingCampaignId === selectedCampaign.id}
+                  className="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-slate-200 disabled:opacity-60"
                 >
-                  Duplicar campaña
+                  {duplicatingCampaignId === selectedCampaign.id ? 'Duplicando…' : 'Duplicar campaña'}
                 </button>
-                <button
-                  onClick={() => handleToggleCampaign(selectedCampaign)}
-                  className="w-full rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-300"
-                >
-                  {selectedCampaign.status === 'active' ? 'Pausar campaña' : 'Reactivar campaña'}
-                </button>
+                {selectedCampaign.status !== 'draft' ? (
+                  <button
+                    onClick={() => handleToggleCampaign(selectedCampaign)}
+                    className="w-full rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-300"
+                  >
+                    {selectedCampaign.status === 'active' ? 'Pausar en Nexora' : 'Reactivar en Nexora'}
+                  </button>
+                ) : null}
                 <button
                   onClick={() => void handleSyncCampaign(selectedCampaign.id)}
                   disabled={syncingCampaignId === selectedCampaign.id}
@@ -643,6 +1071,299 @@ export default function CommandCenterPage() {
           </div>
         </aside>
       </div>
+
+      {showCreateCampaignModal ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="create-campaign-title"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/65 backdrop-blur-[2px]"
+            aria-label="Cerrar"
+            disabled={isCreating}
+            onClick={() => !isCreating && closeCampaignModal()}
+          />
+          <div className="relative flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl">
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-800 px-5 py-4">
+              <div>
+                <h2 id="create-campaign-title" className="text-lg font-semibold text-white">
+                  {editingCampaignId ? 'Editar campaña' : 'Nueva campaña'}
+                </h2>
+                <p className="mt-1 max-w-xl text-xs text-slate-400">
+                  Los datos creativos son solo para vista previa aquí. Al guardar, la campaña se registra en{' '}
+                  <strong className="text-slate-200">Nexora</strong> con el mismo flujo de siempre.{' '}
+                  <strong className="text-amber-200/90">No se publica en Meta Ads</strong> ni en otros canales todavía.
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={isCreating}
+                className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-800 hover:text-white disabled:opacity-50"
+                onClick={() => closeCampaignModal()}
+                aria-label="Cerrar formulario"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="grid min-h-0 flex-1 gap-0 lg:grid-cols-[1fr_min(340px,40%)]">
+              <div className="max-h-[min(72vh,720px)] overflow-y-auto border-b border-slate-800 p-5 lg:border-b-0 lg:border-r">
+                <div className="space-y-4">
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-slate-400">Nombre de campaña</span>
+                    <input
+                      value={campaignName}
+                      onChange={(e) => setCampaignName(e.target.value)}
+                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white placeholder:text-slate-600"
+                      placeholder="Ej. Lanzamiento primavera"
+                    />
+                  </label>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label className="block">
+                      <span className="mb-1 block text-xs font-medium text-slate-400">Canal</span>
+                      <select
+                        value={createPlatform}
+                        onChange={(e) => setCreatePlatform(e.target.value as CreateFlowPlatform)}
+                        disabled={Boolean(editingCampaignId)}
+                        className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <option value="meta-instagram">Meta · Instagram</option>
+                        <option value="meta-facebook">Meta · Facebook</option>
+                        <option value="google">Google Ads</option>
+                        <option value="tiktok">TikTok Ads</option>
+                      </select>
+                      {editingCampaignId ? (
+                        <p className="mt-1 text-[11px] text-slate-500">El canal publicitario no se puede cambiar aquí.</p>
+                      ) : null}
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-xs font-medium text-slate-400">Presupuesto diario (USD)</span>
+                      <input
+                        type="number"
+                        min={50}
+                        max={50000}
+                        value={budgetDaily}
+                        onChange={(e) => {
+                          const value = Number(e.target.value);
+                          setBudgetDaily(value < 50 ? 50 : value);
+                        }}
+                        className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
+                      />
+                    </label>
+                  </div>
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-slate-400">URL de imagen (vista previa)</span>
+                    <input
+                      value={imageUrl}
+                      onChange={(e) => setImageUrl(e.target.value)}
+                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white placeholder:text-slate-600"
+                      placeholder="https://…"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 flex items-center justify-between gap-2">
+                      <span className="text-xs font-medium text-slate-400">Texto principal</span>
+                      <button
+                        type="button"
+                        disabled={isCreating || copyAssistLoading !== null}
+                        onClick={() => void runCopyAssist('primaryText')}
+                        className="shrink-0 rounded-md border border-violet-500/35 bg-violet-500/10 px-2 py-0.5 text-[11px] font-medium text-violet-200 hover:bg-violet-500/20 disabled:opacity-50"
+                      >
+                        {copyAssistLoading === 'primaryText' ? 'Generando...' : 'Mejorar texto'}
+                      </button>
+                    </span>
+                    <textarea
+                      value={primaryText}
+                      onChange={(e) => setPrimaryText(e.target.value)}
+                      rows={3}
+                      className="w-full resize-y rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white placeholder:text-slate-600"
+                    />
+                    {copyAssistSuggestion?.field === 'primaryText' ? (
+                      <div className="mt-2 rounded-lg border border-violet-500/25 bg-slate-950/80 px-3 py-2 text-xs">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-300/90">Sugerencia</p>
+                        <p className="mt-1 text-slate-200">{copyAssistSuggestion.text}</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            className="rounded-md bg-emerald-600/90 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-emerald-500"
+                            onClick={() => {
+                              setPrimaryText(copyAssistSuggestion.text);
+                              setCopyAssistSuggestion(null);
+                            }}
+                          >
+                            Aplicar
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded-md border border-slate-600 px-2.5 py-1 text-[11px] text-slate-300 hover:bg-slate-800"
+                            onClick={() => setCopyAssistSuggestion(null)}
+                          >
+                            Descartar
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 flex items-center justify-between gap-2">
+                      <span className="text-xs font-medium text-slate-400">Titular</span>
+                      <button
+                        type="button"
+                        disabled={isCreating || copyAssistLoading !== null}
+                        onClick={() => void runCopyAssist('headline')}
+                        className="shrink-0 rounded-md border border-violet-500/35 bg-violet-500/10 px-2 py-0.5 text-[11px] font-medium text-violet-200 hover:bg-violet-500/20 disabled:opacity-50"
+                      >
+                        {copyAssistLoading === 'headline' ? 'Generando...' : 'Generar headline'}
+                      </button>
+                    </span>
+                    <input
+                      value={headline}
+                      onChange={(e) => setHeadline(e.target.value)}
+                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
+                    />
+                    {copyAssistSuggestion?.field === 'headline' ? (
+                      <div className="mt-2 rounded-lg border border-violet-500/25 bg-slate-950/80 px-3 py-2 text-xs">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-300/90">Sugerencia</p>
+                        <p className="mt-1 text-slate-200">{copyAssistSuggestion.text}</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            className="rounded-md bg-emerald-600/90 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-emerald-500"
+                            onClick={() => {
+                              setHeadline(copyAssistSuggestion.text);
+                              setCopyAssistSuggestion(null);
+                            }}
+                          >
+                            Aplicar
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded-md border border-slate-600 px-2.5 py-1 text-[11px] text-slate-300 hover:bg-slate-800"
+                            onClick={() => setCopyAssistSuggestion(null)}
+                          >
+                            Descartar
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-slate-400">Descripción</span>
+                    <textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      rows={3}
+                      className="w-full resize-y rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
+                    />
+                  </label>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label className="block">
+                      <span className="mb-1 flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium text-slate-400">CTA</span>
+                        <button
+                          type="button"
+                          disabled={isCreating || copyAssistLoading !== null}
+                          onClick={() => void runCopyAssist('cta')}
+                          className="shrink-0 rounded-md border border-violet-500/35 bg-violet-500/10 px-2 py-0.5 text-[11px] font-medium text-violet-200 hover:bg-violet-500/20 disabled:opacity-50"
+                        >
+                          {copyAssistLoading === 'cta' ? 'Generando...' : 'Sugerir CTA'}
+                        </button>
+                      </span>
+                      <input
+                        value={cta}
+                        onChange={(e) => setCta(e.target.value)}
+                        className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
+                      />
+                      {copyAssistSuggestion?.field === 'cta' ? (
+                        <div className="mt-2 rounded-lg border border-violet-500/25 bg-slate-950/80 px-3 py-2 text-xs">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-300/90">Sugerencia</p>
+                          <p className="mt-1 text-slate-200">{copyAssistSuggestion.text}</p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              className="rounded-md bg-emerald-600/90 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-emerald-500"
+                              onClick={() => {
+                                setCta(copyAssistSuggestion.text);
+                                setCopyAssistSuggestion(null);
+                              }}
+                            >
+                              Aplicar
+                            </button>
+                            <button
+                              type="button"
+                              className="rounded-md border border-slate-600 px-2.5 py-1 text-[11px] text-slate-300 hover:bg-slate-800"
+                              onClick={() => setCopyAssistSuggestion(null)}
+                            >
+                              Descartar
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-xs font-medium text-slate-400">Formato vista previa</span>
+                      <select
+                        value={variant}
+                        onChange={(e) => setVariant(e.target.value as AdPreviewVariant)}
+                        className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
+                      >
+                        <option value="feed">Feed (16:9)</option>
+                        <option value="story">Historia (9:16)</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex max-h-[min(72vh,720px)] flex-col gap-3 overflow-y-auto bg-slate-950/50 p-5">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Vista previa</p>
+                {createPlatform === 'google' || createPlatform === 'tiktok' ? (
+                  <p className="text-[11px] leading-snug text-slate-500">
+                    Referencia estilo Meta; el canal seleccionado es {createPlatform === 'google' ? 'Google Ads' : 'TikTok'}.
+                  </p>
+                ) : null}
+                <div className="mx-auto w-full max-w-sm">
+                  <AdPreviewCard
+                    imageUrl={imageUrl}
+                    primaryText={primaryText}
+                    headline={headline}
+                    description={description}
+                    cta={cta}
+                    platform={createFlowToAdPreviewPlatform(createPlatform)}
+                    variant={variant}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 border-t border-slate-800 bg-slate-900/80 px-5 py-4">
+              <button
+                type="button"
+                disabled={isCreating}
+                className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+                onClick={() => closeCampaignModal()}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isCreating}
+                className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-cyan-400 disabled:opacity-60"
+                onClick={() => void submitCreateCampaignModal()}
+              >
+                {isCreating
+                  ? 'Guardando…'
+                  : editingCampaignId
+                    ? 'Guardar cambios'
+                    : 'Guardar en Nexora'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

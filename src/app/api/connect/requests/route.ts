@@ -1,25 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { validateEmail } from '@/lib/auth';
-import { getBearerToken, verifyUserToken } from '@/lib/jwt';
+import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 
 export const dynamic = 'force-dynamic';
 const ALLOWED_PLATFORMS = new Set(['instagram', 'facebook', 'google', 'tiktok']);
 const ALLOWED_SETUP_PREFERENCES = new Set(['oauth', 'manual']);
 
-function getUserIdFromRequest(request: NextRequest) {
-  const token = getBearerToken(request.headers.get('authorization'));
-  if (!token) {
-    return null;
-  }
-
-  const decoded = verifyUserToken(token);
-  return decoded?.userId || null;
-}
-
 export async function GET(request: NextRequest) {
   try {
-    const userId = getUserIdFromRequest(request);
+    const userId = getUserIdFromAuthorizationHeader(request.headers.get('authorization'));
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -39,7 +29,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = getUserIdFromRequest(request);
+    const userId = getUserIdFromAuthorizationHeader(request.headers.get('authorization'));
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

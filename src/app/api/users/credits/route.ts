@@ -2,23 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getAiPlanConfig, getCurrentCycleRange } from '@/lib/ai-studio';
 import { getFounderPlan, isFounderEmail } from '@/lib/access';
-import { getBearerToken, verifyUserToken } from '@/lib/jwt';
+import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 
 export const dynamic = 'force-dynamic';
 
-function getUserIdFromRequest(request: NextRequest) {
-  const token = getBearerToken(request.headers.get('authorization'));
-  if (!token) {
-    return null;
-  }
-
-  const decoded = verifyUserToken(token);
-  return decoded?.userId || null;
-}
-
 export async function GET(request: NextRequest) {
   try {
-    const userId = getUserIdFromRequest(request);
+    const userId = getUserIdFromAuthorizationHeader(request.headers.get('authorization'));
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

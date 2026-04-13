@@ -1,24 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getBearerToken, verifyUserToken } from '@/lib/jwt';
+import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
+import { CRM_ALLOWED_STAGES } from '@/lib/sales-playbook';
 
 export const dynamic = 'force-dynamic';
 
-const ALLOWED_STAGES = new Set(['lead', 'contacted', 'qualified', 'proposal', 'won']);
+function toFiniteLeadValue(raw: unknown): number {
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : 0;
+}
 
-function getUserIdFromRequest(request: NextRequest) {
-  const token = getBearerToken(request.headers.get('authorization'));
-  if (!token) {
+function toClampedConfidenceForCreate(raw: unknown): number {
+  if (raw === undefined || raw === null) {
+    return 25;
+  }
+  const n = Number(raw);
+  const base = Number.isFinite(n) ? n : 25;
+  return Math.min(100, Math.max(0, Math.round(base)));
+}
+
+function toLastContactedAtOrNull(raw: unknown): Date | null {
+  if (raw === undefined || raw === null || raw === '') {
     return null;
   }
-
-  const decoded = verifyUserToken(token);
-  return decoded?.userId || null;
+  const d = new Date(raw as string | number | Date);
+  return Number.isFinite(d.getTime()) ? d : null;
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = getUserIdFromRequest(request);
+    const userId = getUserIdFromAuthorizationHeader(request.headers.get('authorization'));
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -31,7 +42,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       leads: leads.map((lead) => ({
         ...lead,
-        stage: ALLOWED_STAGES.has(lead.stage) ? lead.stage : 'lead',
+        stage: CRM_ALLOWED_STAGES.has(lead.stage) ? lead.stage : 'lead',
       })),
     });
   } catch (error) {
@@ -42,7 +53,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = getUserIdFromRequest(request);
+    const userId = getUserIdFromAuthorizationHeader(request.headers.get('authorization'));
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -62,12 +73,12 @@ export async function POST(request: NextRequest) {
         phone: body.phone?.trim() || null,
         company: body.company?.trim() || null,
         source: body.source?.trim() || 'manual',
-        stage: ALLOWED_STAGES.has(String(body.stage || '').trim()) ? String(body.stage).trim() : 'lead',
-        value: Number(body.value || 0),
-        confidence: Math.min(100, Math.max(0, Number(body.confidence || 25))),
+        stage: CRM_ALLOWED_STAGES.has(String(body.stage || '').trim()) ? String(body.stage).trim() : 'lead',
+        value: toFiniteLeadValue(body.value),
+        confidence: toClampedConfidenceForCreate(body.confidence),
         nextAction: body.nextAction?.trim() || null,
         notes: body.notes?.trim() || null,
-        lastContactedAt: body.lastContactedAt ? new Date(body.lastContactedAt) : null,
+        lastContactedAt: toLastContactedAtOrNull(body.lastContactedAt),
       },
     });
 

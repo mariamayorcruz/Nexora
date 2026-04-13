@@ -241,10 +241,11 @@ export default function DashboardChatbot() {
                   onChange={(e) => setProviderInput(e.target.value as typeof providerInput)}
                   className="mb-2 w-full rounded-lg border border-white/10 bg-slate-800 px-2 py-1.5 text-xs text-white"
                 >
-                  <option value="auto">Auto (Claude → Gemini → OpenRouter)</option>
+                  <option value="auto">Auto (Claude → Gemini → OpenRouter → Ollama)</option>
                   <option value="claude">Claude (Anthropic)</option>
                   <option value="gemini">Gemini (Google)</option>
                   <option value="openrouter">OpenRouter (gratis disponible)</option>
+                  <option value="ollama">Ollama (local)</option>
                 </select>
                 <input
                   type="password"

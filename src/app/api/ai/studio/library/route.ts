@@ -1,22 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getBearerToken, verifyUserToken } from '@/lib/jwt';
+import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 import { isSupabaseStorageEnabled, getSupabaseReadUrl, deleteSupabaseObject } from '@/lib/storage';
 import { unlink } from 'node:fs/promises';
 import path from 'node:path';
 
 export const dynamic = 'force-dynamic';
 
-function ensureUser(request: NextRequest) {
-  const token = getBearerToken(request.headers.get('authorization'));
-  if (!token) return null;
-  const decoded = verifyUserToken(token);
-  return decoded?.userId || null;
-}
-
 export async function GET(request: NextRequest) {
   try {
-    const userId = ensureUser(request);
+    const userId = getUserIdFromAuthorizationHeader(request.headers.get('authorization'));
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -54,7 +47,7 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const userId = ensureUser(request);
+    const userId = getUserIdFromAuthorizationHeader(request.headers.get('authorization'));
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -90,7 +83,7 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const userId = ensureUser(request);
+    const userId = getUserIdFromAuthorizationHeader(request.headers.get('authorization'));
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

@@ -1,19 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getBearerToken, verifyUserToken } from '@/lib/jwt';
+import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
+import { CRM_ALLOWED_STAGES } from '@/lib/sales-playbook';
 
 export const dynamic = 'force-dynamic';
 
-const ALLOWED_STAGES = new Set(['lead', 'contacted', 'qualified', 'proposal', 'won']);
+function toFiniteLeadValue(raw: unknown): number {
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : 0;
+}
 
-function getUserIdFromRequest(request: NextRequest) {
-  const token = getBearerToken(request.headers.get('authorization'));
-  if (!token) {
+function toClampedConfidenceForPatch(raw: unknown): number {
+  const n = Number(raw);
+  const base = Number.isFinite(n) ? n : 0;
+  return Math.min(100, Math.max(0, Math.round(base)));
+}
+
+function toLastContactedAtOrNull(raw: unknown): Date | null {
+  if (raw === undefined || raw === null || raw === '') {
     return null;
   }
-
-  const decoded = verifyUserToken(token);
-  return decoded?.userId || null;
+  const d = new Date(raw as string | number | Date);
+  return Number.isFinite(d.getTime()) ? d : null;
 }
 
 export async function PATCH(
@@ -21,12 +29,20 @@ export async function PATCH(
   { params }: { params: { leadId: string } }
 ) {
   try {
-    const userId = getUserIdFromRequest(request);
+    const userId = getUserIdFromAuthorizationHeader(request.headers.get('authorization'));
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
+
+    if (body.stage !== undefined) {
+      const trimmedStage = String(body.stage || '').trim();
+      if (!CRM_ALLOWED_STAGES.has(trimmedStage)) {
+        return NextResponse.json({ error: 'La etapa del lead no es válida.' }, { status: 400 });
+      }
+    }
+
     const existing = await prisma.crmLead.findFirst({
       where: { id: params.leadId, userId },
     });
@@ -44,24 +60,14 @@ export async function PATCH(
         company: body.company !== undefined ? body.company?.trim() || null : undefined,
         source: body.source !== undefined ? body.source?.trim() || 'manual' : undefined,
         stage:
-          body.stage !== undefined
-            ? ALLOWED_STAGES.has(String(body.stage || '').trim())
-              ? String(body.stage).trim()
-              : 'lead'
-            : undefined,
-        value: body.value !== undefined ? Number(body.value || 0) : undefined,
+          body.stage !== undefined ? String(body.stage || '').trim() : undefined,
+        value: body.value !== undefined ? toFiniteLeadValue(body.value) : undefined,
         confidence:
-          body.confidence !== undefined
-            ? Math.min(100, Math.max(0, Number(body.confidence || 0)))
-            : undefined,
+          body.confidence !== undefined ? toClampedConfidenceForPatch(body.confidence) : undefined,
         nextAction: body.nextAction !== undefined ? body.nextAction?.trim() || null : undefined,
         notes: body.notes !== undefined ? body.notes?.trim() || null : undefined,
         lastContactedAt:
-          body.lastContactedAt !== undefined
-            ? body.lastContactedAt
-              ? new Date(body.lastContactedAt)
-              : null
-            : undefined,
+          body.lastContactedAt !== undefined ? toLastContactedAtOrNull(body.lastContactedAt) : undefined,
       },
     });
 

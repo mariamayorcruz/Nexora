@@ -28,3 +28,14 @@ export function getBearerToken(authHeader?: string | null) {
 
   return authHeader.substring(7);
 }
+
+/** Resolves user id from `Authorization: Bearer <jwt>`; returns null if missing/invalid token or no userId claim. */
+export function getUserIdFromAuthorizationHeader(authorization: string | null): string | null {
+  const token = getBearerToken(authorization);
+  if (!token) {
+    return null;
+  }
+
+  const decoded = verifyUserToken(token);
+  return decoded?.userId || null;
+}

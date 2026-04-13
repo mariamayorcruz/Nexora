@@ -74,6 +74,9 @@ const PLAYBOOK: Record<SalesStage, StagePlaybook> = {
 
 export const SALES_STAGE_ORDER: SalesStage[] = ['lead', 'contacted', 'qualified', 'proposal', 'won'];
 
+/** Allowed CRM/API stage strings; derived from SALES_STAGE_ORDER so it cannot drift. */
+export const CRM_ALLOWED_STAGES: ReadonlySet<string> = new Set(SALES_STAGE_ORDER);
+
 export function getPlaybook(stage: string): StagePlaybook {
   const key = (stage || 'lead') as SalesStage;
   return PLAYBOOK[key] || PLAYBOOK.lead;

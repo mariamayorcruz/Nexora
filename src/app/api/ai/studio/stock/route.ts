@@ -1,19 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getBearerToken, verifyUserToken } from '@/lib/jwt';
+import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 import { searchStockMedia, type MediaKind } from '@/lib/video-pipeline';
 
 export const dynamic = 'force-dynamic';
 
-function ensureUser(request: NextRequest) {
-  const token = getBearerToken(request.headers.get('authorization'));
-  if (!token) return null;
-  const decoded = verifyUserToken(token);
-  return decoded?.userId || null;
-}
-
 export async function GET(request: NextRequest) {
   try {
-    const userId = ensureUser(request);
+    const userId = getUserIdFromAuthorizationHeader(request.headers.get('authorization'));
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

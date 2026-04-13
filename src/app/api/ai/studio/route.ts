@@ -13,20 +13,10 @@ import {
   type AiToolKey,
 } from '@/lib/ai-studio';
 import { getFounderPlan, isFounderEmail } from '@/lib/access';
-import { getBearerToken, verifyUserToken } from '@/lib/jwt';
+import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
-
-function getUserIdFromRequest(request: NextRequest) {
-  const token = getBearerToken(request.headers.get('authorization'));
-  if (!token) {
-    return null;
-  }
-
-  const decoded = verifyUserToken(token);
-  return decoded?.userId || null;
-}
 
 async function getUsageBucket(userId: string, plan: string | null | undefined, founderAccess: boolean) {
   const { cycleKey, cycleStart, cycleEnd } = getCurrentCycleRange();
@@ -56,7 +46,7 @@ async function getUsageBucket(userId: string, plan: string | null | undefined, f
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = getUserIdFromRequest(request);
+    const userId = getUserIdFromAuthorizationHeader(request.headers.get('authorization'));
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -103,7 +93,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = getUserIdFromRequest(request);
+    const userId = getUserIdFromAuthorizationHeader(request.headers.get('authorization'));
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

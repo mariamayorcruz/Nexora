@@ -83,6 +83,7 @@ export async function POST(request: NextRequest) {
 
     const existingLead = await prisma.crmLead.findFirst({
       where: {
+        userId: auth.user.id,
         OR: [{ email: capture.email }, { id: capture.crmLeadId || undefined }],
       },
     });

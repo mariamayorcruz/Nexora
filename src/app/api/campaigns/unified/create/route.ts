@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getBearerToken, verifyUserToken } from '@/lib/jwt';
+import { normalizeNexoraCreative } from '@/lib/nexora-creative';
+import { getBearerToken, getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 
 export const dynamic = 'force-dynamic';
-
-type TargetPlatform = keyof typeof PLATFORM_MAP;
 
 const PLATFORM_MAP = {
   meta: ['facebook', 'instagram'],
   google: ['google'],
   tiktok: ['tiktok'],
 } as const;
+
+type TargetPlatform = keyof typeof PLATFORM_MAP;
 
 function normalizeBudget(value: unknown, fallback = 300) {
   const parsed = Number(value);
@@ -55,13 +56,13 @@ async function ensureLocalDraftAccount(userId: string, platform: 'instagram' | '
 
 export async function POST(request: NextRequest) {
   try {
-    const token = getBearerToken(request.headers.get('authorization'));
-    if (!token) {
+    const authHeader = request.headers.get('authorization');
+    if (!getBearerToken(authHeader)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const decoded = verifyUserToken(token);
-    if (!decoded?.userId) {
+    const userId = getUserIdFromAuthorizationHeader(authHeader);
+    if (!userId) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
@@ -70,6 +71,14 @@ export async function POST(request: NextRequest) {
       platforms?: TargetPlatform[];
       budgetDaily?: number;
       description?: string;
+      creative?: {
+        imageUrl?: string;
+        primaryText?: string;
+        headline?: string;
+        description?: string;
+        cta?: string;
+        variant?: string;
+      };
     };
 
     const platforms: TargetPlatform[] = Array.isArray(body.platforms) && body.platforms.length > 0 ? body.platforms : ['meta'];
@@ -77,7 +86,7 @@ export async function POST(request: NextRequest) {
     const budgetDaily = normalizeBudget(body.budgetDaily);
 
     const connectedAccounts = await prisma.adAccount.findMany({
-      where: { userId: decoded.userId, connected: true },
+      where: { userId, connected: true },
       orderBy: { createdAt: 'asc' },
     });
 
@@ -91,7 +100,7 @@ export async function POST(request: NextRequest) {
 
     const fallbackAccounts = selectedAccounts.length === 0
       ? await Promise.all(
-          platforms.map((platform) => ensureLocalDraftAccount(decoded.userId, primaryPlatform(platform)))
+          platforms.map((platform) => ensureLocalDraftAccount(userId, primaryPlatform(platform)))
         )
       : [];
 
@@ -100,12 +109,13 @@ export async function POST(request: NextRequest) {
 
     const startDate = new Date();
     const endDate = new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const nexoraCreative = normalizeNexoraCreative(body.creative);
 
     const createdCampaigns = await Promise.all(
       targetAccounts.map((account, idx) =>
         prisma.campaign.create({
           data: {
-            userId: decoded.userId,
+            userId,
             adAccountId: account.id,
             name: targetAccounts.length > 1 ? `${campaignName} · ${account.platform.toUpperCase()}` : campaignName,
             description: body.description || 'Creada desde Command Center',
@@ -119,6 +129,7 @@ export async function POST(request: NextRequest) {
               objective: 'conversion',
               launchWindow: '7-dias',
               slot: idx,
+              nexoraCreative,
             },
           },
         })

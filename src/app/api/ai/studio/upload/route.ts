@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getBearerToken, verifyUserToken } from '@/lib/jwt';
+import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 import { isSupabaseStorageEnabled, uploadVideoToSupabase } from '@/lib/storage';
 import { prisma } from '@/lib/prisma';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -14,13 +14,6 @@ const ALLOWED_VIDEO_TYPES = new Set([
   'video/webm',
   'video/x-matroska',
 ]);
-
-function ensureUser(request: NextRequest) {
-  const token = getBearerToken(request.headers.get('authorization'));
-  if (!token) return null;
-  const decoded = verifyUserToken(token);
-  return decoded?.userId || null;
-}
 
 function safeFileName(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, '-').slice(0, 80) || 'upload-video';
@@ -39,7 +32,7 @@ function resolveExtension(fileName: string, mimeType: string) {
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = ensureUser(request);
+    const userId = getUserIdFromAuthorizationHeader(request.headers.get('authorization'));
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
