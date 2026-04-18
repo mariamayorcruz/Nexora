@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BarChart2, LayoutDashboard, LifeBuoy, Megaphone, Receipt, Settings2, ShieldCheck, Users, Wand2, Zap } from 'lucide-react';
 import DashboardChatbot from '@/components/DashboardChatbot';
 import { useAppLanguage } from '@/hooks/use-app-language';
@@ -54,6 +54,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [billingCheckoutFocus, setBillingCheckoutFocus] = useState(false);
+  const hasRedirected = useRef(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -90,6 +91,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           const payload = await response.json().catch(() => null);
 
           if (response.status === 403 && payload?.code === 'SUBSCRIPTION_REQUIRED') {
+            if (hasRedirected.current) return;
+            hasRedirected.current = true;
             router.push('/#pricing');
             return;
           }
@@ -108,7 +111,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     };
 
     void fetchUser();
-  }, [pathname, router]);
+  }, [pathname]);
 
   const menuRows: MenuRow[] = [
     { kind: 'link', label: language === 'en' ? 'Overview' : 'Resumen', href: '/dashboard', icon: 'OV' },
