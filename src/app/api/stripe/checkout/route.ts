@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
         create: {
           userId: user.id,
           plan: user.subscription?.plan || 'starter',
-          status: user.subscription?.status || 'active',
+          status: 'incomplete',
           stripeCustomerId,
           currentPeriodStart: user.subscription?.currentPeriodStart || new Date(),
           currentPeriodEnd: user.subscription?.currentPeriodEnd || new Date(),

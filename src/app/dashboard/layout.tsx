@@ -77,11 +77,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     const fetchUser = async () => {
       try {
-        const response = await fetch('/api/users/me', {
+        const meUrl =
+          pathname === '/dashboard/billing'
+            ? '/api/users/me?allowIncomplete=1'
+            : '/api/users/me';
+
+        const response = await fetch(meUrl, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
         if (!response.ok) {
+          const payload = await response.json().catch(() => null);
+
+          if (response.status === 403 && payload?.code === 'SUBSCRIPTION_REQUIRED') {
+            router.push('/#pricing');
+            return;
+          }
+
           throw new Error('Failed to fetch user');
         }
 
@@ -96,7 +108,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     };
 
     void fetchUser();
-  }, [router]);
+  }, [pathname, router]);
 
   const menuRows: MenuRow[] = [
     { kind: 'link', label: language === 'en' ? 'Overview' : 'Resumen', href: '/dashboard', icon: 'OV' },

@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
     const auth = await getUserFromToken(request);
     if ('error' in auth) return auth.error;
     const { user } = auth;
+    const allowIncomplete = request.nextUrl.searchParams.get('allowIncomplete') === '1';
 
     const founderAccess = isFounderEmail(user.email);
     const adminAccess = isAdminEmail(user.email) || founderAccess;
@@ -65,6 +66,16 @@ export async function GET(request: NextRequest) {
       });
 
       user.subscription = updatedSubscription;
+    }
+
+    const subscriptionStatus = user.subscription?.status?.toLowerCase() || null;
+    const hasPaidAccess = Boolean(user.subscription) && ['active', 'trialing'].includes(subscriptionStatus || '');
+
+    if (!allowIncomplete && !adminAccess && !hasPaidAccess) {
+      return NextResponse.json(
+        { error: 'Subscription required', code: 'SUBSCRIPTION_REQUIRED' },
+        { status: 403 }
+      );
     }
 
     const adAccounts = await prisma.adAccount.findMany({

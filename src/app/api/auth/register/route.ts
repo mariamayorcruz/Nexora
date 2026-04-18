@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
           data: {
             userId: createdUser.id,
             plan: founderAccess ? getFounderPlan() : 'starter',
-            status: 'active',
+            status: 'incomplete',
             currentPeriodStart: new Date(),
             currentPeriodEnd: trialEndDate,
           },

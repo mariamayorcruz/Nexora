@@ -47,7 +47,7 @@ model Subscription {
   userId            String       @unique
   user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   plan              String       @default("starter") // starter, pro, enterprise
-  status            String       @default("active") // active, cancelled, paused
+  status            String       @default("incomplete") // incomplete, active, cancelled, paused
   currentPeriodStart DateTime
   currentPeriodEnd  DateTime
   cancelAtPeriodEnd Boolean      @default(false)
