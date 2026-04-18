@@ -4,6 +4,8 @@ import Stripe from 'stripe';
 import { resolvePlanFromStripePriceId } from '@/lib/billing';
 import { prisma } from '@/lib/prisma';
 import { getStripeClient } from '@/lib/stripe';
+import { onPayingSubscriptionSynced } from '@/lib/conversion-automation';
+import { syncPaidLeadCapturesForAdmin } from '@/lib/stripe-funnel-sync';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,6 +64,15 @@ async function syncSubscriptionRecord(subscription: Stripe.Subscription) {
       stripeSubId: subscription.id,
     },
   });
+
+  await syncPaidLeadCapturesForAdmin(subscription);
+
+  if (subscription.metadata?.userId) {
+    await onPayingSubscriptionSynced({
+      userId: String(subscription.metadata.userId),
+      stripeSubscriptionStatus: subscription.status,
+    });
+  }
 }
 
 async function syncInvoiceRecord(invoice: Stripe.Invoice) {

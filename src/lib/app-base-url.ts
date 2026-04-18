@@ -4,14 +4,35 @@ function trimSlash(s: string) {
   return s.replace(/\/$/, '');
 }
 
+function normalizeExplicitBase(value: string | undefined): string | undefined {
+  const v = value?.trim();
+  if (!v) return undefined;
+  return v.startsWith('http') ? trimSlash(v) : `https://${trimSlash(v)}`;
+}
+
+/** Origen canónico desde env (emails, enlaces públicos). Prioriza `NEXT_PUBLIC_APP_URL`. */
+function resolveExplicitPublicUrlFromEnv(): string | undefined {
+  return (
+    normalizeExplicitBase(process.env.NEXT_PUBLIC_APP_URL) || normalizeExplicitBase(process.env.APP_BASE_URL)
+  );
+}
+
+function devLocalhostFallback(): string {
+  return 'http://localhost:3000';
+}
+
+function productionLastResortBase(): string {
+  return 'https://www.gotnexora.com';
+}
+
 /**
  * Origen público de la app (OAuth redirect, redirects post-login).
- * Orden: APP_BASE_URL / NEXT_PUBLIC_APP_URL → cabeceras proxy (Vercel) → nextUrl → env de dominio → VERCEL_URL.
+ * Orden: NEXT_PUBLIC_APP_URL / APP_BASE_URL → cabeceras proxy (Vercel) → nextUrl → env de dominio → VERCEL_URL.
  */
 export function resolveAppBaseUrl(request: NextRequest): string {
-  const explicit = process.env.APP_BASE_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim();
+  const explicit = resolveExplicitPublicUrlFromEnv();
   if (explicit) {
-    return explicit.startsWith('http') ? trimSlash(explicit) : `https://${trimSlash(explicit)}`;
+    return explicit;
   }
 
   const forwardedProto = request.headers.get('x-forwarded-proto');
@@ -41,16 +62,19 @@ export function resolveAppBaseUrl(request: NextRequest): string {
     return `https://${trimSlash(process.env.VERCEL_URL)}`;
   }
 
-  return 'http://localhost:3000';
+  if (process.env.NODE_ENV !== 'production') {
+    return devLocalhostFallback();
+  }
+  return productionLastResortBase();
 }
 
 /**
- * Origen público sin `NextRequest` (cron, mailers, jobs). Misma prioridad de env que en producción.
+ * Origen público sin `NextRequest` (cron, mailers, jobs). Prioriza `NEXT_PUBLIC_APP_URL` para enlaces en correos.
  */
 export function resolveAppBaseUrlFromEnv(): string {
-  const explicit = process.env.APP_BASE_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim();
+  const explicit = resolveExplicitPublicUrlFromEnv();
   if (explicit) {
-    return explicit.startsWith('http') ? trimSlash(explicit) : `https://${trimSlash(explicit)}`;
+    return explicit;
   }
 
   const domain = process.env.NEXT_PUBLIC_DOMAIN?.trim();
@@ -65,7 +89,10 @@ export function resolveAppBaseUrlFromEnv(): string {
     return `https://${trimSlash(process.env.VERCEL_URL)}`;
   }
 
-  return 'http://localhost:3000';
+  if (process.env.NODE_ENV !== 'production') {
+    return devLocalhostFallback();
+  }
+  return productionLastResortBase();
 }
 
 /** Ruta completa del callback OAuth de Calendar (para mensajes y Google Cloud Console). */

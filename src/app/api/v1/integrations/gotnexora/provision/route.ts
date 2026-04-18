@@ -41,6 +41,12 @@ function resolveLoginUrl() {
   const direct = process.env.NEXORA_STUDIO_LOGIN_URL?.trim();
   if (direct) return direct;
 
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (appUrl) {
+    const base = appUrl.startsWith('http') ? appUrl : `https://${appUrl}`;
+    return `${base.replace(/\/$/, '')}/auth/login`;
+  }
+
   const nextAuth = process.env.NEXTAUTH_URL?.trim();
   if (nextAuth) return `${nextAuth.replace(/\/$/, '')}/auth/login`;
 
@@ -66,11 +72,11 @@ async function sendProvisionEmail(input: {
   plan: string;
 }) {
   const loginUrl = resolveLoginUrl();
-  const subject = 'Tu acceso a Nexora está listo';
+  const subject = 'Tu acceso está listo';
   const text = [
     `Hola ${input.name},`,
     '',
-    'Tu cuenta de Nexora fue creada correctamente.',
+    'Tu cuenta fue creada correctamente.',
     `Plan activado: ${input.plan}`,
     '',
     `Login: ${loginUrl}`,
@@ -79,15 +85,18 @@ async function sendProvisionEmail(input: {
     '',
     'Te recomendamos cambiar la contraseña después del primer acceso.',
     '',
-    'Equipo Nexora',
+    'Equipo de soporte',
   ].join('\n');
 
-  await sendTransactionalEmail({
+  const result = await sendTransactionalEmail({
     to: input.email,
     subject,
     text,
     html: `<div style="font-family:Arial,sans-serif;line-height:1.6;white-space:pre-wrap">${text}</div>`,
   });
+  if (!result.delivered) {
+    console.error('[gotnexora/provision] Email not delivered:', result);
+  }
 }
 
 export async function POST(request: NextRequest) {

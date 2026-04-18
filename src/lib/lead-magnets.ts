@@ -1,9 +1,10 @@
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
-import path from 'path';
-import fs from 'fs';
-
-const domain = process.env.NEXT_PUBLIC_DOMAIN || 'https://www.gotnexora.com';
-const videoStudioUrl = 'https://estudio-video-web.vercel.app';
+import {
+  AUDIT_DIAGNOSIS_BULLETS,
+  displayNameForAudit,
+  getAuditMeetingLink,
+  getAuditPricingUrl,
+} from '@/lib/audit-flow';
+import { generateAuditPdf } from '@/lib/pdf/generateAuditPdf';
 
 export type AuditNiche = 'servicios' | 'ecommerce' | 'inmobiliario' | 'coaching';
 
@@ -22,7 +23,8 @@ const NICHE_CONFIG: Record<AuditNiche, NicheConfig> = {
     label: 'Servicios',
     accent: [0.98, 0.48, 0.1],
     accentSoft: [0.1, 0.76, 0.9],
-    coverFocus: 'Enfocado en captar prospectos de alto valor, acelerar seguimiento y cerrar con menos friccion.',
+    coverFocus:
+      'Enfocado en captar prospectos de alto valor, acelerar seguimiento y cerrar con menos fricción.',
     scorecardItems: [
       'Tiempo de respuesta del primer contacto comercial.',
       'Claridad de propuesta de valor por servicio.',
@@ -30,8 +32,8 @@ const NICHE_CONFIG: Record<AuditNiche, NicheConfig> = {
     ],
     sprintFocus: [
       'Estandarizar primer follow-up en menos de 24h.',
-      'Separar leads frios y calientes con siguiente accion.',
-      'Optimizar guion de discovery call por objecion.',
+      'Separar leads fríos y calientes con siguiente acción.',
+      'Optimizar guion de discovery call por objeción.',
     ],
     playbookHints: [
       'Usa casos reales por tipo de cliente en apertura.',
@@ -42,15 +44,16 @@ const NICHE_CONFIG: Record<AuditNiche, NicheConfig> = {
     label: 'E-commerce',
     accent: [0.09, 0.77, 0.53],
     accentSoft: [0.33, 0.85, 0.95],
-    coverFocus: 'Orientado a mejorar ROAS, reducir CPA y escalar creatives ganadores sin quemar audiencias.',
+    coverFocus:
+      'Orientado a mejorar ROAS, reducir CPA y escalar creatives ganadores sin quemar audiencias.',
     scorecardItems: [
-      'Relacion gasto publicitario vs rentabilidad neta.',
-      'Frecuencia creativa por audiencia en 7 dias.',
-      'Desempeno por tipo de oferta y bundle.',
+      'Relación gasto publicitario vs rentabilidad neta.',
+      'Frecuencia creativa por audiencia en 7 días.',
+      'Desempeño por tipo de oferta y bundle.',
     ],
     sprintFocus: [
       'Pausar conjuntos con CPA fuera de rango objetivo.',
-      'Duplicar ganadores con variacion de hook y oferta.',
+      'Duplicar ganadores con variación de hook y oferta.',
       'Ajustar retargeting por ventanas de compra.',
     ],
     playbookHints: [
@@ -62,31 +65,33 @@ const NICHE_CONFIG: Record<AuditNiche, NicheConfig> = {
     label: 'Inmobiliario',
     accent: [0.93, 0.63, 0.13],
     accentSoft: [0.18, 0.55, 0.95],
-    coverFocus: 'Disenado para generar citas calificadas, mejorar show rate y aumentar conversion de visitas a cierre.',
+    coverFocus:
+      'Diseñado para generar citas calificadas, mejorar show rate y aumentar conversión de visitas a cierre.',
     scorecardItems: [
-      'Calidad de lead segun presupuesto y zona objetivo.',
+      'Calidad de lead según presupuesto y zona objetivo.',
       'Tasa lead a cita y cita a visita efectiva.',
-      'Seguimiento por etapa con objecion registrada.',
+      'Seguimiento por etapa con objeción registrada.',
     ],
     sprintFocus: [
       'Crear respuesta inicial con filtro de perfil comprador.',
-      'Agendar cita en primera interaccion cuando aplique.',
+      'Agendar cita en primera interacción cuando aplique.',
       'Activar secuencia de nurturing para leads no listos.',
     ],
     playbookHints: [
       'Refuerza prueba social por zona y tipo de propiedad.',
-      'Cierra cada conversacion con compromiso de avance.',
+      'Cierra cada conversación con compromiso de avance.',
     ],
   },
   coaching: {
     label: 'Coaching/Infoproducto',
     accent: [0.83, 0.43, 0.98],
     accentSoft: [0.98, 0.49, 0.72],
-    coverFocus: 'Pensado para escalar sesiones o programas con narrativa clara, autoridad y seguimiento consistente.',
+    coverFocus:
+      'Pensado para escalar sesiones o programas con narrativa clara, autoridad y seguimiento consistente.',
     scorecardItems: [
-      'Mensaje central y transformacion prometida.',
+      'Mensaje central y transformación prometida.',
       'Calidad de aplicantes para llamada de venta.',
-      'Conversion por etapa de tu embudo consultivo.',
+      'Conversión por etapa de tu embudo consultivo.',
     ],
     sprintFocus: [
       'Optimizar VSL/hook principal con beneficio tangible.',
@@ -94,13 +99,13 @@ const NICHE_CONFIG: Record<AuditNiche, NicheConfig> = {
       'Afinar cierre consultivo con manejo de objeciones.',
     ],
     playbookHints: [
-      'Abre con diagnostico, no con pitch directo.',
+      'Abre con diagnóstico, no con pitch directo.',
       'Vincula objeciones a costo de no actuar ahora.',
     ],
   },
 };
 
-function resolveAuditNiche(value?: string | null): AuditNiche {
+export function resolveAuditNiche(value?: string | null): AuditNiche {
   const normalized = String(value || '').trim().toLowerCase();
   if (normalized === 'ecommerce') return 'ecommerce';
   if (normalized === 'inmobiliario') return 'inmobiliario';
@@ -108,181 +113,119 @@ function resolveAuditNiche(value?: string | null): AuditNiche {
   return 'servicios';
 }
 
-const splitLines = (text: string, maxChars = 92) => {
-  const words = text.split(' ');
-  const lines: string[] = [];
-  let current = '';
-  for (const word of words) {
-    const candidate = current ? `${current} ${word}` : word;
-    if (candidate.length > maxChars) {
-      if (current) lines.push(current);
-      current = word;
-    } else {
-      current = candidate;
-    }
-  }
-  if (current) lines.push(current);
-  return lines;
-};
-
-async function buildAuditKitAttachment(firstName: string, niche: AuditNiche) {
-  const generatedAt = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
-  const nicheConfig = NICHE_CONFIG[niche];
-
-  // ── Load reference PDF (premium design) ───────────────────────────────────
-  const templatePath = path.join(process.cwd(), 'public', 'templates', 'nexora-dossier-premium.pdf');
-  const templateBytes = fs.readFileSync(templatePath);
-  const pdf = await PDFDocument.load(templateBytes);
-
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const regular = await pdf.embedFont(StandardFonts.Helvetica);
-
-  // ── Overlay personalisation on page 1 (cover) ─────────────────────────────
-  // Strategy: draw a branded "prepared for" band near the top of the cover,
-  // just below the logo header (which sits around y=780-820 on a 595x842 page).
-  // We also stamp the niche variant and generation date at the bottom.
-  const cover = pdf.getPages()[0];
-
-  // "Preparado para" band — dark semi-transparent strip
-  const bandY = 700;
-  const bandH = 66;
-  cover.drawRectangle({
-    x: 32,
-    y: bandY,
-    width: 531,
-    height: bandH,
-    color: rgb(0.04, 0.08, 0.18),
-    opacity: 0.92,
-  });
-  // Cyan left accent bar
-  cover.drawRectangle({ x: 32, y: bandY, width: 4, height: bandH, color: rgb(0.08, 0.66, 0.59) });
-
-  // Label
-  cover.drawText('PREPARADO PARA', {
-    x: 46,
-    y: bandY + bandH - 18,
-    size: 8,
-    font: bold,
-    color: rgb(0.08, 0.66, 0.59),
-  });
-
-  // Name — truncate to fit (max ~30 chars at size 22)
-  const displayName = firstName.slice(0, 30);
-  cover.drawText(displayName, {
-    x: 46,
-    y: bandY + 22,
-    size: 22,
-    font: bold,
-    color: rgb(0.97, 0.99, 1.0),
-  });
-
-  // Niche badge (right-aligned) + date
-  const nicheLabel = `Variante: ${nicheConfig.label}`;
-  cover.drawText(nicheLabel, {
-    x: 400,
-    y: bandY + bandH - 18,
-    size: 8,
-    font: bold,
-    color: rgb(0.78, 0.86, 0.96),
-  });
-  cover.drawText(generatedAt, {
-    x: 400,
-    y: bandY + 22,
-    size: 8,
-    font: regular,
-    color: rgb(0.55, 0.65, 0.78),
-  });
-
-  // ── Stamp niche focus line below band ────────────────────────────────────
-  cover.drawText(nicheConfig.coverFocus, {
-    x: 46,
-    y: bandY - 16,
-    size: 9,
-    font: regular,
-    color: rgb(0.72, 0.80, 0.92),
-  });
-
-  // ── Bottom footer stamp on every page ────────────────────────────────────
-  const allPages = pdf.getPages();
-  allPages.forEach((page, i) => {
-    // Semi-transparent strip at very bottom
-    page.drawRectangle({ x: 0, y: 0, width: 595, height: 22, color: rgb(0.02, 0.04, 0.12), opacity: 1 });
-    page.drawText(`${firstName} · ${nicheConfig.label} · ${generatedAt}`, {
-      x: 36,
-      y: 6,
-      size: 7,
-      font: regular,
-      color: rgb(0.45, 0.55, 0.68),
-    });
-    page.drawText(`${i + 1} / ${allPages.length}`, {
-      x: 550,
-      y: 6,
-      size: 7,
-      font: regular,
-      color: rgb(0.45, 0.55, 0.68),
-    });
-  });
-
-  const bytes = await pdf.save();
-
-  return {
-    filename: 'nexora-dossier-auditoria.pdf',
-    content: Buffer.from(bytes),
-    contentType: 'application/pdf',
-  };
+export function auditVariantLabelFromNicheParam(value?: string | null): string {
+  return NICHE_CONFIG[resolveAuditNiche(value)].label;
 }
 
-export function getLeadMagnetLinks() {
-  return {
-    aiStudioUrl: videoStudioUrl,
-    pricingUrl: `${domain}#pricing`,
-    signupUrl: `${domain}/auth/signup`,
-    appUrl: process.env.NEXT_PUBLIC_APP_DOWNLOAD_URL || videoStudioUrl,
-  };
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
-export async function buildMasterclassEmail(input: { name?: string | null; email: string; niche?: string | null }) {
-  const firstName = (input.name?.trim() || input.email.split('@')[0]).split(/[._-]/)[0];
-  const niche = resolveAuditNiche(input.niche);
-  const nicheLabel = NICHE_CONFIG[niche].label;
-  const links = getLeadMagnetLinks();
+export async function buildMasterclassEmail(input: {
+  name?: string | null;
+  email: string;
+  niche?: string | null;
+  pdfDownloadUrl: string;
+}) {
+  const nicheLabel = auditVariantLabelFromNicheParam(input.niche);
+  const firstName = displayNameForAudit(input.name, input.email);
+  const meetingUrl = getAuditMeetingLink();
+  const pricingUrl = getAuditPricingUrl();
+  const diagnosisListHtml = AUDIT_DIAGNOSIS_BULLETS.map(
+    (line) => `<li style="margin-bottom:8px;">${escapeHtml(line)}</li>`
+  ).join('');
 
-  const subject = `Tu dossier premium Nexora (${nicheLabel}) · diagnóstico + sprint + playbook`;
-  const preview = `Adjunto: PDF ejecutivo de 6 páginas para ${nicheLabel} con scorecard, matriz de decisiones, sprint y guion comercial.`;
+  const subject = 'Tu auditoría ya está lista';
 
-  // ── Load premium HTML template and substitute variables ───────────────────
-  const templatePath = path.join(process.cwd(), 'public', 'templates', 'nexora-email-auditoria.html');
-  const rawHtml = fs.readFileSync(templatePath, 'utf-8');
-  const html = rawHtml
-    .replace(/\{\{name\}\}/g, firstName)
-    .replace(/\{\{niche\}\}/g, nicheLabel)
-    .replace(/\{\{signup_url\}\}/g, `${links.signupUrl}?source=audit`)
-    .replace(/\{\{studio_url\}\}/g, links.aiStudioUrl);
+  const meetingHtml = meetingUrl
+    ? `<p style="margin:28px 0 8px;font-size:14px;line-height:1.6;color:#64748b;">Si prefieres que lo revisemos contigo:</p>
+<p style="margin:0;"><a href="${escapeHtml(meetingUrl)}" style="color:#0f766e;font-weight:600;font-size:15px;">Prefiero que me lo expliquen</a></p>`
+    : `<p style="margin:28px 0 0;font-size:14px;line-height:1.6;color:#64748b;">Si prefieres que lo revisemos contigo, puedes responder este correo.</p>`;
+
+  const meetingText = meetingUrl
+    ? `\nSi prefieres que lo revisemos contigo:\n${meetingUrl}\n`
+    : '\nSi prefieres que lo revisemos contigo, puedes responder este correo.\n';
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f1f5f9;padding:32px 16px;">
+<tr><td align="center">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;">
+<tr><td style="padding:32px 28px 8px;">
+<p style="margin:0 0 6px;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#64748b;">Tu equipo</p>
+<h1 style="margin:0;font-size:22px;font-weight:700;line-height:1.35;color:#0f172a;">Hola ${escapeHtml(firstName)},</h1>
+</td></tr>
+<tr><td style="padding:8px 28px 0;">
+<p style="margin:0 0 14px;font-size:15px;line-height:1.65;color:#475569;">Tu auditoría ya está lista.</p>
+<p style="margin:0 0 14px;font-size:15px;line-height:1.65;color:#475569;">Estos son los puntos más importantes que detectamos:</p>
+<ul style="margin:0 0 20px;padding-left:20px;color:#475569;font-size:15px;line-height:1.65;">
+${diagnosisListHtml}
+</ul>
+<p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#64748b;">El PDF adjunto y el enlace de abajo te muestran el detalle completo, con qué está fallando y qué aplicar esta semana.</p>
+<p style="margin:0 0 8px;font-size:15px;line-height:1.65;color:#0f172a;font-weight:600;">Ver tu auditoría completa</p>
+<p style="margin:0 0 24px;"><a href="${escapeHtml(input.pdfDownloadUrl)}" style="display:inline-block;color:#0f766e;font-weight:600;font-size:15px;">Abrir auditoría completa</a></p>
+<p style="margin:0 0 14px;font-size:15px;line-height:1.65;color:#475569;">Si quieres aplicar esto con más estructura, puedes ejecutarlo paso a paso desde tu cuenta.</p>
+<p style="margin:0 0 8px;font-size:15px;line-height:1.65;color:#0f172a;font-weight:600;">Suscríbete ahora</p>
+<p style="margin:0 0 8px;"><a href="${escapeHtml(pricingUrl)}" style="color:#0f766e;font-weight:600;font-size:15px;">${escapeHtml(pricingUrl)}</a></p>
+${meetingHtml}
+<p style="margin:28px 0 0;font-size:15px;line-height:1.6;color:#334155;">Quedo atenta,<br><strong>Equipo de soporte</strong></p>
+<p style="margin:16px 0 0;font-size:13px;line-height:1.55;color:#94a3b8;">P.D. Si tienes dudas sobre tu auditoría, puedes responder este correo y lo vemos contigo.</p>
+${nicheLabel ? `<p style="margin:20px 0 0;font-size:12px;color:#94a3b8;">Enfoque: ${escapeHtml(nicheLabel)}</p>` : ''}
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
 
   const text = [
     `Hola ${firstName},`,
     '',
-    `Tu dossier premium de auditoría Nexora (${nicheLabel}) ya está listo — lo encontrarás adjunto en PDF de 6 páginas.`,
+    'Tu auditoría ya está lista.',
     '',
-    'Incluye:',
-    '  · Diagnóstico y scorecard operativo de 15 puntos.',
-    '  · Matriz impacto/esfuerzo para priorizar acciones.',
-    '  · Sprint de 7 días y playbook comercial.',
+    'Estos son los puntos más importantes que detectamos:',
     '',
-    'Mini benchmark rápido:',
-    '  · Si tu CPL subió >20% en 14 días → revisa fatiga creativa antes de subir presupuesto.',
-    '  · Si tu lead→reunión está bajo 20% → el cuello está en seguimiento, no en tráfico.',
-    '  · Si no hay hipótesis por canal → un test por semana, no 6 cambios simultáneos.',
+    ...AUDIT_DIAGNOSIS_BULLETS.map((line) => `- ${line}`),
     '',
-    `Agendar sprint de auditoría (15 min): ${links.signupUrl}?source=audit`,
-    `Abrir Nexora Studio: ${links.aiStudioUrl}`,
+    'El PDF adjunto y el enlace de abajo te muestran el detalle completo, con qué está fallando y qué aplicar esta semana.',
     '',
-    'Responde con la palabra PRIORIDADES y te enviamos una guía corta para ordenar tu semana.',
+    `Abrir auditoría completa: ${input.pdfDownloadUrl}`,
     '',
-    '— Equipo Nexora · gotnexora.com',
-  ].join('\n');
+    'Si quieres aplicar esto con más estructura, puedes ejecutarlo paso a paso desde tu cuenta.',
+    '',
+    `Suscríbete ahora: ${pricingUrl}`,
+    meetingText,
+    'Quedo atenta,',
+    'Equipo de soporte',
+    '',
+    'P.D. Si tienes dudas sobre tu auditoría, puedes responder este correo y lo vemos contigo.',
+    nicheLabel ? `Enfoque: ${nicheLabel}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
 
-  const attachments = [await buildAuditKitAttachment(firstName, niche)];
+  const pdfBytes = await generateAuditPdf({
+    recipientDisplayName: firstName,
+    variantLabel: nicheLabel,
+  });
 
-  return { subject, preview, html, text, attachments };
+  return {
+    subject,
+    preview: 'Dossier en PDF (adjunto + enlace), resumen ejecutivo y siguiente paso claro.',
+    html,
+    text,
+    attachments: [
+      {
+        filename: 'auditoria-nexora.pdf',
+        content: Buffer.from(pdfBytes),
+        contentType: 'application/pdf' as const,
+      },
+    ],
+  };
 }

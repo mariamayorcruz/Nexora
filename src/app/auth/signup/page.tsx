@@ -133,15 +133,21 @@ function SignupForm() {
       <Navbar />
       <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 pb-10 pt-28 sm:px-6 lg:px-8">
         <div className="w-full max-w-md rounded-[28px] border border-gray-200 bg-white p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
-          <h2 className="mb-2 text-center text-3xl font-bold text-gray-900">Crea tu cuenta</h2>
-          <p className="mb-8 text-center text-gray-600">Empieza a gestionar crecimiento, creatividad y campañas desde un solo lugar.</p>
+          <h2 className="mb-2 text-center text-3xl font-bold text-gray-900">
+            Empieza a corregir lo que está frenando tus resultados
+          </h2>
+          <p className="mb-8 text-center text-gray-600">
+            Estás a un paso de aplicar todo lo que viste en tu auditoría.
+          </p>
 
           {selectedPlanConfig && (
             <div className="mb-6 rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm text-slate-700">
-              <p className="font-semibold text-slate-900">Estás activando el plan {selectedPlanConfig.marketingLabel}</p>
+              <p className="font-semibold text-slate-900">
+                Seleccionaste el plan {selectedPlanConfig.marketingLabel}
+              </p>
               <p className="mt-1">
-                Cuando termines tu cuenta te llevaremos directo a Stripe para completar tu suscripción{' '}
-                {selectedBilling === 'yearly' ? 'anual' : 'mensual'}.
+                El siguiente paso es completar el pago de tu suscripción{' '}
+                {selectedBilling === 'yearly' ? 'anual' : 'mensual'} y tendrás acceso inmediato en cuanto termine.
               </p>
             </div>
           )}
@@ -232,8 +238,12 @@ function SignupForm() {
             </label>
 
             <button type="submit" disabled={loading} className="w-full btn-primary disabled:opacity-50">
-              {loading ? 'Creando cuenta...' : 'Crear cuenta'}
+              {loading ? 'Preparando tu acceso...' : 'Continuar al pago'}
             </button>
+            <div className="space-y-1 text-center text-sm text-gray-500">
+              <p>Te tomará menos de 30 segundos</p>
+              <p>No estás comprando todavía. Solo estás creando tu acceso.</p>
+            </div>
           </form>
 
           <p className="mt-6 text-center text-gray-600">

@@ -1,16 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { BarChart2, KanbanSquare, LayoutDashboard, LifeBuoy, Megaphone, Receipt, Settings2, ShieldCheck, Users, Wand2 } from 'lucide-react';
+import { BarChart2, LayoutDashboard, LifeBuoy, Megaphone, Receipt, Settings2, ShieldCheck, Users, Wand2, Zap } from 'lucide-react';
 import DashboardChatbot from '@/components/DashboardChatbot';
 import { useAppLanguage } from '@/hooks/use-app-language';
 
 const SIDEBAR_ICONS: Record<string, React.ElementType> = {
   OV: LayoutDashboard,
-  CR: Users,
-  PL: KanbanSquare,
+  CL: Users,
+  AU: Zap,
   CN: Megaphone,
   IA: Wand2,
   FA: Receipt,
@@ -37,13 +37,27 @@ interface DashboardUser {
   } | null;
 }
 
+type MenuLinkRow = { kind: 'link'; label: string; href: string; icon: string };
+type MenuGroupRow = {
+  kind: 'group';
+  label: string;
+  icon: string;
+  children: { label: string; href: string }[];
+};
+type MenuRow = MenuLinkRow | MenuGroupRow;
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const { language, setLanguage } = useAppLanguage();
   const [user, setUser] = useState<DashboardUser | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const billingCheckoutFocus =
+    pathname === '/dashboard/billing' &&
+    searchParams.get('autostart') === '1' &&
+    Boolean(searchParams.get('plan'));
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -75,36 +89,74 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     void fetchUser();
   }, [router]);
 
-  const menuItems = [
-    { label: language === 'en' ? 'Overview' : 'Resumen', href: '/dashboard', icon: 'OV' },
-    { label: language === 'en' ? 'CRM + Sales Engine' : 'CRM + Motor de Ventas', href: '/dashboard/crm', icon: 'CR' },
-    { label: language === 'en' ? 'Pipeline Board' : 'Pipeline visual', href: '/dashboard/pipeline', icon: 'PL' },
-    { label: language === 'en' ? 'Campaign Hub' : 'Campañas + Canales', href: '/dashboard/connect', icon: 'CN' },
-    { label: 'Nexora Studio', href: '/dashboard/studio', icon: 'IA' },
-    { label: language === 'en' ? 'Billing' : 'Facturación', href: '/dashboard/billing', icon: 'FA' },
-    { label: language === 'en' ? 'Support' : 'Soporte', href: '/dashboard/support', icon: 'SP' },
-    { label: language === 'en' ? 'Settings' : 'Configuración', href: '/dashboard/settings', icon: 'CO' },
+  const menuRows: MenuRow[] = [
+    { kind: 'link', label: language === 'en' ? 'Overview' : 'Resumen', href: '/dashboard', icon: 'OV' },
+    {
+      kind: 'group',
+      label: language === 'en' ? 'Clients' : 'Clientes',
+      icon: 'CL',
+      children: [
+        { label: language === 'en' ? 'List' : 'Lista', href: '/dashboard/leads' },
+        { label: 'CRM', href: '/dashboard/crm' },
+        { label: 'Pipeline', href: '/dashboard/pipeline' },
+      ],
+    },
+    {
+      kind: 'group',
+      label: language === 'en' ? 'Automations' : 'Automatizaciones',
+      icon: 'AU',
+      children: [
+        {
+          label: language === 'en' ? 'Sequences & calendar' : 'Secuencias y calendario',
+          href: '/dashboard/crm',
+        },
+      ],
+    },
+    {
+      kind: 'link',
+      label: language === 'en' ? 'Campaign Hub' : 'Campañas + Canales',
+      href: '/dashboard/connect',
+      icon: 'CN',
+    },
+    { kind: 'link', label: 'Nexora Studio', href: '/dashboard/studio', icon: 'IA' },
+    { kind: 'link', label: language === 'en' ? 'Billing' : 'Facturación', href: '/dashboard/billing', icon: 'FA' },
+    { kind: 'link', label: language === 'en' ? 'Support' : 'Soporte', href: '/dashboard/support', icon: 'SP' },
+    { kind: 'link', label: language === 'en' ? 'Settings' : 'Configuración', href: '/dashboard/settings', icon: 'CO' },
   ];
 
   if (user?.entitlements?.capabilities?.canUseAdvancedAnalytics) {
-    menuItems.splice(4, 0, {
+    menuRows.splice(4, 0, {
+      kind: 'link',
       label: language === 'en' ? 'Analytics' : 'Analítica',
       href: '/dashboard/analytics',
       icon: 'AN',
     });
   }
 
-  const isMenuItemActive = (href: string) => {
+  const isChildActive = (href: string) => {
     if (href === '/dashboard/connect') {
       return pathname === '/dashboard/connect' || pathname.startsWith('/dashboard/campaigns');
     }
-
+    if (href === '/dashboard/leads') {
+      return pathname === '/dashboard/leads' || pathname.startsWith('/dashboard/leads/');
+    }
+    if (href === '/dashboard/crm') {
+      return pathname === '/dashboard/crm' || pathname.startsWith('/dashboard/crm/');
+    }
+    if (href === '/dashboard/pipeline') {
+      return pathname === '/dashboard/pipeline' || pathname.startsWith('/dashboard/pipeline/');
+    }
     return pathname === href;
   };
 
   const canAccessAdminPanel = Boolean(user?.isAdmin || user?.founderAccess);
   if (canAccessAdminPanel) {
-    menuItems.push({ label: language === 'en' ? 'Admin panel' : 'Panel admin', href: '/admin', icon: 'AD' });
+    menuRows.push({
+      kind: 'link',
+      label: language === 'en' ? 'Admin panel' : 'Panel admin',
+      href: '/admin',
+      icon: 'AD',
+    });
   }
 
   const handleLogout = () => {
@@ -125,6 +177,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen bg-slate-950">
+      {!billingCheckoutFocus && (
       <aside
         className={`fixed z-40 h-screen w-60 overflow-y-auto border-r border-slate-800 bg-slate-950 transition-transform lg:relative ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
@@ -158,23 +211,61 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </button>
             ))}
           </div>
-          {menuItems.map((item) => {
-            const active = isMenuItemActive(item.href);
-            const IconComponent = SIDEBAR_ICONS[item.icon] ?? LayoutDashboard;
+          {menuRows.map((row) => {
+            if (row.kind === 'link') {
+              const active = isChildActive(row.href);
+              const IconComponent = SIDEBAR_ICONS[row.icon] ?? LayoutDashboard;
+              return (
+                <Link
+                  key={row.href}
+                  href={row.href}
+                  onClick={() => setSidebarOpen(false)}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition ${
+                    active ? 'bg-slate-900 text-white' : 'text-slate-400 hover:bg-slate-900/60 hover:text-white'
+                  }`}
+                >
+                  <span
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${active ? 'bg-cyan-500/20 text-cyan-300' : 'text-slate-500'}`}
+                  >
+                    <IconComponent size={16} />
+                  </span>
+                  <span className="text-sm font-medium">{row.label}</span>
+                </Link>
+              );
+            }
+
+            const IconComponent = SIDEBAR_ICONS[row.icon] ?? LayoutDashboard;
+            const groupActive = row.children.some((c) => isChildActive(c.href));
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition ${
-                  active ? 'bg-slate-900 text-white' : 'text-slate-400 hover:bg-slate-900/60 hover:text-white'
-                }`}
-              >
-                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${active ? 'bg-cyan-500/20 text-cyan-300' : 'text-slate-500'}`}>
-                  <IconComponent size={16} />
-                </span>
-                <span className="text-sm font-medium">{item.label}</span>
-              </Link>
+              <div key={row.label} className="space-y-1">
+                <div
+                  className={`flex items-center gap-3 rounded-xl px-3 py-2 ${groupActive ? 'text-white' : 'text-slate-500'}`}
+                >
+                  <span
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${groupActive ? 'bg-cyan-500/20 text-cyan-300' : 'text-slate-600'}`}
+                  >
+                    <IconComponent size={16} />
+                  </span>
+                  <span className="text-sm font-semibold">{row.label}</span>
+                </div>
+                <div className="space-y-0.5 border-l border-slate-800 pl-2 ml-4">
+                  {row.children.map((child) => {
+                    const active = isChildActive(child.href);
+                    return (
+                      <Link
+                        key={`${row.label}-${child.href}-${child.label}`}
+                        href={child.href}
+                        onClick={() => setSidebarOpen(false)}
+                        className={`flex items-center rounded-lg px-3 py-2 text-sm transition ${
+                          active ? 'bg-slate-900 font-medium text-white' : 'text-slate-400 hover:bg-slate-900/60 hover:text-white'
+                        }`}
+                      >
+                        {child.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
             );
           })}
         </nav>
@@ -196,8 +287,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </button>
         </div>
       </aside>
+      )}
 
       <div className="flex flex-1 flex-col">
+        {!billingCheckoutFocus && (
         <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950 px-6 py-4 lg:hidden">
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="flex flex-col gap-1">
             <span className="block h-0.5 w-6 bg-white" />
@@ -207,14 +300,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <span className="text-lg font-bold text-white">Nexora</span>
           <div className="w-6" />
         </div>
+        )}
 
-        <main className="flex-1 overflow-y-auto bg-slate-950 px-6 py-6 text-slate-200">
-          <div className="mx-auto w-full max-w-[1440px]">{children}</div>
+        <main
+          className={`flex-1 overflow-y-auto bg-slate-950 text-slate-200 ${
+            billingCheckoutFocus ? 'px-4 py-10 sm:px-6' : 'px-6 py-6'
+          }`}
+        >
+          <div className={`mx-auto w-full ${billingCheckoutFocus ? 'max-w-3xl' : 'max-w-[1440px]'}`}>{children}</div>
         </main>
       </div>
 
-      {sidebarOpen && <div className="fixed inset-0 z-30 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />}
-      <DashboardChatbot />
+      {!billingCheckoutFocus && sidebarOpen && (
+        <div className="fixed inset-0 z-30 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+      {!billingCheckoutFocus && <DashboardChatbot />}
     </div>
   );
 }

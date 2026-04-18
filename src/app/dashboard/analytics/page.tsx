@@ -238,7 +238,7 @@ export default function AnalyticsPage() {
             <Link href="/dashboard/connect" className="rounded-lg bg-cyan-500 px-3 py-2 text-center text-sm font-semibold text-slate-950">
               Ir a Campanas + Canales
             </Link>
-            <Link href="/dashboard/pipeline" className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-center text-sm font-semibold text-slate-200">
+            <Link href="/dashboard/clientes/pipeline" className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-center text-sm font-semibold text-slate-200">
               Abrir Motor de Ventas
             </Link>
           </div>

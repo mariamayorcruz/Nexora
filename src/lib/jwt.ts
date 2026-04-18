@@ -21,6 +21,29 @@ export function verifyUserToken(token: string): { userId: string; email?: string
   }
 }
 
+/** Token to download the lead-magnet audit PDF (no file storage). Optional niche preserved for personalization. */
+export function signLeadAuditPdfToken(leadCaptureId: string, niche?: string | null) {
+  return jwt.sign(
+    {
+      typ: 'lead-audit-pdf',
+      lid: leadCaptureId,
+      ...(niche ? { niche: String(niche).slice(0, 32) } : {}),
+    },
+    requireJwtSecret(),
+    { expiresIn: '30d' }
+  );
+}
+
+export function verifyLeadAuditPdfToken(token: string): { lid: string; niche?: string } | null {
+  try {
+    const p = jwt.verify(token, requireJwtSecret()) as { typ?: string; lid?: string; niche?: string };
+    if (p.typ !== 'lead-audit-pdf' || !p.lid) return null;
+    return { lid: p.lid, niche: p.niche };
+  } catch {
+    return null;
+  }
+}
+
 export function getBearerToken(authHeader?: string | null) {
   if (!authHeader?.startsWith('Bearer ')) {
     return null;

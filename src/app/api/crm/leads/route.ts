@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isInternalOrTestEmail } from '@/lib/access';
 import { prisma } from '@/lib/prisma';
 import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 import { CRM_ALLOWED_STAGES } from '@/lib/sales-playbook';
@@ -34,10 +35,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const leads = await prisma.crmLead.findMany({
+    const rawLeads = await prisma.crmLead.findMany({
       where: { userId },
       orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
     });
+    const leads = rawLeads.filter((lead) => !isInternalOrTestEmail(lead.email));
 
     return NextResponse.json({
       leads: leads.map((lead) => ({
@@ -60,16 +62,23 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const name = String(body.name || '').trim();
+    const cleanEmail = body.email?.trim()?.toLowerCase() || null;
 
     if (!name) {
       return NextResponse.json({ error: 'El nombre del contacto es obligatorio.' }, { status: 400 });
+    }
+    if (cleanEmail && isInternalOrTestEmail(cleanEmail)) {
+      return NextResponse.json(
+        { error: 'Los correos internos o de prueba no se guardan en el CRM comercial.' },
+        { status: 400 }
+      );
     }
 
     const lead = await prisma.crmLead.create({
       data: {
         userId,
         name,
-        email: body.email?.trim() || null,
+        email: cleanEmail,
         phone: body.phone?.trim() || null,
         company: body.company?.trim() || null,
         source: body.source?.trim() || 'manual',

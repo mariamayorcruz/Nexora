@@ -1,4 +1,5 @@
 import { Campaign, Invoice, Subscription, User } from '@prisma/client';
+import { BILLING_PLANS, type BillingPlan } from '@/lib/billing';
 import { buildLifecycleTemplates } from '@/lib/customer-success';
 
 type CampaignWithAnalytics = Campaign & {
@@ -61,16 +62,21 @@ export interface EmailCenterSummary {
   checklist: string[];
 }
 
-export function calculateMrr(subscriptions: SubscriptionSummary[]) {
-  const monthlyMap: Record<string, number> = {
-    starter: 30,
-    professional: 79,
-    enterprise: 149,
-  };
+/** Alineado con funnel admin / Stripe: suscripción que aporta MRR. */
+export function isSubscriptionMrrEligible(status: string) {
+  return status === 'active' || status === 'trialing';
+}
 
+export function calculateMrr(subscriptions: SubscriptionSummary[]) {
   return subscriptions
-    .filter((subscription) => subscription.status === 'active')
-    .reduce((sum, subscription) => sum + (monthlyMap[subscription.plan] || 0), 0);
+    .filter((s) => isSubscriptionMrrEligible(s.status))
+    .reduce((sum, s) => {
+      const key = String(s.plan || '')
+        .trim()
+        .toLowerCase() as BillingPlan;
+      const cfg = BILLING_PLANS[key];
+      return sum + (cfg?.monthlyPrice ?? 0);
+    }, 0);
 }
 
 export function buildAdminAlerts(params: {

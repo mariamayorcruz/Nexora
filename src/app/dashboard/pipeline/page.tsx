@@ -22,6 +22,7 @@ interface Lead {
   assignedTo: string;
   lastActivity: string;
   nextAction?: string | null;
+  notes?: string | null;
   tags: string[];
 }
 
@@ -44,16 +45,64 @@ interface CrmLeadResponse {
   stage: string;
   value: number;
   nextAction?: string | null;
+  notes?: string | null;
   updatedAt: string;
 }
 
 const STAGES: Array<{ id: StageId; label: string; chipClass: string; icon: string }> = [
-  { id: 'new', label: 'Nuevos Entrantes', chipClass: 'bg-slate-700', icon: '●' },
-  { id: 'contacted', label: 'Contactados', chipClass: 'bg-blue-600', icon: '📞' },
-  { id: 'qualified', label: 'Calificados', chipClass: 'bg-cyan-600', icon: '✓' },
+  { id: 'new', label: 'Nuevo', chipClass: 'bg-slate-700', icon: '●' },
+  { id: 'contacted', label: 'Contactado', chipClass: 'bg-blue-600', icon: '📞' },
+  { id: 'qualified', label: 'Calificado', chipClass: 'bg-cyan-600', icon: '✓' },
   { id: 'proposal', label: 'Propuesta', chipClass: 'bg-amber-600', icon: '📝' },
-  { id: 'closed', label: 'Cerrados', chipClass: 'bg-emerald-600', icon: '✅' },
+  { id: 'closed', label: 'Ganado', chipClass: 'bg-emerald-600', icon: '✅' },
 ];
+
+const ESTADO_MARKER = /^\[#estado:([^\]#]+)\#\]\s*\n?/;
+
+function stripEstadoFromNotes(notes: string | null | undefined): string {
+  return String(notes || '').replace(ESTADO_MARKER, '').trim();
+}
+
+function setEstadoInNotes(notes: string | null | undefined, estadoKey: string): string {
+  const body = stripEstadoFromNotes(notes);
+  if (!estadoKey) return body;
+  return `[#estado:${estadoKey}#]\n${body}`;
+}
+
+function getEstadoFromNotes(notes: string | null | undefined): string | null {
+  const m = String(notes || '').match(ESTADO_MARKER);
+  return m ? m[1] : null;
+}
+
+const OUTCOME_KEYS = ['', 'perdido', 'no_interesado', 'no_responde'] as const;
+
+const OUTCOME_LABELS: Record<string, string> = {
+  '': 'Sin resultado cerrado',
+  perdido: 'Perdido',
+  no_interesado: 'No interesado',
+  no_responde: 'No responde',
+};
+
+function displayNotesPreview(notes: string | null | undefined): string {
+  const s = stripEstadoFromNotes(notes);
+  return s.length > 0 ? s : '';
+}
+
+function openCalendlyUrl(raw: string, setMessage: (msg: string) => void) {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    setMessage('Configura tu enlace de Calendly en CRM → Motor IA + Calendario.');
+    return;
+  }
+  const url = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    const u = new URL(url);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error('invalid');
+    window.open(url, '_blank', 'noopener,noreferrer');
+  } catch {
+    setMessage('URL de agenda no válida.');
+  }
+}
 
 const STAGE_TO_CRM: Record<StageId, string> = {
   new: 'lead',
@@ -105,6 +154,7 @@ function mapLead(item: CrmLeadResponse): Lead {
     assignedTo: 'Sin asignar',
     lastActivity: item.updatedAt,
     nextAction: item.nextAction,
+    notes: item.notes ?? null,
     tags: buildTags(normalizeSource(item.source), item.company),
   };
 }
@@ -164,6 +214,9 @@ export default function PipelineUnifiedPage() {
   const [showNewLeadModal, setShowNewLeadModal] = useState(false);
   const [agendaOpen, setAgendaOpen] = useState(true);
   const [modalSaveTriggered, setModalSaveTriggered] = useState(false);
+  const [meetingCalendly, setMeetingCalendly] = useState('');
+  const [busyLeadId, setBusyLeadId] = useState<string | null>(null);
+  const [sendingFollowUpId, setSendingFollowUpId] = useState<string | null>(null);
 
   const fetchLeads = async () => {
     setLoading(true);
@@ -197,6 +250,17 @@ export default function PipelineUnifiedPage() {
 
   useEffect(() => {
     void fetchLeads();
+  }, []);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    void fetch('/api/crm/followups', { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((d: { meetingLinks?: { calendlyUrl?: string } }) => {
+        setMeetingCalendly(String(d.meetingLinks?.calendlyUrl || ''));
+      })
+      .catch(() => {});
   }, []);
 
   // Auto-close modal when a save triggered from modal completes successfully
@@ -346,6 +410,82 @@ export default function PipelineUnifiedPage() {
     }
   };
 
+  const sendFollowUpLead = async (lead: Lead) => {
+    setSendingFollowUpId(lead.id);
+    setMessage('');
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/crm/followups', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ leadId: lead.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(typeof data.error === 'string' ? data.error : 'No se pudo enviar el follow-up.');
+      }
+      setMessage(data.status === 'sent' ? 'Follow-up enviado.' : 'Follow-up registrado.');
+      await fetchLeads();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No se pudo enviar el follow-up.');
+    } finally {
+      setSendingFollowUpId(null);
+    }
+  };
+
+  const updateLeadOutcome = async (lead: Lead, outcomeKey: string) => {
+    setBusyLeadId(lead.id);
+    setMessage('');
+    try {
+      const token = localStorage.getItem('token');
+      const nextNotes = setEstadoInNotes(lead.notes, outcomeKey);
+      const res = await fetch(`/api/crm/leads/${lead.id}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ notes: nextNotes || null }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(typeof data.error === 'string' ? data.error : 'No se pudo actualizar el resultado.');
+      }
+      await fetchLeads();
+      setMessage('Resultado actualizado.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No se pudo actualizar el resultado.');
+    } finally {
+      setBusyLeadId(null);
+    }
+  };
+
+  const handleColumnGuidance = (stageId: StageId, columnLeads: Lead[]) => {
+    const first = columnLeads[0];
+    switch (stageId) {
+      case 'new':
+        if (first) void sendFollowUpLead(first);
+        else setMessage('Añade un lead para enviar el primer mensaje.');
+        break;
+      case 'contacted':
+        openCalendlyUrl(meetingCalendly, setMessage);
+        break;
+      case 'qualified':
+        console.log('[Pipeline guidance] Enviar propuesta');
+        setMessage('Prepara la propuesta y envíala con tu flujo habitual.');
+        break;
+      case 'proposal':
+        if (first) void sendFollowUpLead(first);
+        else setMessage('Añade un lead para enviar el recordatorio.');
+        break;
+      default:
+        break;
+    }
+  };
+
   return (
     <div className="-m-6 flex h-[calc(100vh-5.8rem)] bg-slate-950 text-slate-200">
       <div className="flex flex-1 flex-col overflow-hidden">
@@ -453,6 +593,10 @@ export default function PipelineUnifiedPage() {
                     stage={stage}
                     leads={filteredLeads.filter((lead) => lead.stage === stage.id)}
                     onDropLead={moveLead}
+                    onGuidance={handleColumnGuidance}
+                    busyLeadId={busyLeadId}
+                    sendingFollowUpId={sendingFollowUpId}
+                    onPatchOutcome={updateLeadOutcome}
                   />
                 ))}
               </div>
@@ -480,6 +624,11 @@ export default function PipelineUnifiedPage() {
                         {lead.nextAction ? (
                           <p className="mt-0.5 truncate text-xs text-slate-500">{lead.nextAction}</p>
                         ) : null}
+                        <p
+                          className={`mt-0.5 line-clamp-2 text-xs ${displayNotesPreview(lead.notes) ? 'text-slate-500' : 'text-slate-600 italic'}`}
+                        >
+                          {displayNotesPreview(lead.notes) || 'Sin notas aún'}
+                        </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-3">
                         <span className={`text-xs font-medium ${priorityColor}`}>{priority}</span>
@@ -614,10 +763,18 @@ function PipelineColumn({
   stage,
   leads,
   onDropLead,
+  onGuidance,
+  busyLeadId,
+  sendingFollowUpId,
+  onPatchOutcome,
 }: {
   stage: { id: StageId; label: string; chipClass: string; icon: string };
   leads: Lead[];
   onDropLead: (leadId: string, newStage: StageId) => void;
+  onGuidance: (stageId: StageId, columnLeads: Lead[]) => void;
+  busyLeadId: string | null;
+  sendingFollowUpId: string | null;
+  onPatchOutcome: (lead: Lead, outcomeKey: string) => void;
 }) {
   const [isOver, setIsOver] = useState(false);
   const [showPlaybook, setShowPlaybook] = useState(false);
@@ -673,9 +830,60 @@ function PipelineColumn({
         ) : null}
       </div>
 
+      {stage.id === 'new' ? (
+        <div className="mx-3 mb-2 rounded-lg border border-cyan-500/20 bg-slate-900/90 px-2 py-2">
+          <p className="text-[10px] text-cyan-100/90">Contactar en menos de 24h</p>
+          <button
+            type="button"
+            onClick={() => onGuidance('new', leads)}
+            disabled={Boolean(sendingFollowUpId)}
+            className="mt-1.5 w-full rounded-lg border border-cyan-500/35 bg-cyan-500/10 px-2 py-1.5 text-[10px] font-semibold text-cyan-200 hover:bg-cyan-500/15 disabled:opacity-50"
+          >
+            Enviar primer mensaje
+          </button>
+        </div>
+      ) : null}
+      {stage.id === 'contacted' ? (
+        <div className="mx-3 mb-2 rounded-lg border border-cyan-500/20 bg-slate-900/90 px-2 py-2">
+          <p className="text-[10px] text-cyan-100/90">Agendar llamada</p>
+          <button
+            type="button"
+            onClick={() => onGuidance('contacted', leads)}
+            className="mt-1.5 w-full rounded-lg border border-cyan-500/35 bg-cyan-500/10 px-2 py-1.5 text-[10px] font-semibold text-cyan-200 hover:bg-cyan-500/15"
+          >
+            Enviar link de agenda
+          </button>
+        </div>
+      ) : null}
+      {stage.id === 'qualified' ? (
+        <div className="mx-3 mb-2 rounded-lg border border-cyan-500/20 bg-slate-900/90 px-2 py-2">
+          <p className="text-[10px] text-cyan-100/90">Enviar propuesta</p>
+          <button
+            type="button"
+            onClick={() => onGuidance('qualified', leads)}
+            className="mt-1.5 w-full rounded-lg border border-cyan-500/35 bg-cyan-500/10 px-2 py-1.5 text-[10px] font-semibold text-cyan-200 hover:bg-cyan-500/15"
+          >
+            Enviar propuesta
+          </button>
+        </div>
+      ) : null}
+      {stage.id === 'proposal' ? (
+        <div className="mx-3 mb-2 rounded-lg border border-cyan-500/20 bg-slate-900/90 px-2 py-2">
+          <p className="text-[10px] text-cyan-100/90">Hacer seguimiento en 48h</p>
+          <button
+            type="button"
+            onClick={() => onGuidance('proposal', leads)}
+            disabled={Boolean(sendingFollowUpId)}
+            className="mt-1.5 w-full rounded-lg border border-cyan-500/35 bg-cyan-500/10 px-2 py-1.5 text-[10px] font-semibold text-cyan-200 hover:bg-cyan-500/15 disabled:opacity-50"
+          >
+            Enviar recordatorio
+          </button>
+        </div>
+      ) : null}
+
       <div className="flex-1 space-y-2.5 overflow-y-auto p-3">
         {leads.map((lead) => (
-          <LeadCard key={lead.id} lead={lead} />
+          <LeadCard key={lead.id} lead={lead} busyLeadId={busyLeadId} onPatchOutcome={onPatchOutcome} />
         ))}
         {leads.length === 0 ? (
           <div className="flex h-20 items-center justify-center rounded-xl border-2 border-dashed border-slate-800 text-xs text-slate-700">
@@ -687,7 +895,15 @@ function PipelineColumn({
   );
 }
 
-function LeadCard({ lead }: { lead: Lead }) {
+function LeadCard({
+  lead,
+  busyLeadId,
+  onPatchOutcome,
+}: {
+  lead: Lead;
+  busyLeadId: string | null;
+  onPatchOutcome: (lead: Lead, outcomeKey: string) => void;
+}) {
   const [isDragging, setIsDragging] = useState(false);
   const priority = getLeadPriority(lead);
   const hours = getHoursSince(lead.lastActivity);
@@ -705,6 +921,9 @@ function LeadCard({ lead }: { lead: Lead }) {
   const whatsappHref = lead.phone
     ? `https://wa.me/${lead.phone.replace(/[^\d]/g, '')}`
     : null;
+
+  const outcome = getEstadoFromNotes(lead.notes);
+  const notesPreview = displayNotesPreview(lead.notes);
 
   return (
     <div
@@ -727,6 +946,14 @@ function LeadCard({ lead }: { lead: Lead }) {
           ${lead.value.toLocaleString()}
         </span>
       </div>
+
+      {outcome ? (
+        <p className="mt-1.5 text-[10px] font-medium text-amber-200/90">Resultado: {OUTCOME_LABELS[outcome] || outcome}</p>
+      ) : null}
+
+      <p className={`mt-1.5 line-clamp-2 text-[11px] leading-relaxed ${notesPreview ? 'text-slate-400' : 'text-slate-600 italic'}`}>
+        {notesPreview || 'Sin notas aún'}
+      </p>
 
       {/* Priority + Probability + SLA */}
       <div className="mt-2 flex items-center gap-2">
@@ -773,6 +1000,38 @@ function LeadCard({ lead }: { lead: Lead }) {
           </a>
         ) : null}
       </div>
+
+      <label className="mt-2 block">
+        <span className="mb-0.5 block text-[9px] uppercase tracking-wide text-slate-500">Resultado</span>
+        <select
+          value={getEstadoFromNotes(lead.notes) || ''}
+          onChange={(event) => void onPatchOutcome(lead, event.target.value)}
+          disabled={busyLeadId === lead.id}
+          className="w-full rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-[10px] text-slate-200 focus:outline-none disabled:opacity-50"
+        >
+          {OUTCOME_KEYS.map((k) => (
+            <option key={k || 'none'} value={k}>
+              {OUTCOME_LABELS[k]}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <button
+        type="button"
+        onClick={() => {
+          if (
+            confirm(
+              '¿Archivar o limpiar este lead? La eliminación permanente no está disponible en la app; puedes marcar un resultado o mover el contacto a Ganado con una nota.'
+            )
+          ) {
+            console.log('[Pipeline] Eliminar lead solicitado', lead.id);
+          }
+        }}
+        className="mt-1.5 w-full text-left text-[9px] text-slate-500 underline decoration-slate-600 underline-offset-2 hover:text-slate-400"
+      >
+        Eliminar lead
+      </button>
     </div>
   );
 }

@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
-import { prisma } from '@/lib/prisma';
+import { prisma, withPrismaRetry } from '@/lib/prisma';
 import { hashPassword, validateEmail, validatePassword } from '@/lib/auth';
 import {
   getFounderPlan,
   getFounderTrialDays,
   isAdminEmail,
   isFounderEmail,
+  isInternalOrTestEmail,
 } from '@/lib/access';
-import { resolveAppBaseUrl } from '@/lib/app-base-url';
 import { signUserToken } from '@/lib/jwt';
 import { dispatchOnboardingSequence } from '@/lib/crm-sequences';
 import { sendRegistrationTeamWelcome, isEmailDeliveryConfigured } from '@/lib/mailer';
@@ -46,71 +46,91 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verificar si el usuario ya existe
-    const existingUser = await prisma.user.findUnique({
-      where: { email: cleanEmail },
+    const founderAccess = isFounderEmail(cleanEmail);
+    const trialEndDate = new Date();
+    trialEndDate.setDate(trialEndDate.getDate() + (founderAccess ? getFounderTrialDays() : 7));
+
+    const registration = await withPrismaRetry(async () => {
+      const existingUser = await prisma.user.findUnique({
+        where: { email: cleanEmail },
+      });
+
+      if (existingUser) {
+        return { status: 'duplicate' as const };
+      }
+
+      const hashedPassword = await hashPassword(password);
+
+      const user = await prisma.$transaction(async (tx) => {
+        const createdUser = await tx.user.create({
+          data: {
+            name: cleanName,
+            email: cleanEmail,
+            password: hashedPassword,
+            marketingOptIn: optedInToMarketing,
+            marketingOptInAt: optedInToMarketing ? new Date() : null,
+            nurtureStatus: optedInToMarketing ? 'eligible' : 'not-consented',
+            nextNurtureSendAt: optedInToMarketing
+              ? new Date(Date.now() + 24 * 60 * 60 * 1000)
+              : null,
+          },
+        });
+
+        await tx.subscription.create({
+          data: {
+            userId: createdUser.id,
+            plan: founderAccess ? getFounderPlan() : 'starter',
+            status: 'active',
+            currentPeriodStart: new Date(),
+            currentPeriodEnd: trialEndDate,
+          },
+        });
+
+        return createdUser;
+      });
+
+      const sid = createSessionId();
+      await upsertUserSession({
+        userId: user.id,
+        sid,
+        userAgent: request.headers.get('user-agent'),
+        ip: request.headers.get('x-forwarded-for'),
+      });
+
+      const token = signUserToken({ userId: user.id, email: user.email, sid });
+
+      return { status: 'ok' as const, user, token, founderAccess };
     });
 
-    if (existingUser) {
+    if (registration.status === 'duplicate') {
       return NextResponse.json(
         { error: 'El email ya está registrado' },
         { status: 400 }
       );
     }
 
-    // Hashear contraseña
-    const hashedPassword = await hashPassword(password);
+    const { user, token, founderAccess: founderFlag } = registration;
 
-    // Crear suscripción por defecto (plan Starter con 7 días de prueba)
-    const founderAccess = isFounderEmail(cleanEmail);
-    const trialEndDate = new Date();
-    trialEndDate.setDate(trialEndDate.getDate() + (founderAccess ? getFounderTrialDays() : 7));
-
-    const user = await prisma.$transaction(async (tx) => {
-      const createdUser = await tx.user.create({
-        data: {
-          name: cleanName,
-          email: cleanEmail,
-          password: hashedPassword,
-          marketingOptIn: optedInToMarketing,
-          marketingOptInAt: optedInToMarketing ? new Date() : null,
-          nurtureStatus: optedInToMarketing ? 'eligible' : 'not-consented',
-          nextNurtureSendAt: optedInToMarketing ? new Date(Date.now() + 24 * 60 * 60 * 1000) : null,
-        },
-      });
-
-      await tx.subscription.create({
-        data: {
-          userId: createdUser.id,
-          plan: founderAccess ? getFounderPlan() : 'starter',
-          status: 'active',
-          currentPeriodStart: new Date(),
-          currentPeriodEnd: trialEndDate,
-        },
-      });
-
-      return createdUser;
-    });
-
-    try {
-      await dispatchOnboardingSequence({
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        createdAt: user.createdAt,
-      });
-    } catch (sequenceError) {
-      console.error('Onboarding sequence dispatch failed:', sequenceError);
+    if (!isInternalOrTestEmail(cleanEmail)) {
+      try {
+        await dispatchOnboardingSequence({
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          createdAt: user.createdAt,
+        });
+      } catch (sequenceError) {
+        console.error('Onboarding sequence dispatch failed:', sequenceError);
+      }
     }
 
-    const adminOrFounder = isAdminEmail(cleanEmail) || founderAccess;
+    const adminOrFounder = isAdminEmail(cleanEmail) || founderFlag;
     if (adminOrFounder && isEmailDeliveryConfigured()) {
       try {
         const result = await sendRegistrationTeamWelcome({
           to: cleanEmail,
           name: cleanName,
-          baseUrl: resolveAppBaseUrl(request),
-          founderAccess,
+          founderAccess: founderFlag,
           isAdmin: isAdminEmail(cleanEmail),
         });
         if (!result.delivered) {
@@ -121,17 +141,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Generar token JWT
-    const sid = createSessionId();
-    await upsertUserSession({
-      userId: user.id,
-      sid,
-      userAgent: request.headers.get('user-agent'),
-      ip: request.headers.get('x-forwarded-for'),
-    });
-
-    const token = signUserToken({ userId: user.id, email: user.email, sid });
-
     return NextResponse.json({
       success: true,
       token,
@@ -139,7 +148,7 @@ export async function POST(request: NextRequest) {
         id: user.id,
         email: user.email,
         name: user.name,
-        founderAccess,
+        founderAccess: founderFlag,
       },
     });
   } catch (error: unknown) {

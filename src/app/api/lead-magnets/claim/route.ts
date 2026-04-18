@@ -1,10 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateEmail } from '@/lib/auth';
+import { buildAuditPdfUrl } from '@/lib/audit-flow';
+import { resolveAppBaseUrlFromEnv } from '@/lib/app-base-url';
+import { signLeadAuditPdfToken } from '@/lib/jwt';
 import { buildMasterclassEmail } from '@/lib/lead-magnets';
 import { isEmailDeliveryConfigured, sendTransactionalEmail } from '@/lib/mailer';
 import { prisma } from '@/lib/prisma';
+import { TRACKING_COOKIE_SID, TRACKING_COOKIE_TID } from '@/lib/tracking';
 
 export const dynamic = 'force-dynamic';
+
+/** Resuelve el trackerId de AttributionSession desde cookies; solo si ya existe sesión en BD. */
+async function resolveAttributionTrackerIdFromRequest(request: NextRequest): Promise<string | null> {
+  const tidRaw = request.cookies.get(TRACKING_COOKIE_TID)?.value?.trim();
+  const sidRaw = request.cookies.get(TRACKING_COOKIE_SID)?.value?.trim();
+  const tid = tidRaw && tidRaw.length >= 12 && tidRaw.length <= 128 ? tidRaw : null;
+  const sid = sidRaw && sidRaw.length >= 12 && sidRaw.length <= 128 ? sidRaw : null;
+
+  if (tid) {
+    const row = await prisma.attributionSession.findUnique({
+      where: { trackerId: tid },
+      select: { trackerId: true },
+    });
+    if (row) return row.trackerId;
+  }
+  if (sid) {
+    const row = await prisma.attributionSession.findUnique({
+      where: { sessionKey: sid },
+      select: { trackerId: true },
+    });
+    if (row) return row.trackerId;
+  }
+  return null;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,7 +52,9 @@ export async function POST(request: NextRequest) {
       select: { id: true },
     });
 
-    const leadCapture =
+    const nameForDb = name.trim() ? name.trim() : null;
+
+    let leadCapture =
       (await prisma.leadCapture.findFirst({
         where: {
           email,
@@ -38,38 +68,76 @@ export async function POST(request: NextRequest) {
       (await prisma.leadCapture.create({
         data: {
           email,
-          name: name || null,
+          name: nameForDb,
           source,
           resource,
           userId: existingUser?.id || null,
         },
       }));
 
+    if (leadCapture.name !== nameForDb) {
+      leadCapture = await prisma.leadCapture.update({
+        where: { id: leadCapture.id },
+        data: { name: nameForDb },
+      });
+    }
+
+    const attributionTrackerId = await resolveAttributionTrackerIdFromRequest(request);
+    if (attributionTrackerId && !leadCapture.trackerId) {
+      leadCapture = await prisma.leadCapture.update({
+        where: { id: leadCapture.id },
+        data: { trackerId: attributionTrackerId },
+      });
+    }
+
     let deliveryStatus: 'sent' | 'pending_setup' | 'failed' = 'pending_setup';
+
+    const origin = resolveAppBaseUrlFromEnv();
+    const pdfToken = signLeadAuditPdfToken(leadCapture.id, niche || 'servicios');
+    const pdfDownloadUrl = buildAuditPdfUrl(origin, pdfToken);
 
     if (isEmailDeliveryConfigured()) {
       try {
-        const emailPayload = await buildMasterclassEmail({ name, email, niche });
-        await sendTransactionalEmail({
+        const emailPayload = await buildMasterclassEmail({
+          name,
+          email,
+          niche,
+          pdfDownloadUrl,
+        });
+        const result = await sendTransactionalEmail({
           to: email,
           subject: emailPayload.subject,
           html: emailPayload.html,
           text: emailPayload.text,
           attachments: emailPayload.attachments,
         });
-        deliveryStatus = 'sent';
+        if (result.delivered) {
+          deliveryStatus = 'sent';
+        } else {
+          console.error('[lead-magnets] Email not delivered:', result);
+          deliveryStatus = 'failed';
+        }
       } catch (emailError) {
         console.error('Masterclass email delivery error:', emailError);
         deliveryStatus = 'failed';
       }
     }
 
+    const thanksQs = new URLSearchParams({
+      resource,
+      delivery: deliveryStatus,
+      email,
+      niche: niche || 'servicios',
+      t: pdfToken,
+    });
+    if (name) thanksQs.set('name', name);
+
     return NextResponse.json({
       success: true,
       leadCaptureId: leadCapture.id,
       resource,
       deliveryStatus,
-      redirectUrl: `/masterclass/gracias?resource=${resource}&delivery=${deliveryStatus}&email=${encodeURIComponent(email)}&niche=${encodeURIComponent(niche || 'servicios')}`,
+      redirectUrl: `/masterclass/gracias?${thanksQs.toString()}`,
     });
   } catch (error) {
     console.error('Lead magnet claim error:', error);

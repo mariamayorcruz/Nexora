@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import {
   SALES_STAGE_ORDER,
   suggestConfidence,
@@ -20,6 +21,7 @@ interface CrmLead {
   value: number;
   confidence: number;
   nextAction?: string | null;
+  notes?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -96,6 +98,46 @@ function stageLabel(stage: string) {
   return STAGES.find((item) => item.key === stage)?.label || stage;
 }
 
+/** Persisted in `notes` as first line; avoids new API fields. */
+const ESTADO_MARKER = /^\[#estado:([^\]#]+)\#\]\s*\n?/;
+
+function stripEstadoFromNotes(notes: string | null | undefined): string {
+  return String(notes || '').replace(ESTADO_MARKER, '').trim();
+}
+
+function setEstadoInNotes(notes: string | null | undefined, estadoKey: string): string {
+  const body = stripEstadoFromNotes(notes);
+  if (!estadoKey) return body;
+  return `[#estado:${estadoKey}#]\n${body}`;
+}
+
+function getEstadoFromNotes(notes: string | null | undefined): string | null {
+  const m = String(notes || '').match(ESTADO_MARKER);
+  return m ? m[1] : null;
+}
+
+const OUTCOME_KEYS = ['', 'perdido', 'no_interesado', 'no_responde'] as const;
+
+const OUTCOME_LABELS: Record<string, string> = {
+  '': 'Sin resultado cerrado',
+  perdido: 'Perdido',
+  no_interesado: 'No interesado',
+  no_responde: 'No responde',
+};
+
+const STAGE_SELECT_LABELS: Record<SalesStage, string> = {
+  lead: 'Nuevo',
+  contacted: 'Contactado',
+  qualified: 'Calificado',
+  proposal: 'Propuesta',
+  won: 'Ganado',
+};
+
+function displayNotesPreview(notes: string | null | undefined): string {
+  const s = stripEstadoFromNotes(notes);
+  return s.length > 0 ? s : '';
+}
+
 const NEW_LEAD_FORM = {
   name: '',
   email: '',
@@ -167,6 +209,7 @@ function buildTimeOptions() {
 const TIME_OPTIONS = buildTimeOptions();
 
 export default function DashboardCrmPage() {
+  const pathname = usePathname();
   const [leads, setLeads] = useState<CrmLead[]>([]);
   const [captures, setCaptures] = useState<LeadCapture[]>([]);
   const [form, setForm] = useState(NEW_LEAD_FORM);
@@ -233,6 +276,16 @@ export default function DashboardCrmPage() {
   }, []);
 
   useEffect(() => {
+    if (!pathname) return;
+    if (
+      pathname.includes('/dashboard/clientes/calendario') ||
+      pathname.includes('/dashboard/automatizaciones')
+    ) {
+      setViewMode('motor');
+    }
+  }, [pathname]);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const calendarState = params.get('calendar');
     if (calendarState === 'connected') {
@@ -245,6 +298,15 @@ export default function DashboardCrmPage() {
       setMessage('No se pudo conectar Google Calendar. Revisa configuración OAuth.');
     }
   }, []);
+
+  useEffect(() => {
+    if (!pathname?.includes('/dashboard/automatizaciones')) return;
+    if (viewMode !== 'motor') return;
+    const timer = window.setTimeout(() => {
+      document.getElementById('crm-automation-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 200);
+    return () => window.clearTimeout(timer);
+  }, [pathname, viewMode]);
 
   const filteredLeads = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -350,6 +412,36 @@ export default function DashboardCrmPage() {
       setMessage(`Lead movido a ${stageLabel(nextStage)}.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'No se pudo mover etapa.');
+    } finally {
+      setBusyLeadId(null);
+    }
+  };
+
+  const updateLeadOutcome = async (lead: CrmLead, outcomeKey: string) => {
+    setBusyLeadId(lead.id);
+    setMessage('');
+
+    try {
+      const token = localStorage.getItem('token');
+      const nextNotes = setEstadoInNotes(lead.notes, outcomeKey);
+      const response = await fetch(`/api/crm/leads/${lead.id}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ notes: nextNotes || null }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || 'No se pudo actualizar el resultado.');
+      }
+
+      await fetchCrm();
+      setMessage('Resultado del lead actualizado.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No se pudo actualizar el resultado.');
     } finally {
       setBusyLeadId(null);
     }
@@ -683,7 +775,7 @@ export default function DashboardCrmPage() {
         },
         body: JSON.stringify({
           message: `Propon una cita comercial para ${appointmentForm.dateKey} a las ${appointmentForm.time}. Quiero titulo corto y notas accionables.`,
-          page: '/dashboard/crm',
+          page: '/dashboard/clientes/crm',
           aiProvider,
           aiApiKey: aiApiKey.trim() || undefined,
         }),
@@ -787,49 +879,165 @@ export default function DashboardCrmPage() {
                   <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-400">{stageLeads.length}</span>
                 </div>
 
+                {stage.key === 'lead' ? (
+                  <div className="mb-2 rounded-lg border border-cyan-500/20 bg-slate-900/90 px-2 py-2">
+                    <p className="text-[10px] text-cyan-100/90">Contactar en menos de 24h</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const first = stageLeads[0];
+                        if (first) void sendFollowUp(first);
+                        else setMessage('Añade un lead en Entrantes para enviar el primer mensaje.');
+                      }}
+                      className="mt-1.5 w-full rounded-lg border border-cyan-500/35 bg-cyan-500/10 px-2 py-1.5 text-[10px] font-semibold text-cyan-200 hover:bg-cyan-500/15"
+                    >
+                      Enviar primer mensaje
+                    </button>
+                  </div>
+                ) : null}
+                {stage.key === 'contacted' ? (
+                  <div className="mb-2 rounded-lg border border-cyan-500/20 bg-slate-900/90 px-2 py-2">
+                    <p className="text-[10px] text-cyan-100/90">Agendar llamada</p>
+                    <button
+                      type="button"
+                      onClick={() => openMeetingLink(salesEngine.meetingLinks.calendlyUrl, 'Calendly')}
+                      className="mt-1.5 w-full rounded-lg border border-cyan-500/35 bg-cyan-500/10 px-2 py-1.5 text-[10px] font-semibold text-cyan-200 hover:bg-cyan-500/15"
+                    >
+                      Enviar link de agenda
+                    </button>
+                  </div>
+                ) : null}
+                {stage.key === 'qualified' ? (
+                  <div className="mb-2 rounded-lg border border-cyan-500/20 bg-slate-900/90 px-2 py-2">
+                    <p className="text-[10px] text-cyan-100/90">Enviar propuesta</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        console.log('[CRM guidance] Enviar propuesta');
+                        setMessage('Prepara la propuesta y envíala con Follow-up o tu canal habitual.');
+                      }}
+                      className="mt-1.5 w-full rounded-lg border border-cyan-500/35 bg-cyan-500/10 px-2 py-1.5 text-[10px] font-semibold text-cyan-200 hover:bg-cyan-500/15"
+                    >
+                      Enviar propuesta
+                    </button>
+                  </div>
+                ) : null}
+                {stage.key === 'proposal' ? (
+                  <div className="mb-2 rounded-lg border border-cyan-500/20 bg-slate-900/90 px-2 py-2">
+                    <p className="text-[10px] text-cyan-100/90">Hacer seguimiento en 48h</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const first = stageLeads[0];
+                        if (first) void sendFollowUp(first);
+                        else setMessage('Añade un lead en Propuesta para enviar el recordatorio.');
+                      }}
+                      className="mt-1.5 w-full rounded-lg border border-cyan-500/35 bg-cyan-500/10 px-2 py-1.5 text-[10px] font-semibold text-cyan-200 hover:bg-cyan-500/15"
+                    >
+                      Enviar recordatorio
+                    </button>
+                  </div>
+                ) : null}
+
                 <div className="space-y-2">
                   {stageLeads.length === 0 ? (
                     <p className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-3 text-xs text-slate-500">Sin oportunidades</p>
                   ) : (
-                    stageLeads.map((lead) => (
-                      <article key={lead.id} className="rounded-xl border border-slate-800 bg-slate-900 p-3">
-                        <p className="text-sm font-semibold text-white">{lead.name}</p>
-                        <p className="mt-1 text-xs text-slate-400">{lead.company || 'Sin empresa'} · {lead.source}</p>
-                        <p className="mt-2 text-xs text-slate-300">${Math.round(lead.value || 0).toLocaleString()} · {lead.confidence || 0}%</p>
-                        <p className="mt-2 line-clamp-2 text-xs text-slate-400">{lead.nextAction || 'Definir siguiente acción'}</p>
+                    stageLeads.map((lead) => {
+                      const outcome = getEstadoFromNotes(lead.notes);
+                      const notesPreview = displayNotesPreview(lead.notes);
+                      return (
+                        <article key={lead.id} className="rounded-xl border border-slate-800 bg-slate-900 p-3">
+                          <p className="text-sm font-semibold text-white">{lead.name}</p>
+                          <p className="mt-1 text-xs text-slate-400">{lead.company || 'Sin empresa'} · {lead.source}</p>
+                          {outcome ? (
+                            <p className="mt-1 text-[10px] font-medium text-amber-200/90">
+                              Resultado: {OUTCOME_LABELS[outcome] || outcome}
+                            </p>
+                          ) : null}
+                          <p
+                            className={`mt-2 line-clamp-2 text-xs ${notesPreview ? 'text-slate-400' : 'text-slate-600 italic'}`}
+                          >
+                            {notesPreview || 'Sin notas aún'}
+                          </p>
+                          <p className="mt-2 text-xs text-slate-300">
+                            ${Math.round(lead.value || 0).toLocaleString()} · {lead.confidence || 0}%
+                          </p>
+                          <p className="mt-2 line-clamp-2 text-xs text-slate-400">
+                            {lead.nextAction || 'Definir siguiente acción'}
+                          </p>
 
-                        <div className="mt-3 flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => void sendFollowUp(lead)}
-                            disabled={sendingFollowUpId === lead.id}
-                            className="flex-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5 text-xs font-medium text-emerald-200 disabled:opacity-50"
-                          >
-                            {sendingFollowUpId === lead.id ? 'Enviando...' : 'Follow-up'}
-                          </button>
-                          <select
-                            value={lead.stage}
-                            onChange={(event) => void moveLead(lead, event.target.value)}
-                            className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-200 focus:outline-none"
-                          >
-                            {STAGES.map((option) => (
-                              <option key={option.key} value={option.key}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
-                          <button
-                            type="button"
-                            onClick={() => void applyPlaybook(lead)}
-                            disabled={busyLeadId === lead.id}
-                            className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-400 hover:border-cyan-500 hover:text-cyan-300"
-                            title="Aplicar playbook"
-                          >
-                            ✦
-                          </button>
-                        </div>
-                      </article>
-                    ))
+                          <div className="mt-3 flex flex-col gap-2">
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => void sendFollowUp(lead)}
+                                disabled={sendingFollowUpId === lead.id}
+                                className="flex-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5 text-xs font-medium text-emerald-200 disabled:opacity-50"
+                              >
+                                {sendingFollowUpId === lead.id ? 'Enviando...' : 'Follow-up'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void applyPlaybook(lead)}
+                                disabled={busyLeadId === lead.id}
+                                className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-400 hover:border-cyan-500 hover:text-cyan-300"
+                                title="Aplicar playbook"
+                              >
+                                ✦
+                              </button>
+                            </div>
+                            <label className="block">
+                              <span className="sr-only">Etapa</span>
+                              <select
+                                value={lead.stage}
+                                onChange={(event) => void moveLead(lead, event.target.value)}
+                                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-200 focus:outline-none"
+                              >
+                                {STAGES.map((option) => (
+                                  <option key={option.key} value={option.key}>
+                                    {STAGE_SELECT_LABELS[option.key]}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="block">
+                              <span className="mb-0.5 block text-[10px] uppercase tracking-wide text-slate-500">Resultado</span>
+                              <select
+                                value={getEstadoFromNotes(lead.notes) || ''}
+                                onChange={(event) => void updateLeadOutcome(lead, event.target.value)}
+                                disabled={busyLeadId === lead.id}
+                                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-200 focus:outline-none"
+                              >
+                                {OUTCOME_KEYS.map((k) => (
+                                  <option key={k || 'none'} value={k}>
+                                    {OUTCOME_LABELS[k]}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (
+                                  confirm(
+                                    '¿Archivar o limpiar este lead? La eliminación permanente no está disponible en la app; puedes marcar un resultado (p. ej. No interesado) o mover a Ganado con una nota.'
+                                  )
+                                ) {
+                                  console.log('[CRM] Eliminar lead solicitado', lead.id);
+                                  setMessage(
+                                    'Para limpiar tu lista, usa Resultado (Perdido / No interesado / No responde) o mueve el contacto a Ganado con una nota.'
+                                  );
+                                }
+                              }}
+                              className="w-full text-left text-[10px] text-slate-500 underline decoration-slate-600 underline-offset-2 hover:text-slate-400"
+                            >
+                              Eliminar lead
+                            </button>
+                          </div>
+                        </article>
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -1210,7 +1418,7 @@ export default function DashboardCrmPage() {
             </div>
           </div>
 
-          <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+          <div id="crm-automation-section" className="scroll-mt-24 mt-4 rounded-xl border border-slate-800 bg-slate-950/70 p-4">
             <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Secuencia de emails (editable y automática)</p>
             <div className="mt-3 space-y-3">
               {salesEngine.followUpTemplates.map((template, idx) => (

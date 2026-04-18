@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const session = await stripe.checkout.sessions.create({
+    const checkoutPayload = {
       mode: 'subscription',
       customer: stripeCustomerId,
       client_reference_id: user.id,
@@ -108,7 +108,22 @@ export async function POST(request: NextRequest) {
           billingCycle,
         },
       },
+    } as const;
+
+    console.info('[stripe.checkout] creating session', {
+      selectedPlan: plan,
+      billingInterval: billingCycle,
+      resolvedPriceId: priceId,
+      mode: checkoutPayload.mode,
+      success_url: checkoutPayload.success_url,
+      cancel_url: checkoutPayload.cancel_url,
+      customer: checkoutPayload.customer,
+      customer_email: null,
+      metadata: checkoutPayload.metadata,
+      subscription_metadata: checkoutPayload.subscription_data.metadata,
     });
+
+    const session = await stripe.checkout.sessions.create(checkoutPayload);
 
     return NextResponse.json({
       sessionId: session.id,
@@ -116,7 +131,28 @@ export async function POST(request: NextRequest) {
       plan: planConfig.marketingLabel,
     });
   } catch (error) {
-    console.error('Stripe checkout error:', error);
+    const stripeError = error as {
+      message?: string;
+      type?: string;
+      code?: string;
+      param?: string;
+      raw?: {
+        message?: string;
+        param?: string;
+      };
+      statusCode?: number;
+    };
+
+    console.error('Stripe checkout error:', {
+      message: stripeError?.message,
+      type: stripeError?.type,
+      code: stripeError?.code,
+      param: stripeError?.param,
+      rawMessage: stripeError?.raw?.message,
+      rawParam: stripeError?.raw?.param,
+      statusCode: stripeError?.statusCode,
+      error: stripeError,
+    });
     return NextResponse.json(
       { error: 'No se pudo crear la sesion de pago en este momento.' },
       { status: 500 }

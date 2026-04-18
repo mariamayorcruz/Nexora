@@ -43,7 +43,6 @@ export default function DashboardPage() {
   const [user, setUser] = useState<DashboardUser | null>(null);
   const [adAccounts, setAdAccounts] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
-  const [crmStats, setCrmStats] = useState<{ totalPipelineValue: number; wonValue: number; totalLeads: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [compactView, setCompactView] = useState(true);
 
@@ -68,24 +67,18 @@ export default function DashboardPage() {
 
     const fetchUserData = async () => {
       try {
-        const [meResponse, statsResponse] = await Promise.all([
-          fetch('/api/users/me', { headers: { Authorization: `Bearer ${token}` } }),
-          fetch('/api/crm/stats', { headers: { Authorization: `Bearer ${token}` } }),
-        ]);
+        const response = await fetch('/api/users/me', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
-        if (!meResponse.ok) {
+        if (!response.ok) {
           throw new Error('Failed to fetch user');
         }
 
-        const data = await meResponse.json();
+        const data = await response.json();
         setUser(data.user);
         setAdAccounts(data.adAccounts || []);
         setCampaigns(data.campaigns || []);
-
-        if (statsResponse.ok) {
-          const stats = await statsResponse.json();
-          setCrmStats(stats);
-        }
       } catch (error) {
         console.error('Error fetching user:', error);
         window.location.href = '/auth/login';
@@ -98,56 +91,14 @@ export default function DashboardPage() {
   }, []);
 
   const activeCampaigns = campaigns.filter((campaign) => campaign.status === 'active');
+  const totalSpend = campaigns.reduce((sum, campaign) => sum + (campaign.analytics?.spend || 0), 0);
+  const totalRevenue = campaigns.reduce((sum, campaign) => sum + (campaign.analytics?.revenue || 0), 0);
   const totalClicks = campaigns.reduce((sum, campaign) => sum + (campaign.analytics?.clicks || 0), 0);
   const totalConversions = campaigns.reduce((sum, campaign) => sum + (campaign.analytics?.conversions || 0), 0);
-  const estimatedLeads = crmStats?.totalLeads ?? (totalConversions > 0 ? totalConversions : Math.max(1, Math.round(totalClicks * 0.08)));
+  const roi = totalSpend > 0 ? Math.round(((totalRevenue - totalSpend) / totalSpend) * 100) : 0;
+  const estimatedLeads = totalConversions > 0 ? totalConversions : Math.max(1, Math.round(totalClicks * 0.08));
   const estimatedWins = Math.max(0, Math.round(estimatedLeads * 0.18));
   const entitlements = user?.entitlements;
-
-  const handleRunAutopilot = async () => {
-    setAutopilotRunning(true);
-    setAutopilotDraftSaved(false);
-    try {
-      const token = localStorage.getItem('token');
-      const autopilotMessage = [
-        `Analiza mi cuenta: tengo ${adAccounts.length} cuentas conectadas, ${activeCampaigns.length} campañas activas, pipeline CRM de $${(crmStats?.totalPipelineValue ?? 0).toLocaleString()}.`,
-        'Dame el diagnóstico más útil ahora mismo y si puedes, genera un borrador de campaña concreto.',
-        'Sé directo y accionable en español.',
-      ].join(' ');
-      const response = await fetch('/api/support/assistant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ message: autopilotMessage, aiProvider: 'auto' }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
-      setAutopilotResult(data.reply);
-      setAutopilotProvider(data?.ai?.providerUsed || 'heuristic');
-    } catch {
-      setAutopilotResult({ title: 'No disponible', message: 'El autopiloto no pudo conectar ahora. Vuelve a intentar en unos segundos.', nextSteps: [] });
-    } finally {
-      setAutopilotRunning(false);
-    }
-  };
-
-  const handleAutopilotSaveDraft = async () => {
-    if (!autopilotResult?.campaignDraft) return;
-    setAutopilotSavingDraft(true);
-    try {
-      const token = localStorage.getItem('token');
-      const resp = await fetch('/api/campaigns/draft', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(autopilotResult.campaignDraft),
-      });
-      if (!resp.ok) throw new Error('error');
-      setAutopilotDraftSaved(true);
-    } catch {
-      // silencio — el botón mostrará estado normal
-    } finally {
-      setAutopilotSavingDraft(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -211,7 +162,7 @@ export default function DashboardPage() {
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link
-                href={entitlements?.capabilities?.canUseAdvancedAnalytics ? '/dashboard/pipeline' : '/dashboard/billing'}
+                href={entitlements?.capabilities?.canUseAdvancedAnalytics ? '/dashboard/clientes/pipeline' : '/dashboard/billing'}
                 className="inline-flex items-center rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200"
               >
                 {entitlements?.capabilities?.canUseAdvancedAnalytics
@@ -258,23 +209,18 @@ export default function DashboardPage() {
           <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-500">{language === 'en' ? 'Based on clicks and conversions' : 'Basados en clics y conversiones'}</p>
         </div>
         <div className="rounded-[30px] border border-slate-800 bg-slate-900/70 p-5 shadow-[0_16px_55px_rgba(2,6,23,0.5)] transition-shadow hover:shadow-cyan-500/10">
-          <p className="text-sm text-slate-400">{language === 'en' ? 'Pipeline value' : 'Valor del pipeline'}</p>
-          <p className="mt-3 text-4xl font-semibold text-emerald-400">
-            ${(crmStats?.totalPipelineValue ?? 0).toLocaleString()}
-          </p>
-          <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-500">CRM · todos los stages</p>
+          <p className="text-sm text-slate-400">{language === 'en' ? 'Estimated ROI' : 'ROI estimado'}</p>
+          <p className="mt-3 text-4xl font-semibold text-white">{roi}%</p>
         </div>
         <div className="rounded-[30px] border border-slate-800 bg-slate-900/70 p-5 shadow-[0_16px_55px_rgba(2,6,23,0.5)] transition-shadow hover:shadow-cyan-500/10">
-          <p className="text-sm text-slate-400">{language === 'en' ? 'Closed / Won' : 'Cerrado / Won'}</p>
-          <p className="mt-3 text-4xl font-semibold text-cyan-300">
-            ${(crmStats?.wonValue ?? 0).toLocaleString()}
-          </p>
-          <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-500">Ingresos confirmados</p>
+          <p className="text-sm text-slate-400">{language === 'en' ? 'Likely sales' : 'Ventas probables'}</p>
+          <p className="mt-3 text-4xl font-semibold text-white">{estimatedWins}</p>
+          <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-500">Lectura rápida del embudo</p>
         </div>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-3">
-        <Link href="/dashboard/pipeline" className="group block xl:col-span-1">
+        <Link href="/dashboard/clientes/pipeline" className="group block xl:col-span-1">
           <div className="h-full rounded-[32px] border border-indigo-400/30 bg-[linear-gradient(180deg,#1e1b4b_0%,#111827_58%,#020617_100%)] p-8 shadow-[0_18px_60px_rgba(30,27,75,0.5)] transition group-hover:-translate-y-1 group-hover:shadow-[0_26px_70px_rgba(99,102,241,0.25)]">
             <Target className="h-12 w-12 text-indigo-600" />
             <h2 className="mt-6 text-2xl font-semibold text-white">Motor de ventas</h2>
@@ -284,7 +230,7 @@ export default function DashboardPage() {
           </div>
         </Link>
 
-        <Link href="/dashboard/pipeline" className="group block xl:col-span-1">
+        <Link href="/dashboard/clientes/pipeline" className="group block xl:col-span-1">
           <div className="h-full rounded-[32px] border border-violet-400/30 bg-[linear-gradient(180deg,#2e1065_0%,#111827_60%,#020617_100%)] p-8 shadow-[0_18px_60px_rgba(46,16,101,0.5)] transition group-hover:-translate-y-1 group-hover:shadow-[0_26px_70px_rgba(167,139,250,0.25)]">
             <Users2 className="h-12 w-12 text-violet-600" />
             <h2 className="mt-6 text-2xl font-semibold text-white">Seguimiento comercial inteligente</h2>

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 import {
   DEFAULT_SALES_ENGINE,
+  filterVisibleSentLogs,
   parseStoredCadence,
   serializeCadence,
   type FollowUpTrigger,
@@ -45,7 +46,10 @@ export async function GET(request: NextRequest) {
       settings: {
         ...settings,
         defaultCadence: parsed.cadence,
-        salesEngine: parsed.salesEngine,
+        salesEngine: {
+          ...parsed.salesEngine,
+          sentLogs: filterVisibleSentLogs(parsed.salesEngine.sentLogs),
+        },
       },
     });
   } catch (error) {
@@ -173,7 +177,10 @@ export async function POST(request: NextRequest) {
       settings: {
         ...settings,
         defaultCadence: cadenceValue,
-        salesEngine: nextSalesEngine,
+        salesEngine: {
+          ...nextSalesEngine,
+          sentLogs: filterVisibleSentLogs(nextSalesEngine.sentLogs),
+        },
       },
     });
   } catch (error) {

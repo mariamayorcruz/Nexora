@@ -23,6 +23,8 @@ model User {
   nurtureStatus     String       @default("not-consented")
   lastNurtureSentAt DateTime?
   nextNurtureSendAt DateTime?
+  /// Primera vez que la suscripción entró en estado pagado (active/trial) vía sync webhook.
+  onboardingStartedAt DateTime?
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
   subscription      Subscription?
@@ -90,6 +92,7 @@ model Campaign {
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
   analytics         Analytics?
+  crmLeads          CrmLead[]
 }
 
 model Analytics {
@@ -134,11 +137,14 @@ model CrmLead {
   company         String?
   source          String   @default("manual")
   stage           String   @default("lead")
+  status          String   @default("nuevo")
   value           Float    @default(0)
   confidence      Int      @default(25)
   nextAction      String?
   notes           String?  @db.Text
   lastContactedAt DateTime?
+  campaignId      String?
+  campaign        Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
@@ -253,9 +259,23 @@ model LeadCapture {
   user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   crmLeadId  String?
   convertedToCrmAt DateTime?
+  // Funnel admin: marca pago vía webhook Stripe por email (no asigna CRM a otro tenant).
+  paid              Boolean   @default(false)
+  convertedToPaidAt DateTime?
+  /// Coincide con AttributionSession.trackerId cuando el lead llegó con cookies nxa_tid / nxa_sid.
+  trackerId         String?
+  /// Recuperación comercial: lead sin pago tras umbral (ver `applyUnpaidLeadRecoveryFlags`); no envía email solo.
+  needsSalesFollowup   Boolean   @default(false)
+  salesFollowupMarkedAt DateTime?
+  /// Primer correo de recuperación enviado (evita reenvíos en corridas posteriores).
+  salesRecoveryFollowupSentAt DateTime?
   createdAt  DateTime @default(now())
 
   @@index([email, source])
+  @@index([paid])
+  @@index([trackerId])
+  @@index([needsSalesFollowup, createdAt])
+  @@index([needsSalesFollowup, salesRecoveryFollowupSentAt])
 }
 
 model VerificationToken {

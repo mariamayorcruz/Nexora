@@ -1,12 +1,17 @@
 import { randomUUID } from 'node:crypto';
+import { resolveAppBaseUrlFromEnv } from '@/lib/app-base-url';
 import { prisma } from '@/lib/prisma';
+import { renderCrmTransactionalEmail } from '@/lib/email/template';
+import { capitalizeLeadNameForEmail } from '@/lib/format-person-name';
 import { isEmailDeliveryConfigured, sendTransactionalEmail } from '@/lib/mailer';
 import {
   DEFAULT_FOLLOWUP_TEMPLATES,
   DEFAULT_SALES_ENGINE,
+  sanitizeSalesEngineCopy,
   type FollowUpTemplate,
   type SalesEngineConfig,
 } from './crm-sales-engine-defaults';
+import { isInternalOrTestEmail } from './access';
 
 export type { FollowUpTrigger, FollowUpTemplate, SalesEngineConfig } from './crm-sales-engine-defaults';
 export { DEFAULT_FOLLOWUP_TEMPLATES, DEFAULT_SALES_ENGINE } from './crm-sales-engine-defaults';
@@ -41,8 +46,8 @@ export function parseStoredCadence(raw: string | null | undefined) {
             return {
               id: String(template.id || `template-${index + 1}`),
               name: String(template.name || `Template ${index + 1}`),
-              subject: String(template.subject || ''),
-              body: String(template.body || ''),
+              subject: sanitizeSalesEngineCopy(String(template.subject || '')),
+              body: sanitizeSalesEngineCopy(String(template.body || '')),
               trigger:
                 template.trigger === 'on_signup' ||
                 template.trigger === 'after_signup' ||
@@ -91,7 +96,7 @@ export function parseStoredCadence(raw: string | null | undefined) {
           return {
             id: String(log.id || randomUUID()),
             to: String(log.to || ''),
-            subject: String(log.subject || ''),
+            subject: sanitizeSalesEngineCopy(String(log.subject || '')),
             status:
               log.status === 'sent' || log.status === 'failed' || log.status === 'pending_setup'
                 ? log.status
@@ -131,6 +136,10 @@ export function serializeCadence(payload: { cadence: string; salesEngine: SalesE
   return JSON.stringify(payload);
 }
 
+export function filterVisibleSentLogs(logs: SalesEngineConfig['sentLogs']) {
+  return logs.filter((log) => !isInternalOrTestEmail(log.to));
+}
+
 export function resolveMeetingLink(engine: SalesEngineConfig) {
   if (engine.meetingLinks.calendlyUrl) return engine.meetingLinks.calendlyUrl;
   if (engine.meetingLinks.zoomUrl) return engine.meetingLinks.zoomUrl;
@@ -138,8 +147,11 @@ export function resolveMeetingLink(engine: SalesEngineConfig) {
 }
 
 export function applyTemplateVars(input: string, vars: Record<string, string>) {
+  const rawName = (vars.name ?? '').trim();
+  const nameForEmail = capitalizeLeadNameForEmail(rawName || 'cliente');
+
   return input
-    .replace(/\{\{name\}\}/g, vars.name || 'cliente')
+    .replace(/\{\{name\}\}/g, nameForEmail)
     .replace(/\{\{email\}\}/g, vars.email || '')
     .replace(/\{\{meeting_link\}\}/g, vars.meetingLink || '')
     .replace(/\{\{dashboard_url\}\}/g, vars.dashboardUrl || '');
@@ -158,17 +170,6 @@ export function toMailerAttachments(template: FollowUpTemplate | undefined) {
       filename: asset.name || 'archivo',
       path: asset.url,
     }));
-}
-
-function getDashboardUrl() {
-  const domain = process.env.NEXT_PUBLIC_DOMAIN?.trim();
-  if (domain) {
-    return domain.startsWith('http') ? domain : `https://${domain}`;
-  }
-
-  const appUrl = process.env.NEXTAUTH_URL?.trim();
-  if (appUrl) return appUrl;
-  return 'https://www.gotnexora.com';
 }
 
 export async function ensureSalesEngineSettingsForUser(userId: string) {
@@ -197,11 +198,15 @@ export async function dispatchOnboardingSequence(user: {
   name?: string | null;
   createdAt: Date;
 }) {
+  if (isInternalOrTestEmail(user.email)) {
+    return { sentCount: 0 };
+  }
+
   const settings = await ensureSalesEngineSettingsForUser(user.id);
   const parsed = parseStoredCadence(settings.defaultCadence);
   const salesEngine = parsed.salesEngine;
   const now = Date.now();
-  const dashboardUrl = `${getDashboardUrl().replace(/\/$/, '')}/dashboard`;
+  const dashboardUrl = `${resolveAppBaseUrlFromEnv().replace(/\/$/, '')}/dashboard`;
 
   const existingKeys = new Set(
     salesEngine.sentLogs
@@ -242,17 +247,32 @@ export async function dispatchOnboardingSequence(user: {
 
     let status: 'sent' | 'failed' | 'pending_setup' = 'pending_setup';
 
+    const meetingLink = resolveMeetingLink(salesEngine);
+    const html = renderCrmTransactionalEmail({
+      title: subject.length > 200 ? `${subject.slice(0, 197)}…` : subject,
+      greetingName: user.name || 'emprendedora',
+      bodyText: body,
+      cta: meetingLink ? { label: 'Agendar auditoría', href: meetingLink } : undefined,
+      brandEyebrow: 'Tu equipo',
+    });
+
     if (isEmailDeliveryConfigured()) {
       try {
-        await sendTransactionalEmail({
+        const result = await sendTransactionalEmail({
           to: user.email,
           subject,
           text: body,
-          html: `<div style="white-space:pre-wrap;font-family:Arial,sans-serif;line-height:1.6">${body}</div>`,
+          html,
           attachments: toMailerAttachments(template),
         });
-        status = 'sent';
-      } catch {
+        if (result.delivered) {
+          status = 'sent';
+        } else {
+          console.error('[crm-sequences] Email not delivered:', result);
+          status = 'failed';
+        }
+      } catch (e) {
+        console.error('[crm-sequences] sendTransactionalEmail error:', e);
         status = 'failed';
       }
     }

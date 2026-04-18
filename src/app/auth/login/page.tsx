@@ -1,27 +1,45 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import Navbar from '@/components/Navbar';
+import { useEffect, useState } from 'react';
 
 const inputClassName =
   'w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-base text-gray-900 placeholder:text-gray-400 outline-none transition focus:border-transparent focus:ring-2 focus:ring-primary';
 
+const CREDENTIALS_ERROR =
+  'No pudimos iniciar sesión. Verifica tus datos e intenta nuevamente.';
+const NETWORK_ERROR = 'Problema de conexión. Intenta nuevamente.';
+const EMPTY_FIELDS_ERROR = 'Completa todos los campos para continuar';
+
 export default function Login() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [socialMessage, setSocialMessage] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
 
+  const fieldsFilled = Boolean(formData.email.trim() && formData.password.trim());
+
+  useEffect(() => {
+    if (localStorage.getItem('token')) {
+      router.replace('/dashboard');
+    }
+  }, [router]);
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    setError('');
-    setSocialMessage('');
+    if (loading) {
+      return;
+    }
+    const email = formData.email.trim().toLowerCase();
+    if (!email || !formData.password.trim()) {
+      setError(EMPTY_FIELDS_ERROR);
+      return;
+    }
+
+    setError(null);
     setLoading(true);
 
     try {
@@ -29,7 +47,7 @@ export default function Login() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: formData.email.trim().toLowerCase(),
+          email,
           password: formData.password,
         }),
       });
@@ -37,112 +55,89 @@ export default function Login() {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || 'No pudimos iniciar sesion.');
+        setError(CREDENTIALS_ERROR);
         return;
       }
 
       localStorage.setItem('token', data.token);
-      router.push('/dashboard');
+      router.replace('/dashboard');
     } catch (requestError) {
       console.error('Login request error:', requestError);
-        setError('Error de conexión. Intenta de nuevo.');
+      setError(NETWORK_ERROR);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSocialClick = (provider: 'Google' | 'GitHub') => {
-    setError('');
-    setSocialMessage(
-        `El acceso con ${provider} todavía no está configurado en Nexora. Por ahora entra con email y contraseña para no frenar tu acceso.`
-    );
-  };
-
   return (
-    <>
-      <Navbar />
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 pb-10 pt-28 sm:px-6 lg:px-8">
-        <div className="w-full max-w-md rounded-[28px] border border-gray-200 bg-white p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
-          <h2 className="mb-8 text-center text-3xl font-bold text-gray-900">Inicia sesión</h2>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-6 py-12">
+      <div className="w-full max-w-md">
+        <header className="text-center">
+          <h1 className="text-balance text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
+            Crea campañas, automatiza leads y escala con IA
+          </h1>
+          <p className="mt-4 text-pretty text-base text-gray-600">
+            Accede en segundos a tu dashboard
+          </p>
+        </header>
 
+        <form onSubmit={handleSubmit} className="mt-10 space-y-6">
           {error && (
-            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
               {error}
             </div>
           )}
 
-          {socialMessage && (
-            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-              {socialMessage}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">Email</label>
-              <input
-                type="email"
-                value={formData.email}
-                onChange={(event) => setFormData({ ...formData, email: event.target.value })}
-                required
-                autoComplete="email"
-                spellCheck={false}
-                className={inputClassName}
-                placeholder="tu@email.com"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">Contraseña</label>
-              <input
-                type="password"
-                value={formData.password}
-                onChange={(event) => setFormData({ ...formData, password: event.target.value })}
-                required
-                autoComplete="current-password"
-                className={inputClassName}
-                placeholder="Escribe tu contraseña"
-              />
-            </div>
-
-            <button type="submit" disabled={loading} className="w-full btn-primary disabled:opacity-50">
-              {loading ? 'Entrando...' : 'Inicia sesión'}
-            </button>
-          </form>
-
-          <p className="mt-6 text-center text-gray-600">
-            ¿No tienes cuenta?{' '}
-            <Link href="/auth/signup" className="font-semibold text-primary hover:underline">
-              Registrate aqui
-            </Link>
-          </p>
-
-          <div className="mt-6 flex items-center gap-4">
-            <div className="h-px flex-1 bg-gray-300" />
-            <span className="text-sm text-gray-500">O continua con</span>
-            <div className="h-px flex-1 bg-gray-300" />
+          <div className="space-y-2">
+            <label htmlFor="login-email" className="block text-sm font-medium text-gray-700">
+              Correo electrónico
+            </label>
+            <input
+              id="login-email"
+              type="email"
+              value={formData.email}
+              onChange={(event) => {
+                setError(null);
+                setFormData({ ...formData, email: event.target.value });
+              }}
+              autoComplete="email"
+              autoFocus
+              spellCheck={false}
+              className={inputClassName}
+              placeholder="tu@email.com"
+            />
           </div>
 
-          <div className="mt-6 grid grid-cols-2 gap-4">
-            <button
-              type="button"
-              onClick={() => handleSocialClick('Google')}
-              className="flex items-center justify-center rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-            >
-              <span className="text-base text-gray-900">G</span>
-              <span className="ml-2">Google</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSocialClick('GitHub')}
-              className="flex items-center justify-center rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-            >
-              <span className="text-base text-gray-900">GH</span>
-              <span className="ml-2">GitHub</span>
-            </button>
+          <div className="space-y-2">
+            <label htmlFor="login-password" className="block text-sm font-medium text-gray-700">
+              Contraseña
+            </label>
+            <input
+              id="login-password"
+              type="password"
+              value={formData.password}
+              onChange={(event) => {
+                setError(null);
+                setFormData({ ...formData, password: event.target.value });
+              }}
+              autoComplete="current-password"
+              className={inputClassName}
+              placeholder="••••••••"
+            />
           </div>
-        </div>
+
+          <div className="space-y-4 pt-2">
+            <button
+              type="submit"
+              disabled={loading || !fieldsFilled}
+              className="btn-primary w-full cursor-pointer py-3 text-base disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {loading ? 'Entrando...' : 'Entrar a Nexora'}
+            </button>
+            <p className="text-center text-xs text-gray-500">No necesitas tarjeta de crédito</p>
+          </div>
+        </form>
       </div>
-    </>
+    </div>
   );
 }

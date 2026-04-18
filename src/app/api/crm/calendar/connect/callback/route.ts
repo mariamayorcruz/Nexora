@@ -28,14 +28,14 @@ export async function GET(request: NextRequest) {
   const baseUrl = resolveAppBaseUrl(request);
 
   if (!state) {
-    return NextResponse.redirect(`${baseUrl}/dashboard/crm?calendar=error`);
+    return NextResponse.redirect(`${baseUrl}/dashboard/clientes/calendario?calendar=error`);
   }
 
   const error = request.nextUrl.searchParams.get('error');
   const code = request.nextUrl.searchParams.get('code');
 
   if (error || !code) {
-    return NextResponse.redirect(`${baseUrl}/dashboard/crm?calendar=error`);
+    return NextResponse.redirect(`${baseUrl}/dashboard/clientes/calendario?calendar=error`);
   }
 
   try {
@@ -73,9 +73,9 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return NextResponse.redirect(`${baseUrl}/dashboard/crm?calendar=connected`);
+    return NextResponse.redirect(`${baseUrl}/dashboard/clientes/calendario?calendar=connected`);
   } catch (dbError) {
     console.error('Calendar callback error:', dbError);
-    return NextResponse.redirect(`${baseUrl}/dashboard/crm?calendar=error`);
+    return NextResponse.redirect(`${baseUrl}/dashboard/clientes/calendario?calendar=error`);
   }
 }

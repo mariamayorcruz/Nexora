@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { CreditCard, LifeBuoy, Receipt, Users } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { isSubscriptionMrrEligible } from '@/lib/admin-ops';
 
 type UserRecord = {
   id: string;
@@ -68,7 +69,11 @@ export default function AdminClientesPage() {
     void fetchData();
   }, []);
 
-  const activeSubscriptions = useMemo(() => subscriptions.filter((item) => item.status === 'active').length, [subscriptions]);
+  /** Misma elegibilidad que MRR / embudo admin (`active` o `trialing`). */
+  const activeSubscriptions = useMemo(
+    () => subscriptions.filter((item) => isSubscriptionMrrEligible(item.status)).length,
+    [subscriptions]
+  );
   const openTickets = support?.queueSummary.openTickets || 0;
   const recentUsers = users.slice(0, 8);
 

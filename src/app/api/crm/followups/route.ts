@@ -1,16 +1,34 @@
 import { randomUUID } from 'node:crypto';
+import type Mail from 'nodemailer/lib/mailer';
 import { NextRequest, NextResponse } from 'next/server';
+import { resolveAppBaseUrlFromEnv } from '@/lib/app-base-url';
+import { displayNameForAudit, getAuditPricingUrl } from '@/lib/audit-flow';
+import { isInternalOrTestEmail } from '@/lib/access';
+import { shouldExcludeRecipientFromSalesFollowup } from '@/lib/conversion-automation';
 import { prisma } from '@/lib/prisma';
 import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
+import { renderCrmTransactionalEmail } from '@/lib/email/template';
 import { isEmailDeliveryConfigured, sendTransactionalEmail } from '@/lib/mailer';
+import { generateAuditPdf } from '@/lib/pdf/generateAuditPdf';
 import {
   applyTemplateVars,
   parseStoredCadence,
   resolveMeetingLink,
   serializeCadence,
   toMailerAttachments,
+  filterVisibleSentLogs,
   type SalesEngineConfig,
 } from '@/lib/crm-sequences';
+
+/** CTA principal: compra / aplicar auditoría (#pricing). El enlace de reunión sigue pudiendo ir en el cuerpo vía {{meeting_link}}. */
+const CRM_FOLLOWUP_PRIMARY_CTA = {
+  label: 'Suscríbete ahora',
+  href: getAuditPricingUrl(),
+} as const;
+
+/** Tras el CTA; mismo orden en HTML y texto plano. */
+const CRM_LEAD_FOLLOWUP_POST_CTA =
+  'No es una llamada genérica: saldrás con claridad sobre qué hacer y qué evitar.\n\nQuedo atenta,\nEquipo de soporte';
 
 export async function GET(request: NextRequest) {
   try {
@@ -24,7 +42,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       templates: parsed.salesEngine.followUpTemplates,
-      sentLogs: parsed.salesEngine.sentLogs,
+      sentLogs: filterVisibleSentLogs(parsed.salesEngine.sentLogs),
       meetingLinks: parsed.salesEngine.meetingLinks,
       calendar: parsed.salesEngine.calendar,
     });
@@ -72,6 +90,7 @@ export async function POST(request: NextRequest) {
         const linkedCapture = await prisma.leadCapture.findFirst({
           where: {
             crmLeadId: lead.id,
+            userId,
           },
           orderBy: { createdAt: 'desc' },
           select: {
@@ -98,6 +117,28 @@ export async function POST(request: NextRequest) {
     if (!to) {
       return NextResponse.json({ error: 'Email de destinatario requerido.' }, { status: 400 });
     }
+    if (isInternalOrTestEmail(to)) {
+      return NextResponse.json(
+        { error: 'No enviamos follow-ups comerciales a cuentas internas o de prueba.' },
+        { status: 400 }
+      );
+    }
+
+    if (await shouldExcludeRecipientFromSalesFollowup(to)) {
+      return NextResponse.json(
+        {
+          error:
+            'Este contacto ya está pagando (suscripción activa o captura marcada como pagada). No se envían follow-ups comerciales.',
+        },
+        { status: 400 }
+      );
+    }
+
+    leadName = String(leadName ?? '').trim() || 'cliente';
+    const recipientDisplayName = displayNameForAudit(
+      leadName.toLowerCase() === 'cliente' ? null : leadName,
+      to
+    );
 
     const template =
       salesEngine.followUpTemplates.find((item) => item.id === body.templateId) ||
@@ -105,15 +146,15 @@ export async function POST(request: NextRequest) {
       salesEngine.followUpTemplates[0];
 
     const meetingLink = resolveMeetingLink(salesEngine);
-    const dashboardUrl = `${(process.env.NEXT_PUBLIC_DOMAIN || 'https://www.gotnexora.com').replace(/\/$/, '')}/dashboard`;
-    const subject = applyTemplateVars(String(body.subject || template?.subject || 'Seguimiento Nexora').trim(), {
-      name: leadName,
+    const dashboardUrl = `${resolveAppBaseUrlFromEnv().replace(/\/$/, '')}/dashboard`;
+    const subject = applyTemplateVars(String(body.subject || template?.subject || 'Seguimiento de tu solicitud').trim(), {
+      name: recipientDisplayName,
       meetingLink: meetingLink || '',
       dashboardUrl,
       email: to,
     });
     const bodyText = applyTemplateVars(String(body.body || template?.body || ''), {
-      name: leadName,
+      name: recipientDisplayName,
       meetingLink: meetingLink || '',
       dashboardUrl,
       email: to,
@@ -121,17 +162,80 @@ export async function POST(request: NextRequest) {
 
     let status: 'sent' | 'failed' | 'pending_setup' = 'pending_setup';
 
+    const textMail = `${bodyText}\n\n${CRM_FOLLOWUP_PRIMARY_CTA.label}: ${CRM_FOLLOWUP_PRIMARY_CTA.href}${
+      meetingLink ? `\n\nSi prefieres agendar una llamada: ${meetingLink}` : ''
+    }\n\n${CRM_LEAD_FOLLOWUP_POST_CTA}`;
+
+    const html = renderCrmTransactionalEmail({
+      title: subject.length > 200 ? `${subject.slice(0, 197)}…` : subject,
+      greetingName: recipientDisplayName,
+      bodyText: bodyText,
+      cta: { label: CRM_FOLLOWUP_PRIMARY_CTA.label, href: CRM_FOLLOWUP_PRIMARY_CTA.href },
+      postCtaText: CRM_LEAD_FOLLOWUP_POST_CTA,
+      brandEyebrow: 'Tu equipo',
+    });
+
     if (isEmailDeliveryConfigured()) {
       try {
-        await sendTransactionalEmail({
+        let auditPdfAttachment: Mail.Attachment[] = [];
+        try {
+          const pdfBytes = await generateAuditPdf({
+            recipientName: leadName.toLowerCase() === 'cliente' ? null : leadName,
+            recipientEmail: to,
+            variantLabel: null,
+          });
+          auditPdfAttachment = [
+            {
+              filename: 'auditoria-nexora.pdf',
+              content: Buffer.from(pdfBytes),
+              contentType: 'application/pdf',
+            },
+          ];
+        } catch (pdfErr) {
+          console.error('[crm/followups] generateAuditPdf failed:', pdfErr);
+        }
+
+        const attachments = [...auditPdfAttachment, ...toMailerAttachments(template)];
+        const result = await sendTransactionalEmail({
           to,
           subject,
-          text: bodyText,
-          html: `<div style="white-space:pre-wrap;font-family:Arial,sans-serif;line-height:1.6">${bodyText}</div>`,
-          attachments: toMailerAttachments(template),
+          text: textMail,
+          html,
+          attachments,
+          audit: { flow: 'crm-followups' },
         });
-        status = 'sent';
-      } catch {
+        const delivered = result.delivered;
+        console.info('[email-flow:crm-followups]', {
+          flow: 'crm-followups',
+          templateId: template?.id,
+          trigger: template?.trigger,
+          subjectPreview: subject.slice(0, 120),
+          attachmentCount: attachments.length,
+          to,
+          delivered,
+          failureReason: 'reason' in result ? result.reason : undefined,
+          provider: result.meta?.provider,
+          from: result.meta?.from,
+          providerResponse: result.meta?.providerResponse,
+          resendSkippedDueToAttachments: result.meta?.resendSkippedDueToAttachments,
+        });
+        if (delivered) {
+          status = 'sent';
+        } else {
+          console.error('[crm/followups] Email not delivered:', result);
+          status = 'failed';
+        }
+      } catch (e) {
+        console.error('[crm/followups] sendTransactionalEmail error:', e);
+        console.info('[email-flow:crm-followups]', {
+          flow: 'crm-followups',
+          delivered: false,
+          to,
+          templateId: template?.id,
+          trigger: template?.trigger,
+          failureReason: e instanceof Error ? e.message : String(e),
+          note: 'exception_before_result',
+        });
         status = 'failed';
       }
     }

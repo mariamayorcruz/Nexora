@@ -33,6 +33,11 @@ export default function BillingPage() {
   const shouldAutostart = searchParams.get('autostart') === '1';
   const requestedPlan = requestedPlanFromUrl || fallbackSelection?.plan || null;
   const requestedBilling = requestedBillingFromUrl || fallbackSelection?.billing || 'monthly';
+  const requestedPlanConfig = useMemo(
+    () => (requestedPlan ? BILLING_PLANS[requestedPlan] : null),
+    [requestedPlan]
+  );
+  const checkoutFocusMode = Boolean(shouldAutostart && requestedPlanConfig);
 
   const currentPlanLabel = useMemo(() => getBillingPlanLabel(subscription?.plan), [subscription?.plan]);
 
@@ -198,6 +203,88 @@ export default function BillingPage() {
     return (
       <div className="py-12 text-center">
         <div className="inline-block h-12 w-12 animate-spin rounded-full border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  const renderCheckoutError = () => (
+    <div className="rounded-[32px] border border-red-200 bg-white p-8 text-center shadow-sm sm:p-10">
+      <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-500">Pago</p>
+      <h1 className="mt-4 text-3xl font-bold text-slate-900">No pudimos iniciar el pago</h1>
+      <p className="mt-4 text-base leading-7 text-slate-600">Intenta nuevamente.</p>
+      <button
+        onClick={() => requestedPlanConfig && handlePlanChange(requestedPlanConfig.key, requestedBilling)}
+        disabled={!!processingPlan || !requestedPlanConfig}
+        className="btn-primary mt-8 w-full disabled:opacity-60 sm:w-auto"
+      >
+        {processingPlan ? 'Abriendo Stripe...' : 'Reintentar pago'}
+      </button>
+    </div>
+  );
+
+  if (checkoutFocusMode && checkoutState?.type === 'error') {
+    return renderCheckoutError();
+  }
+
+  if (checkoutFocusMode && requestedPlanConfig) {
+    const price = requestedBilling === 'yearly' ? requestedPlanConfig.yearlyPrice : requestedPlanConfig.monthlyPrice;
+
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-cyan-300">Activación</p>
+          <h1 className="mt-4 text-3xl font-bold text-white sm:text-4xl">Estás a un paso de activar tu acceso</h1>
+          <p className="mt-4 text-base leading-7 text-slate-300">
+            Completa el pago para entrar con tu plan seleccionado y empezar de inmediato.
+          </p>
+        </div>
+
+        {checkoutState && (
+          <div
+            className={`rounded-2xl border p-5 text-sm ${
+              checkoutState.type === 'success'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                : 'border-amber-200 bg-amber-50 text-amber-800'
+            }`}
+          >
+            {checkoutState.message}
+          </div>
+        )}
+
+        <div className="rounded-[32px] border border-slate-800 bg-slate-900/80 p-8 shadow-[0_24px_80px_rgba(2,6,23,0.35)]">
+          <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Plan seleccionado</p>
+          <h2 className="mt-3 text-3xl font-semibold text-white">{requestedPlanConfig.marketingLabel}</h2>
+          <p className="mt-3 text-sm leading-7 text-slate-300">{requestedPlanConfig.description}</p>
+
+          <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-950/70 p-5">
+            <div className="flex items-end gap-2">
+              <span className="text-5xl font-semibold text-white">${price}</span>
+              <span className="pb-2 text-sm text-slate-400">/ mes</span>
+            </div>
+            <p className="mt-3 text-sm text-slate-400">
+              {requestedBilling === 'yearly' ? 'Facturación anual con mejor margen' : 'Facturación mensual flexible'}
+            </p>
+          </div>
+
+          <ul className="mt-8 space-y-3 text-sm text-slate-300">
+            {requestedPlanConfig.features.slice(0, 4).map((feature) => (
+              <li key={feature}>{feature}</li>
+            ))}
+          </ul>
+
+          <button
+            onClick={() => handlePlanChange(requestedPlanConfig.key, requestedBilling)}
+            disabled={!!processingPlan}
+            className="btn-primary mt-10 w-full disabled:opacity-60"
+          >
+            {processingPlan ? 'Abriendo Stripe...' : 'Completar pago'}
+          </button>
+
+          <div className="mt-4 space-y-1 text-center text-sm text-slate-400">
+            <p>Pago seguro con Stripe</p>
+            <p>Acceso inmediato después del pago</p>
+          </div>
+        </div>
       </div>
     );
   }
