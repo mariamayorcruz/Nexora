@@ -1,5 +1,3 @@
-import fetch from 'node-fetch';
-
 /**
  * Envía un prompt a Ollama (servidor local) y retorna la respuesta generada.
  * @param {string} prompt - Texto a enviar al modelo.

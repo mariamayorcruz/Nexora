@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { BarChart2, LayoutDashboard, LifeBuoy, Megaphone, Receipt, Settings2, ShieldCheck, Users, Wand2, Zap } from 'lucide-react';
 import DashboardChatbot from '@/components/DashboardChatbot';
@@ -48,16 +48,25 @@ type MenuRow = MenuLinkRow | MenuGroupRow;
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const router = useRouter();
   const { language, setLanguage } = useAppLanguage();
   const [user, setUser] = useState<DashboardUser | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const billingCheckoutFocus =
-    pathname === '/dashboard/billing' &&
-    searchParams.get('autostart') === '1' &&
-    Boolean(searchParams.get('plan'));
+  const [billingCheckoutFocus, setBillingCheckoutFocus] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const searchParams = new URLSearchParams(window.location.search);
+    setBillingCheckoutFocus(
+      pathname === '/dashboard/billing' &&
+        searchParams.get('autostart') === '1' &&
+        Boolean(searchParams.get('plan'))
+    );
+  }, [pathname]);
 
   useEffect(() => {
     const token = localStorage.getItem('token');

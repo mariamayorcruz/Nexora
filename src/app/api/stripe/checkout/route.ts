@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import Stripe from 'stripe';
 import { BillingCycle, BillingPlan, getBillingPlan, getStripePriceId } from '@/lib/billing';
 import { prisma } from '@/lib/prisma';
 import { getStripeClient } from '@/lib/stripe';
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const checkoutPayload = {
+    const checkoutPayload: Stripe.Checkout.SessionCreateParams = {
       mode: 'subscription',
       customer: stripeCustomerId,
       client_reference_id: user.id,
@@ -108,7 +109,7 @@ export async function POST(request: NextRequest) {
           billingCycle,
         },
       },
-    } as const;
+    };
 
     console.info('[stripe.checkout] creating session', {
       selectedPlan: plan,
@@ -120,7 +121,7 @@ export async function POST(request: NextRequest) {
       customer: checkoutPayload.customer,
       customer_email: null,
       metadata: checkoutPayload.metadata,
-      subscription_metadata: checkoutPayload.subscription_data.metadata,
+      subscription_metadata: checkoutPayload.subscription_data?.metadata,
     });
 
     const session = await stripe.checkout.sessions.create(checkoutPayload);

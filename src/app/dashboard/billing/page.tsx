@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { BILLING_PLANS, BillingCycle, BillingPlan, getBillingPlanLabel } from '@/lib/billing';
 
 interface SubscriptionState {
@@ -17,20 +16,46 @@ interface CheckoutState {
   message: string;
 }
 
+type BillingQueryState = {
+  sessionId: string | null;
+  checkoutStatus: string | null;
+  requestedPlanFromUrl: BillingPlan | null;
+  requestedBillingFromUrl: BillingCycle | null;
+  shouldAutostart: boolean;
+};
+
+function readBillingQueryState(): BillingQueryState {
+  if (typeof window === 'undefined') {
+    return {
+      sessionId: null,
+      checkoutStatus: null,
+      requestedPlanFromUrl: null,
+      requestedBillingFromUrl: null,
+      shouldAutostart: false,
+    };
+  }
+
+  const searchParams = new URLSearchParams(window.location.search);
+
+  return {
+    sessionId: searchParams.get('session_id'),
+    checkoutStatus: searchParams.get('checkout'),
+    requestedPlanFromUrl: searchParams.get('plan') as BillingPlan | null,
+    requestedBillingFromUrl: (searchParams.get('billing') as BillingCycle | null) || null,
+    shouldAutostart: searchParams.get('autostart') === '1',
+  };
+}
+
 export default function BillingPage() {
-  const searchParams = useSearchParams();
   const [subscription, setSubscription] = useState<SubscriptionState | null>(null);
   const [loading, setLoading] = useState(true);
   const [processingPlan, setProcessingPlan] = useState<string | null>(null);
   const [checkoutState, setCheckoutState] = useState<CheckoutState | null>(null);
   const [fallbackSelection, setFallbackSelection] = useState<{ plan: BillingPlan; billing: BillingCycle } | null>(null);
+  const [queryState, setQueryState] = useState<BillingQueryState>(() => readBillingQueryState());
   const autoCheckoutStarted = useRef(false);
 
-  const sessionId = searchParams.get('session_id');
-  const checkoutStatus = searchParams.get('checkout');
-  const requestedPlanFromUrl = searchParams.get('plan') as BillingPlan | null;
-  const requestedBillingFromUrl = (searchParams.get('billing') as BillingCycle | null) || null;
-  const shouldAutostart = searchParams.get('autostart') === '1';
+  const { sessionId, checkoutStatus, requestedPlanFromUrl, requestedBillingFromUrl, shouldAutostart } = queryState;
   const requestedPlan = requestedPlanFromUrl || fallbackSelection?.plan || null;
   const requestedBilling = requestedBillingFromUrl || fallbackSelection?.billing || 'monthly';
   const requestedPlanConfig = useMemo(
@@ -56,6 +81,10 @@ export default function BillingPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    setQueryState(readBillingQueryState());
+  }, []);
 
   useEffect(() => {
     void fetchSubscription();
