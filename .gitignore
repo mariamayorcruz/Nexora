@@ -36,6 +36,7 @@ yarn-error.log*
 # Build
 build/
 .turbo/
+tsconfig.tsbuildinfo
 
 # Database
 *.sqlite
