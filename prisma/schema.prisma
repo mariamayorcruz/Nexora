@@ -25,6 +25,8 @@ model User {
   nextNurtureSendAt DateTime?
   /// Primera vez que la suscripción entró en estado pagado (active/trial) vía sync webhook.
   onboardingStartedAt DateTime?
+  onboardingCompletedAt DateTime?
+  onboardingData    Json?
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
   subscription      Subscription?

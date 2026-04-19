@@ -21,7 +21,12 @@ const SIDEBAR_ICONS: Record<string, React.ElementType> = {
 };
 
 interface DashboardUser {
+  id?: string;
   email: string;
+  name?: string | null;
+  onboardingStartedAt?: string | null;
+  onboardingCompletedAt?: string | null;
+  onboardingData?: Record<string, unknown> | null;
   isAdmin?: boolean;
   founderAccess?: boolean;
   founderPlan?: string | null;
@@ -34,6 +39,7 @@ interface DashboardUser {
   } | null;
   subscription?: {
     plan?: string | null;
+    status?: string | null;
   } | null;
 }
 
@@ -101,6 +107,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         }
 
         const data = await response.json();
+        const subscriptionStatus = data?.user?.subscription?.status?.toLowerCase?.() || null;
+        const onboardingCompletedAt = data?.user?.onboardingCompletedAt ?? null;
+
+        if (subscriptionStatus === 'active' && onboardingCompletedAt === null) {
+          if (hasRedirected.current) return;
+          hasRedirected.current = true;
+          router.push('/onboarding');
+          return;
+        }
+
         setUser(data.user);
       } catch (error) {
         console.error('Error fetching user:', error);
