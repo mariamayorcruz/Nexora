@@ -219,7 +219,7 @@ export default function DashboardPage() {
         <div className="rounded-[30px] border border-slate-800 bg-slate-900/70 p-5 shadow-[0_16px_55px_rgba(2,6,23,0.5)] transition-shadow hover:shadow-cyan-500/10">
           <p className="text-sm text-slate-400">{language === 'en' ? 'Leads in funnel' : 'Leads en embudo'}</p>
           <p className="mt-3 text-4xl font-semibold text-white">{leadsInFunnel}</p>
-          <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-500">{language === 'en' ? 'Based on clicks and conversions' : 'Basados en clics y conversiones'}</p>
+          <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-500">{language === 'en' ? 'CRM + active captures' : 'CRM + capturas activas'}</p>
         </div>
         <div className="rounded-[30px] border border-slate-800 bg-slate-900/70 p-5 shadow-[0_16px_55px_rgba(2,6,23,0.5)] transition-shadow hover:shadow-cyan-500/10">
           <p className="text-sm text-slate-400">{language === 'en' ? 'Estimated ROI' : 'ROI estimado'}</p>
