@@ -38,11 +38,22 @@ interface DashboardUser {
   } | null;
 }
 
+interface OverviewFunnel {
+  crmLeads: number;
+  leadCapturesOpen: number;
+  crmWon: number;
+}
+
 export default function DashboardPage() {
   const { language } = useAppLanguage();
   const [user, setUser] = useState<DashboardUser | null>(null);
   const [adAccounts, setAdAccounts] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [overviewFunnel, setOverviewFunnel] = useState<OverviewFunnel>({
+    crmLeads: 0,
+    leadCapturesOpen: 0,
+    crmWon: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [compactView, setCompactView] = useState(true);
 
@@ -79,6 +90,10 @@ export default function DashboardPage() {
         setUser(data.user);
         setAdAccounts(data.adAccounts || []);
         setCampaigns(data.campaigns || []);
+        const of = data.overviewFunnel as OverviewFunnel | undefined;
+        if (of && typeof of.crmLeads === 'number' && typeof of.leadCapturesOpen === 'number' && typeof of.crmWon === 'number') {
+          setOverviewFunnel(of);
+        }
       } catch (error) {
         console.error('Error fetching user:', error);
         window.location.href = '/auth/login';
@@ -93,11 +108,9 @@ export default function DashboardPage() {
   const activeCampaigns = campaigns.filter((campaign) => campaign.status === 'active');
   const totalSpend = campaigns.reduce((sum, campaign) => sum + (campaign.analytics?.spend || 0), 0);
   const totalRevenue = campaigns.reduce((sum, campaign) => sum + (campaign.analytics?.revenue || 0), 0);
-  const totalClicks = campaigns.reduce((sum, campaign) => sum + (campaign.analytics?.clicks || 0), 0);
-  const totalConversions = campaigns.reduce((sum, campaign) => sum + (campaign.analytics?.conversions || 0), 0);
   const roi = totalSpend > 0 ? Math.round(((totalRevenue - totalSpend) / totalSpend) * 100) : 0;
-  const estimatedLeads = totalConversions > 0 ? totalConversions : Math.max(1, Math.round(totalClicks * 0.08));
-  const estimatedWins = Math.max(0, Math.round(estimatedLeads * 0.18));
+  const leadsInFunnel = overviewFunnel.crmLeads + overviewFunnel.leadCapturesOpen;
+  const closedWon = overviewFunnel.crmWon;
   const entitlements = user?.entitlements;
 
   if (loading) {
@@ -204,8 +217,8 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="rounded-[30px] border border-slate-800 bg-slate-900/70 p-5 shadow-[0_16px_55px_rgba(2,6,23,0.5)] transition-shadow hover:shadow-cyan-500/10">
-          <p className="text-sm text-slate-400">{language === 'en' ? 'Estimated leads' : 'Leads estimados'}</p>
-          <p className="mt-3 text-4xl font-semibold text-white">{estimatedLeads}</p>
+          <p className="text-sm text-slate-400">{language === 'en' ? 'Leads in funnel' : 'Leads en embudo'}</p>
+          <p className="mt-3 text-4xl font-semibold text-white">{leadsInFunnel}</p>
           <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-500">{language === 'en' ? 'Based on clicks and conversions' : 'Basados en clics y conversiones'}</p>
         </div>
         <div className="rounded-[30px] border border-slate-800 bg-slate-900/70 p-5 shadow-[0_16px_55px_rgba(2,6,23,0.5)] transition-shadow hover:shadow-cyan-500/10">
@@ -213,8 +226,8 @@ export default function DashboardPage() {
           <p className="mt-3 text-4xl font-semibold text-white">{roi}%</p>
         </div>
         <div className="rounded-[30px] border border-slate-800 bg-slate-900/70 p-5 shadow-[0_16px_55px_rgba(2,6,23,0.5)] transition-shadow hover:shadow-cyan-500/10">
-          <p className="text-sm text-slate-400">{language === 'en' ? 'Likely sales' : 'Ventas probables'}</p>
-          <p className="mt-3 text-4xl font-semibold text-white">{estimatedWins}</p>
+          <p className="text-sm text-slate-400">{language === 'en' ? 'Closed won' : 'Cierres ganados'}</p>
+          <p className="mt-3 text-4xl font-semibold text-white">{closedWon}</p>
           <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-500">Lectura rápida del embudo</p>
         </div>
       </section>

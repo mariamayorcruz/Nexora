@@ -95,6 +95,12 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    const [crmLeads, leadCapturesOpen, crmWon] = await Promise.all([
+      prisma.crmLead.count({ where: { userId: user.id } }),
+      prisma.leadCapture.count({ where: { userId: user.id, convertedToCrmAt: null } }),
+      prisma.crmLead.count({ where: { userId: user.id, stage: 'won' } }),
+    ]);
+
     const entitlements = buildEntitlementSummary(effectivePlan, {
       adAccounts: adAccounts.length,
       activeCampaigns: campaigns.filter((campaign) => campaign.status === 'active').length,
@@ -113,6 +119,7 @@ export async function GET(request: NextRequest) {
       },
       adAccounts,
       campaigns,
+      overviewFunnel: { crmLeads, leadCapturesOpen, crmWon },
     });
   } catch (error: any) {
     console.error('Error fetching user:', error);
