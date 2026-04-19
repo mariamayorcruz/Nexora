@@ -22,6 +22,8 @@ interface LeadCapture {
   id: string;
   createdAt: string;
   convertedToCrmAt?: string | null;
+  paid?: boolean;
+  convertedToPaidAt?: string | null;
 }
 
 interface CrmLead {
@@ -111,6 +113,7 @@ export default function AnalyticsPage() {
 
     const capturedLeads = captures.length;
     const convertedCaptures = captures.filter((capture) => Boolean(capture.convertedToCrmAt)).length;
+    const paidCaptures = captures.filter((c) => c.paid).length;
     const crmQualified = crmLeads.filter((lead) => ['qualified', 'proposal', 'won'].includes(lead.stage)).length;
     const crmWon = crmLeads.filter((lead) => lead.stage === 'won').length;
     const pipelineValue = crmLeads.filter((lead) => lead.stage !== 'won').reduce((sum, lead) => sum + lead.value, 0);
@@ -128,6 +131,7 @@ export default function AnalyticsPage() {
       ...totals,
       capturedLeads,
       convertedCaptures,
+      paidCaptures,
       crmQualified,
       crmWon,
       pipelineValue,
@@ -193,6 +197,39 @@ export default function AnalyticsPage() {
         <Kpi label="Paso a CRM" value={`${metrics.leadToCrmRate.toFixed(0)}%`} />
         <Kpi label="Forecast" value={`$${Math.round(metrics.forecast).toLocaleString()}`} />
         <Kpi label="Cierres" value={metrics.crmWon.toLocaleString()} />
+      </section>
+
+      <section className="rounded-[24px] border border-slate-800 bg-slate-900/70 p-5">
+        <h2 className="text-lg font-semibold text-white">Embudo de capturas</h2>
+        <div className="mt-4 grid gap-4 md:grid-cols-3">
+          <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-4">
+            <p className="text-3xl font-semibold text-white">{metrics.capturedLeads.toLocaleString()}</p>
+            <p className="mt-1 text-xs uppercase tracking-[0.14em] text-slate-500">Capturas totales</p>
+            <p className="mt-2 text-sm text-slate-400">
+              {metrics.capturedLeads > 0 ? '100' : '0'}% del total
+            </p>
+          </div>
+          <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-4">
+            <p className="text-3xl font-semibold text-white">{metrics.convertedCaptures.toLocaleString()}</p>
+            <p className="mt-1 text-xs uppercase tracking-[0.14em] text-slate-500">Pasaron a CRM</p>
+            <p className="mt-2 text-sm text-slate-400">
+              {metrics.capturedLeads > 0
+                ? ((metrics.convertedCaptures / metrics.capturedLeads) * 100).toFixed(0)
+                : '0'}
+              % del total
+            </p>
+          </div>
+          <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-4">
+            <p className="text-3xl font-semibold text-white">{metrics.paidCaptures.toLocaleString()}</p>
+            <p className="mt-1 text-xs uppercase tracking-[0.14em] text-slate-500">Pagaron</p>
+            <p className="mt-2 text-sm text-slate-400">
+              {metrics.capturedLeads > 0
+                ? ((metrics.paidCaptures / metrics.capturedLeads) * 100).toFixed(0)
+                : '0'}
+              % del total
+            </p>
+          </div>
+        </div>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
