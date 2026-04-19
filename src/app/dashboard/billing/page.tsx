@@ -11,6 +11,18 @@ interface SubscriptionState {
   stripeSubId?: string | null;
 }
 
+interface BillingInvoiceRow {
+  id: string;
+  createdAt: string;
+  paidAt: string | null;
+  amount: number;
+  currency: string;
+  status: string;
+  description: string | null;
+  hostedInvoiceUrl: string | null;
+  invoicePdfUrl: string | null;
+}
+
 interface CheckoutState {
   type: 'success' | 'cancelled' | 'error';
   message: string;
@@ -48,6 +60,7 @@ function readBillingQueryState(): BillingQueryState {
 
 export default function BillingPage() {
   const [subscription, setSubscription] = useState<SubscriptionState | null>(null);
+  const [invoices, setInvoices] = useState<BillingInvoiceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingPlan, setProcessingPlan] = useState<string | null>(null);
   const [checkoutState, setCheckoutState] = useState<CheckoutState | null>(null);
@@ -75,6 +88,17 @@ export default function BillingPage() {
       });
       const data = await response.json();
       setSubscription(data.user.subscription);
+
+      const invResponse = await fetch('/api/billing/invoices', {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store',
+      });
+      if (invResponse.ok) {
+        const invData = (await invResponse.json()) as { invoices?: BillingInvoiceRow[] };
+        setInvoices(Array.isArray(invData.invoices) ? invData.invoices : []);
+      } else {
+        setInvoices([]);
+      }
     } catch (error) {
       console.error('Error fetching subscription:', error);
     } finally {
@@ -366,6 +390,57 @@ export default function BillingPage() {
           </div>
         ) : (
           <p className="mt-4 text-gray-600">Todavía no encontramos una suscripción asociada.</p>
+        )}
+      </div>
+
+      <div className="rounded-[28px] border border-gray-200 bg-white p-8 shadow-sm">
+        <h3 className="text-xl font-semibold text-gray-900">Historial de facturas</h3>
+        {invoices.length === 0 ? (
+          <p className="mt-4 text-sm text-gray-600">Aún no hay facturas registradas para tu cuenta.</p>
+        ) : (
+          <div className="mt-6 overflow-x-auto">
+            <table className="w-full min-w-[520px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 text-gray-500">
+                  <th className="pb-3 pr-4 font-medium">Fecha</th>
+                  <th className="pb-3 pr-4 font-medium">Monto</th>
+                  <th className="pb-3 pr-4 font-medium">Estado</th>
+                  <th className="pb-3 font-medium text-right">Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoices.map((inv) => {
+                  const dateSrc = inv.paidAt || inv.createdAt;
+                  const dateLabel = dateSrc ? new Date(dateSrc).toLocaleDateString('es-ES') : '—';
+                  const amountLabel = new Intl.NumberFormat('es-ES', {
+                    style: 'currency',
+                    currency: inv.currency || 'USD',
+                  }).format(inv.amount);
+                  return (
+                    <tr key={inv.id} className="border-b border-gray-100 last:border-0">
+                      <td className="py-3 pr-4 text-gray-900">{dateLabel}</td>
+                      <td className="py-3 pr-4 font-medium text-gray-900">{amountLabel}</td>
+                      <td className="py-3 pr-4 capitalize text-gray-700">{inv.status}</td>
+                      <td className="py-3 text-right">
+                        {inv.hostedInvoiceUrl ? (
+                          <a
+                            href={inv.hostedInvoiceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800"
+                          >
+                            Ver factura
+                          </a>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

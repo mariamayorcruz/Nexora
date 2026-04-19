@@ -102,6 +102,8 @@ async function syncInvoiceRecord(invoice: Stripe.Invoice) {
       periodEnd: toDate(invoice.period_end),
       dueDate: invoice.due_date ? toDate(invoice.due_date) : null,
       paidAt: invoice.status === 'paid' && invoice.status_transitions.paid_at ? toDate(invoice.status_transitions.paid_at) : null,
+      hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
+      invoicePdfUrl: invoice.invoice_pdf ?? null,
     },
     create: {
       userId: subscription.userId,
@@ -114,6 +116,8 @@ async function syncInvoiceRecord(invoice: Stripe.Invoice) {
       periodEnd: toDate(invoice.period_end),
       dueDate: invoice.due_date ? toDate(invoice.due_date) : null,
       paidAt: invoice.status === 'paid' && invoice.status_transitions.paid_at ? toDate(invoice.status_transitions.paid_at) : null,
+      hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
+      invoicePdfUrl: invoice.invoice_pdf ?? null,
     },
   });
 }
