@@ -216,41 +216,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-950">
+    <div className="flex min-h-screen bg-slate-950 font-sans">
       {!billingCheckoutFocus && (
       <aside
-        className={`fixed z-40 h-screen w-60 overflow-y-auto border-r border-slate-800 bg-slate-950 transition-transform lg:relative ${
+        className={`fixed z-40 h-screen w-64 overflow-y-auto border-r border-white/5 bg-[#080e1a] transition-transform lg:relative ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
-        <div className="border-b border-slate-800 p-6">
+        <div className="border-b border-white/6 px-6 py-6">
           <Link href="/dashboard" className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-500 text-sm font-semibold text-slate-950">
+            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-cyan-400 text-sm font-bold text-slate-950 shadow-[0_10px_30px_rgba(34,211,238,0.25)]">
               NX
             </div>
             <div>
-              <p className="text-lg font-bold text-white">Nexora</p>
-              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
-                {language === 'en' ? 'Revenue Command' : 'Centro de control'}
-              </p>
+              <p className="text-lg font-bold tracking-tight text-white">Nexora</p>
             </div>
           </Link>
         </div>
 
-        <nav className="space-y-2 p-4">
-          <div className="mb-3 flex gap-2 px-1">
-            {(['es', 'en'] as const).map((option) => (
-              <button
-                key={option}
-                onClick={() => setLanguage(option)}
-                className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] transition ${
-                  language === option ? 'bg-cyan-500 text-slate-950' : 'bg-slate-800 text-slate-400'
-                }`}
-              >
-                {option}
-              </button>
-            ))}
-          </div>
+        <nav className="space-y-2 px-4 py-5">
+          <p className="px-3 pb-2 text-[10px] uppercase tracking-[0.28em] text-white/25">
+            {language === 'en' ? 'Navigation' : 'Navegación'}
+          </p>
           {menuRows.map((row) => {
             if (row.kind === 'link') {
               const active = isChildActive(row.href);
@@ -260,12 +247,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   key={row.href}
                   href={row.href}
                   onClick={() => setSidebarOpen(false)}
-                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition ${
-                    active ? 'bg-slate-900 text-white' : 'text-slate-400 hover:bg-slate-900/60 hover:text-white'
+                  className={`relative flex items-center gap-3 rounded-xl px-4 py-2.5 transition-all duration-150 ${
+                    active
+                      ? 'bg-cyan-500/12 text-white'
+                      : 'text-slate-400/70 hover:bg-white/4 hover:text-white/85'
                   }`}
                 >
+                  {active && <span className="absolute left-0 top-1/2 h-7 w-[3px] -translate-y-1/2 rounded-r-full bg-cyan-500" />}
                   <span
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${active ? 'bg-cyan-500/20 text-cyan-300' : 'text-slate-500'}`}
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                      active ? 'text-cyan-300' : 'text-slate-500'
+                    }`}
                   >
                     <IconComponent size={16} />
                   </span>
@@ -279,16 +271,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             return (
               <div key={row.label} className="space-y-1">
                 <div
-                  className={`flex items-center gap-3 rounded-xl px-3 py-2 ${groupActive ? 'text-white' : 'text-slate-500'}`}
+                  className={`flex items-center gap-3 rounded-xl px-4 py-2 ${
+                    groupActive ? 'text-white' : 'text-white/25'
+                  }`}
                 >
                   <span
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${groupActive ? 'bg-cyan-500/20 text-cyan-300' : 'text-slate-600'}`}
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                      groupActive ? 'text-cyan-300' : 'text-slate-600'
+                    }`}
                   >
                     <IconComponent size={16} />
                   </span>
-                  <span className="text-sm font-semibold">{row.label}</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.28em]">
+                    {row.label}
+                  </span>
                 </div>
-                <div className="space-y-0.5 border-l border-slate-800 pl-2 ml-4">
+                <div className="ml-7 space-y-0.5 border-l border-white/8 pl-3">
                   {row.children.map((child) => {
                     const active = isChildActive(child.href);
                     return (
@@ -296,8 +294,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         key={`${row.label}-${child.href}-${child.label}`}
                         href={child.href}
                         onClick={() => setSidebarOpen(false)}
-                        className={`flex items-center rounded-lg px-3 py-2 text-sm transition ${
-                          active ? 'bg-slate-900 font-medium text-white' : 'text-slate-400 hover:bg-slate-900/60 hover:text-white'
+                        className={`flex items-center rounded-lg px-3 py-2 text-xs transition-all duration-150 ${
+                          active
+                            ? 'bg-cyan-500/10 font-medium text-white'
+                            : 'text-slate-400 hover:text-white'
                         }`}
                       >
                         {child.label}
@@ -310,19 +310,43 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           })}
         </nav>
 
-        <div className="border-t border-slate-800 p-4">
-          <div className="rounded-[20px] border border-slate-800 bg-slate-900 p-4">
-            <p className="text-sm font-medium text-white">{user?.email}</p>
-            <p className="mt-1 text-xs uppercase tracking-[0.24em] text-slate-500">
-              {user?.founderAccess
-                ? language === 'en'
-                  ? 'Founder plan'
-                  : 'Plan fundador'
-                : `${language === 'en' ? 'Plan' : 'Plan'} ${user?.entitlements?.marketingLabel || user?.founderPlan || user?.subscription?.plan || 'starter'}`}
-            </p>
+        <div className="mt-auto border-t border-white/6 px-4 py-4">
+          <div className="mb-4 flex gap-2 px-2">
+            {(['es', 'en'] as const).map((option) => (
+              <button
+                key={option}
+                onClick={() => setLanguage(option)}
+                className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] transition-all duration-150 ${
+                  language === option
+                    ? 'bg-white/6 text-cyan-300'
+                    : 'text-slate-500 hover:text-white/80'
+                }`}
+              >
+                {option}
+              </button>
+            ))}
           </div>
 
-          <button onClick={handleLogout} className="mt-4 w-full rounded-2xl px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-900">
+          <div className="flex items-center gap-3 rounded-2xl px-2 py-2">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cyan-500/20 text-sm font-semibold uppercase text-cyan-300">
+              {(user?.email || 'NX').slice(0, 2)}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-white">{user?.email}</p>
+              <p className="mt-1 text-[11px] uppercase tracking-[0.2em] text-cyan-400">
+                {user?.founderAccess
+                  ? language === 'en'
+                    ? 'Founder plan'
+                    : 'Plan fundador'
+                  : `${language === 'en' ? 'Plan' : 'Plan'} ${user?.entitlements?.marketingLabel || user?.founderPlan || user?.subscription?.plan || 'starter'}`}
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={handleLogout}
+            className="mt-3 w-full rounded-xl px-3 py-2 text-left text-xs font-medium text-slate-500 transition-all duration-150 hover:text-red-400"
+          >
             {language === 'en' ? 'Log out' : 'Cerrar sesión'}
           </button>
         </div>
