@@ -95,7 +95,8 @@ export default function OnboardingPage() {
     };
 
     void validateAccess();
-  }, [router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const progress = useMemo(() => {
     let completed = 0;

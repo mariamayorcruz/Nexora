@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { hashPassword } from '@/lib/auth';
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
         name,
         password: hashedPassword,
         onboardingCompletedAt: null,
-        onboardingData: null,
+        onboardingData: Prisma.JsonNull,
         subscription: {
           upsert: {
             update: {
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
         name,
         password: hashedPassword,
         onboardingCompletedAt: null,
-        onboardingData: null,
+        onboardingData: Prisma.JsonNull,
         subscription: {
           create: {
             plan: 'professional',
