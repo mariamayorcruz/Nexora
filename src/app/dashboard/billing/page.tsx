@@ -261,14 +261,14 @@ export default function BillingPage() {
   }
 
   const renderCheckoutError = () => (
-    <div className="rounded-[32px] border border-red-200 bg-white p-8 text-center shadow-sm sm:p-10">
+    <div className="rounded-2xl border border-white/6 bg-slate-900 p-8 text-center sm:p-10">
       <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-500">Pago</p>
-      <h1 className="mt-4 text-3xl font-bold text-slate-900">No pudimos iniciar el pago</h1>
-      <p className="mt-4 text-base leading-7 text-slate-600">Intenta nuevamente.</p>
+      <h1 className="mt-4 text-3xl font-bold text-white">No pudimos iniciar el pago</h1>
+      <p className="mt-4 text-base leading-7 text-slate-400">Intenta nuevamente.</p>
       <button
         onClick={() => requestedPlanConfig && handlePlanChange(requestedPlanConfig.key, requestedBilling)}
         disabled={!!processingPlan || !requestedPlanConfig}
-        className="btn-primary mt-8 w-full disabled:opacity-60 sm:w-auto"
+        className="mt-8 w-full rounded-2xl border border-white/10 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white disabled:opacity-60 sm:w-auto"
       >
         {processingPlan ? 'Abriendo Stripe...' : 'Reintentar pago'}
       </button>
@@ -283,7 +283,7 @@ export default function BillingPage() {
     const price = requestedBilling === 'yearly' ? requestedPlanConfig.yearlyPrice : requestedPlanConfig.monthlyPrice;
 
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 bg-[#080e1a]">
         <div className="text-center">
           <p className="text-sm font-semibold uppercase tracking-[0.24em] text-cyan-300">Activación</p>
           <h1 className="mt-4 text-3xl font-bold text-white sm:text-4xl">Estás a un paso de activar tu acceso</h1>
@@ -304,14 +304,14 @@ export default function BillingPage() {
           </div>
         )}
 
-        <div className="rounded-[32px] border border-slate-800 bg-slate-900/80 p-8 shadow-[0_24px_80px_rgba(2,6,23,0.35)]">
-          <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Plan seleccionado</p>
+        <div className="rounded-2xl border border-white/6 bg-slate-900 p-8">
+          <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Plan seleccionado</p>
           <h2 className="mt-3 text-3xl font-semibold text-white">{requestedPlanConfig.marketingLabel}</h2>
           <p className="mt-3 text-sm leading-7 text-slate-300">{requestedPlanConfig.description}</p>
 
-          <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-950/70 p-5">
+          <div className="mt-8 rounded-2xl border border-white/6 bg-slate-900 p-5">
             <div className="flex items-end gap-2">
-              <span className="text-5xl font-semibold text-white">${price}</span>
+              <span className="text-5xl font-bold text-white">${price}</span>
               <span className="pb-2 text-sm text-slate-400">/ mes</span>
             </div>
             <p className="mt-3 text-sm text-slate-400">
@@ -328,7 +328,7 @@ export default function BillingPage() {
           <button
             onClick={() => handlePlanChange(requestedPlanConfig.key, requestedBilling)}
             disabled={!!processingPlan}
-            className="btn-primary mt-10 w-full disabled:opacity-60"
+            className="mt-10 w-full rounded-2xl border border-white/10 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white disabled:opacity-60"
           >
             {processingPlan ? 'Abriendo Stripe...' : 'Completar pago'}
           </button>
@@ -343,14 +343,14 @@ export default function BillingPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 bg-[#080e1a]">
       <div>
-        <h2 className="mb-2 text-3xl font-bold text-gray-900">Facturación y suscripción</h2>
-        <p className="text-gray-600">Gestiona tu plan, lanza upgrades y valida el estado real de Stripe.</p>
+        <h2 className="mb-2 text-3xl font-bold text-white">Facturación y suscripción</h2>
+        <p className="text-slate-400">Gestiona tu plan, lanza upgrades y valida el estado real de Stripe.</p>
       </div>
 
       {shouldAutostart && requestedPlan && !checkoutState && (
-        <div className="rounded-2xl border border-orange-200 bg-orange-50 p-5 text-sm text-orange-900">
+        <div className="rounded-2xl border border-white/6 bg-slate-900 p-5 text-sm text-slate-300">
           Estamos preparando tu checkout para el plan {BILLING_PLANS[requestedPlan]?.marketingLabel || requestedPlan}.
         </div>
       )}
@@ -369,39 +369,39 @@ export default function BillingPage() {
         </div>
       )}
 
-      <div className="rounded-[28px] border border-gray-200 bg-white p-8 shadow-sm">
-        <h3 className="text-xl font-semibold text-gray-900">Tu plan actual</h3>
+      <div className="rounded-2xl border border-white/6 bg-slate-900 p-8">
+        <h3 className="text-xl font-semibold text-white">Tu plan actual</h3>
         {subscription ? (
           <div className="mt-6 grid gap-4 md:grid-cols-3">
-            <div className="rounded-2xl bg-gray-50 p-5">
-              <p className="text-sm text-gray-500">Plan</p>
-              <p className="mt-2 text-2xl font-semibold text-gray-900">{currentPlanLabel}</p>
+            <div className="rounded-2xl border border-white/6 bg-slate-900 p-5">
+              <p className="text-xs uppercase tracking-wider text-slate-400">Plan</p>
+              <p className="mt-2 text-2xl font-semibold text-white">{currentPlanLabel}</p>
             </div>
-            <div className="rounded-2xl bg-gray-50 p-5">
-              <p className="text-sm text-gray-500">Estado</p>
-              <p className="mt-2 text-2xl font-semibold capitalize text-gray-900">{subscription.status}</p>
+            <div className="rounded-2xl border border-white/6 bg-slate-900 p-5">
+              <p className="text-xs uppercase tracking-wider text-slate-400">Estado</p>
+              <p className="mt-2 text-2xl font-semibold capitalize text-white">{subscription.status}</p>
             </div>
-            <div className="rounded-2xl bg-gray-50 p-5">
-              <p className="text-sm text-gray-500">Próximo corte</p>
-              <p className="mt-2 text-2xl font-semibold text-gray-900">
+            <div className="rounded-2xl border border-white/6 bg-slate-900 p-5">
+              <p className="text-xs uppercase tracking-wider text-slate-400">Próximo corte</p>
+              <p className="mt-2 text-2xl font-semibold text-white">
                 {new Date(subscription.currentPeriodEnd).toLocaleDateString('es-ES')}
               </p>
             </div>
           </div>
         ) : (
-          <p className="mt-4 text-gray-600">Todavía no encontramos una suscripción asociada.</p>
+          <p className="mt-4 text-slate-400">Todavía no encontramos una suscripción asociada.</p>
         )}
       </div>
 
-      <div className="rounded-[28px] border border-gray-200 bg-white p-8 shadow-sm">
-        <h3 className="text-xl font-semibold text-gray-900">Historial de facturas</h3>
+      <div className="rounded-2xl border border-white/6 bg-slate-900 p-8">
+        <h3 className="text-xl font-semibold text-white">Historial de facturas</h3>
         {invoices.length === 0 ? (
-          <p className="mt-4 text-sm text-gray-600">Aún no hay facturas registradas para tu cuenta.</p>
+          <p className="mt-4 text-sm text-slate-400">Aún no hay facturas registradas para tu cuenta.</p>
         ) : (
           <div className="mt-6 overflow-x-auto">
             <table className="w-full min-w-[520px] text-left text-sm">
               <thead>
-                <tr className="border-b border-gray-200 text-gray-500">
+                <tr className="border-b border-white/6 text-slate-400">
                   <th className="pb-3 pr-4 font-medium">Fecha</th>
                   <th className="pb-3 pr-4 font-medium">Monto</th>
                   <th className="pb-3 pr-4 font-medium">Estado</th>
@@ -417,22 +417,22 @@ export default function BillingPage() {
                     currency: inv.currency || 'USD',
                   }).format(inv.amount);
                   return (
-                    <tr key={inv.id} className="border-b border-gray-100 last:border-0">
-                      <td className="py-3 pr-4 text-gray-900">{dateLabel}</td>
-                      <td className="py-3 pr-4 font-medium text-gray-900">{amountLabel}</td>
-                      <td className="py-3 pr-4 capitalize text-gray-700">{inv.status}</td>
+                    <tr key={inv.id} className="border-b border-white/6 last:border-0">
+                      <td className="py-3 pr-4 text-white">{dateLabel}</td>
+                      <td className="py-3 pr-4 font-medium text-white">{amountLabel}</td>
+                      <td className="py-3 pr-4 capitalize text-slate-300">{inv.status}</td>
                       <td className="py-3 text-right">
                         {inv.hostedInvoiceUrl ? (
                           <a
                             href={inv.hostedInvoiceUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800"
+                            className="inline-flex rounded-xl border border-white/10 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
                           >
                             Ver factura
                           </a>
                         ) : (
-                          <span className="text-xs text-gray-400">—</span>
+                          <span className="text-xs text-slate-500">—</span>
                         )}
                       </td>
                     </tr>
@@ -456,25 +456,25 @@ export default function BillingPage() {
             <article
               key={plan.key}
               className={`rounded-[28px] border p-8 shadow-sm ${
-                isCurrentPlan ? 'border-primary bg-orange-50' : 'border-gray-200 bg-white'
+                isCurrentPlan ? 'rounded-2xl border border-cyan-400/40 bg-slate-900' : 'rounded-2xl border border-white/6 bg-slate-900'
               }`}
             >
-              <p className="text-sm uppercase tracking-[0.24em] text-gray-400">{plan.label}</p>
-              <h3 className="mt-3 text-2xl font-semibold text-gray-900">{plan.marketingLabel}</h3>
-              <p className="mt-3 text-sm leading-6 text-gray-600">{plan.description}</p>
+              <p className="text-xs uppercase tracking-wider text-slate-400">{plan.label}</p>
+              <h3 className="mt-3 text-2xl font-semibold text-white">{plan.marketingLabel}</h3>
+              <p className="mt-3 text-sm leading-6 text-slate-300">{plan.description}</p>
 
               <div className="mt-6">
-                <p className="text-4xl font-semibold text-gray-900">${plan.monthlyPrice}</p>
-                <p className="text-sm text-gray-500">por mes</p>
+                <p className="text-4xl font-bold text-white">${plan.monthlyPrice}</p>
+                <p className="text-sm text-slate-400">por mes</p>
               </div>
 
-              <ul className="mt-6 space-y-3 text-sm text-gray-600">
+              <ul className="mt-6 space-y-3 text-sm text-slate-300">
                 {plan.features.map((feature) => (
                   <li key={feature}>{feature}</li>
                 ))}
               </ul>
 
-              <div className="mt-6 rounded-2xl bg-gray-50 p-4 text-sm text-gray-700">
+              <div className="mt-6 rounded-2xl border border-white/6 bg-slate-900 p-4 text-xs text-slate-500">
                 {plan.key === 'starter' && 'Incluye 1 cuenta publicitaria, hasta 3 campañas activas y una bolsa inicial de IA.'}
                 {plan.key === 'professional' && 'Incluye radar creativo, analítica avanzada, video, 3 cuentas y una bolsa robusta de IA.'}
                 {plan.key === 'enterprise' && 'Incluye máxima capacidad, automatización sugerida, soporte prioritario y créditos amplios para operar todo el mes.'}
@@ -483,8 +483,10 @@ export default function BillingPage() {
               <button
                 onClick={() => handlePlanChange(plan.key, 'monthly')}
                 disabled={isCurrentPlan || !!processingPlan}
-                className={`mt-8 w-full ${
-                  isCurrentPlan ? 'btn-secondary cursor-default opacity-80' : 'btn-primary'
+                className={`mt-8 w-full rounded-2xl px-4 py-3 text-sm font-semibold transition disabled:opacity-60 ${
+                  isCurrentPlan
+                    ? 'cursor-default border border-cyan-400/30 text-cyan-300'
+                    : 'border border-white/10 text-slate-200 hover:border-cyan-400/30 hover:text-white'
                 } disabled:opacity-60`}
               >
                 {isCurrentPlan ? 'Plan actual' : isProcessing ? 'Abriendo Stripe...' : `Cambiar a ${plan.marketingLabel}`}
