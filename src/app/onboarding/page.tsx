@@ -45,8 +45,8 @@ export default function OnboardingPage() {
   const [userName, setUserName] = useState('');
   const [form, setForm] = useState({
     businessName: '',
-    industry: '',
-    primaryGoal: '',
+    industries: [] as string[],
+    primaryGoals: [] as string[],
     channels: [] as string[],
     customerRange: '',
   });
@@ -101,12 +101,30 @@ export default function OnboardingPage() {
   const progress = useMemo(() => {
     let completed = 0;
     if (form.businessName.trim()) completed += 1;
-    if (form.industry) completed += 1;
-    if (form.primaryGoal) completed += 1;
+    if (form.industries.length > 0) completed += 1;
+    if (form.primaryGoals.length > 0) completed += 1;
     if (form.channels.length > 0) completed += 1;
     if (form.customerRange) completed += 1;
     return Math.round((completed / 5) * 100);
   }, [form]);
+
+  const toggleIndustry = (industry: (typeof INDUSTRY_OPTIONS)[number]['value']) => {
+    setForm((current) => ({
+      ...current,
+      industries: current.industries.includes(industry)
+        ? current.industries.filter((item) => item !== industry)
+        : [...current.industries, industry],
+    }));
+  };
+
+  const togglePrimaryGoal = (goal: (typeof GOAL_OPTIONS)[number]['value']) => {
+    setForm((current) => ({
+      ...current,
+      primaryGoals: current.primaryGoals.includes(goal)
+        ? current.primaryGoals.filter((item) => item !== goal)
+        : [...current.primaryGoals, goal],
+    }));
+  };
 
   const toggleChannel = (channel: (typeof CHANNEL_OPTIONS)[number]) => {
     setForm((current) => ({
@@ -214,20 +232,21 @@ export default function OnboardingPage() {
                   <Layers3 className="h-4 w-4 text-cyan-300" />
                   Tipo de negocio / industria
                 </label>
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="flex flex-wrap gap-3">
                   {INDUSTRY_OPTIONS.map((option) => {
-                    const active = form.industry === option.value;
+                    const active = form.industries.includes(option.value);
                     return (
                       <button
                         key={option.value}
                         type="button"
-                        onClick={() => setForm((current) => ({ ...current, industry: option.value }))}
-                        className={`${optionCardClassName} ${
+                        onClick={() => toggleIndustry(option.value)}
+                        className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition ${
                           active
-                            ? 'border-cyan-400/60 bg-cyan-400/10 text-white shadow-[0_0_0_1px_rgba(34,211,238,0.2)]'
+                            ? 'border-cyan-400/60 bg-cyan-400/10 text-white'
                             : 'border-slate-700 bg-slate-950/70 text-slate-300 hover:border-slate-600 hover:bg-slate-900'
                         }`}
                       >
+                        <CheckCircle2 className={`h-4 w-4 ${active ? 'text-cyan-300' : 'text-slate-500'}`} />
                         {option.label}
                       </button>
                     );
@@ -240,20 +259,21 @@ export default function OnboardingPage() {
                   <Target className="h-4 w-4 text-cyan-300" />
                   Objetivo principal
                 </label>
-                <div className="space-y-3">
+                <div className="flex flex-wrap gap-3">
                   {GOAL_OPTIONS.map((option) => {
-                    const active = form.primaryGoal === option.value;
+                    const active = form.primaryGoals.includes(option.value);
                     return (
                       <button
                         key={option.value}
                         type="button"
-                        onClick={() => setForm((current) => ({ ...current, primaryGoal: option.value }))}
-                        className={`${optionCardClassName} w-full ${
+                        onClick={() => togglePrimaryGoal(option.value)}
+                        className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition ${
                           active
-                            ? 'border-cyan-400/60 bg-cyan-400/10 text-white shadow-[0_0_0_1px_rgba(34,211,238,0.2)]'
+                            ? 'border-cyan-400/60 bg-cyan-400/10 text-white'
                             : 'border-slate-700 bg-slate-950/70 text-slate-300 hover:border-slate-600 hover:bg-slate-900'
                         }`}
                       >
+                        <CheckCircle2 className={`h-4 w-4 ${active ? 'text-cyan-300' : 'text-slate-500'}`} />
                         {option.label}
                       </button>
                     );

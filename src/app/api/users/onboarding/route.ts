@@ -40,16 +40,22 @@ export async function POST(request: NextRequest) {
 
     const body = (await request.json()) as {
       businessName?: string;
-      industry?: string;
-      primaryGoal?: string;
+      industries?: string[];
+      primaryGoals?: string[];
       channels?: string[];
       customerRange?: string;
     };
 
     const businessName = String(body.businessName || '').trim();
-    const industry = String(body.industry || '').trim();
-    const primaryGoal = String(body.primaryGoal || '').trim();
     const customerRange = String(body.customerRange || '').trim();
+    const rawIndustries = Array.isArray(body.industries) ? body.industries : [];
+    const industries = rawIndustries
+      .map((industry) => String(industry || '').trim())
+      .filter((industry): industry is string => INDUSTRIES.has(industry));
+    const rawPrimaryGoals = Array.isArray(body.primaryGoals) ? body.primaryGoals : [];
+    const primaryGoals = rawPrimaryGoals
+      .map((goal) => String(goal || '').trim())
+      .filter((goal): goal is string => GOALS.has(goal));
     const rawChannels = Array.isArray(body.channels) ? body.channels : [];
     const channels = rawChannels
       .map((channel) => String(channel || '').trim())
@@ -59,12 +65,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'El nombre del negocio es requerido.' }, { status: 400 });
     }
 
-    if (!INDUSTRIES.has(industry)) {
-      return NextResponse.json({ error: 'Selecciona un tipo de negocio válido.' }, { status: 400 });
+    if (industries.length === 0) {
+      return NextResponse.json({ error: 'Selecciona al menos un tipo de negocio válido.' }, { status: 400 });
     }
 
-    if (!GOALS.has(primaryGoal)) {
-      return NextResponse.json({ error: 'Selecciona un objetivo principal válido.' }, { status: 400 });
+    if (primaryGoals.length === 0) {
+      return NextResponse.json({ error: 'Selecciona al menos un objetivo principal válido.' }, { status: 400 });
     }
 
     if (!CUSTOMER_RANGES.has(customerRange)) {
@@ -86,8 +92,8 @@ export async function POST(request: NextRequest) {
         onboardingCompletedAt: new Date(),
         onboardingData: {
           businessName,
-          industry,
-          primaryGoal,
+          industries,
+          primaryGoals,
           channels,
           customerRange,
         },
