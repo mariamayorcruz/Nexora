@@ -32,10 +32,7 @@ type MeResponse = {
 };
 
 const inputClassName =
-  'w-full rounded-2xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20';
-
-const optionCardClassName =
-  'rounded-2xl border px-4 py-4 text-left text-sm transition';
+  'w-full rounded-2xl border border-slate-600 bg-slate-800/50 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/10';
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -168,7 +165,7 @@ export default function OnboardingPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-slate-200">
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-slate-950 to-slate-900 px-6 text-slate-200">
         <div className="text-center">
           <div className="inline-block h-12 w-12 animate-spin rounded-full border-b-2 border-cyan-400" />
           <p className="mt-4 text-sm text-slate-400">Preparando tu espacio…</p>
@@ -178,40 +175,40 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 px-4 py-8 text-slate-200 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-6xl">
-        <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <section className="rounded-[32px] border border-slate-800 bg-slate-900/85 p-6 shadow-[0_24px_80px_rgba(2,6,23,0.35)] sm:p-8">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-300">Onboarding</p>
-                <h1 className="mt-3 text-3xl font-bold text-white sm:text-4xl">
-                  Configura Nexora para tu negocio
-                </h1>
-                <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-400">
-                  {userName
-                    ? `${userName}, responde estas 5 preguntas para personalizar tu primer paso dentro del sistema.`
-                    : 'Responde estas 5 preguntas para personalizar tu primer paso dentro del sistema.'}
-                </p>
-              </div>
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-slate-950 to-slate-900 px-4 py-10 text-slate-200 sm:px-6 lg:px-8">
+      <section className="w-full max-w-2xl rounded-[32px] border border-slate-700/50 bg-slate-900/80 p-6 shadow-[0_18px_60px_rgba(2,6,23,0.35)] backdrop-blur-xl sm:p-8">
+        <div className="text-center">
+          <p className="text-sm font-semibold uppercase tracking-[0.32em] text-cyan-300">Nexora</p>
+          <h1 className="mt-4 text-3xl font-bold text-white sm:text-4xl">
+            Configura tu negocio en Nexora
+          </h1>
+          <p className="mt-4 text-sm leading-7 text-slate-400">
+            {userName
+              ? `${userName}, responde estas 5 preguntas para personalizar tu primer paso dentro del sistema.`
+              : 'Responde estas 5 preguntas para personalizar tu primer paso dentro del sistema.'}
+          </p>
+        </div>
 
-              <div className="hidden rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-right sm:block">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Progreso</p>
-                <p className="mt-2 text-2xl font-semibold text-white">{progress}%</p>
-              </div>
-            </div>
+        <div className="mt-8">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Progreso</p>
+            <p className="text-sm font-bold text-cyan-300">{progress}%</p>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+            <div
+              className="h-full rounded-full bg-cyan-400 transition-all"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
 
-            <div className="mt-6 h-2 overflow-hidden rounded-full bg-slate-800">
-              <div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-orange-400 transition-all" style={{ width: `${progress}%` }} />
-            </div>
+        {error && (
+          <div className="mt-6 rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+            {error}
+          </div>
+        )}
 
-            {error && (
-              <div className="mt-6 rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-                {error}
-              </div>
-            )}
-
-            <form className="mt-8 space-y-8" onSubmit={handleSubmit}>
+        <form className="mt-8 space-y-8" onSubmit={handleSubmit}>
               <div className="space-y-3">
                 <label className="flex items-center gap-2 text-sm font-semibold text-white">
                   <Building2 className="h-4 w-4 text-cyan-300" />
@@ -240,10 +237,10 @@ export default function OnboardingPage() {
                         key={option.value}
                         type="button"
                         onClick={() => toggleIndustry(option.value)}
-                        className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition ${
+                        className={`inline-flex items-center gap-2 rounded-2xl border px-5 py-3 text-sm transition ${
                           active
-                            ? 'border-cyan-400/60 bg-cyan-400/10 text-white'
-                            : 'border-slate-700 bg-slate-950/70 text-slate-300 hover:border-slate-600 hover:bg-slate-900'
+                            ? 'border-cyan-400 bg-cyan-500/20 text-white'
+                            : 'border-slate-600 bg-slate-800/50 text-slate-300 hover:border-slate-500 hover:bg-slate-800'
                         }`}
                       >
                         <CheckCircle2 className={`h-4 w-4 ${active ? 'text-cyan-300' : 'text-slate-500'}`} />
@@ -267,10 +264,10 @@ export default function OnboardingPage() {
                         key={option.value}
                         type="button"
                         onClick={() => togglePrimaryGoal(option.value)}
-                        className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition ${
+                        className={`inline-flex items-center gap-2 rounded-2xl border px-5 py-3 text-sm transition ${
                           active
-                            ? 'border-cyan-400/60 bg-cyan-400/10 text-white'
-                            : 'border-slate-700 bg-slate-950/70 text-slate-300 hover:border-slate-600 hover:bg-slate-900'
+                            ? 'border-cyan-400 bg-cyan-500/20 text-white'
+                            : 'border-slate-600 bg-slate-800/50 text-slate-300 hover:border-slate-500 hover:bg-slate-800'
                         }`}
                       >
                         <CheckCircle2 className={`h-4 w-4 ${active ? 'text-cyan-300' : 'text-slate-500'}`} />
@@ -291,10 +288,10 @@ export default function OnboardingPage() {
                         key={channel}
                         type="button"
                         onClick={() => toggleChannel(channel)}
-                        className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition ${
+                        className={`inline-flex items-center gap-2 rounded-2xl border px-5 py-3 text-sm transition ${
                           active
-                            ? 'border-cyan-400/60 bg-cyan-400/10 text-white'
-                            : 'border-slate-700 bg-slate-950/70 text-slate-300 hover:border-slate-600 hover:bg-slate-900'
+                            ? 'border-cyan-400 bg-cyan-500/20 text-white'
+                            : 'border-slate-600 bg-slate-800/50 text-slate-300 hover:border-slate-500 hover:bg-slate-800'
                         }`}
                       >
                         <CheckCircle2 className={`h-4 w-4 ${active ? 'text-cyan-300' : 'text-slate-500'}`} />
@@ -328,38 +325,17 @@ export default function OnboardingPage() {
                 <p className="text-sm text-slate-400">
                   Esto solo nos ayuda a adaptar tu experiencia inicial. Toma menos de 1 minuto.
                 </p>
-                <button type="submit" disabled={saving} className="btn-primary gap-2 disabled:opacity-60">
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-500 to-cyan-400 px-5 py-3 text-sm font-bold text-slate-950 transition hover:brightness-110 disabled:opacity-60"
+                >
                   {saving ? 'Guardando…' : 'Guardar y continuar'}
                   {!saving && <ArrowRight className="h-4 w-4" />}
                 </button>
               </div>
             </form>
-          </section>
-
-          <aside className="rounded-[32px] border border-slate-800 bg-slate-900/70 p-6 shadow-[0_24px_80px_rgba(2,6,23,0.25)] sm:p-8">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-orange-300">Qué pasa después</p>
-            <h2 className="mt-3 text-2xl font-semibold text-white">Tu dashboard se ajusta a tu contexto</h2>
-            <div className="mt-6 space-y-4">
-              {[
-                'Priorizamos el objetivo más importante para tu negocio.',
-                'Organizamos los canales que ya usas para que empieces más rápido.',
-                'Dejamos lista una experiencia inicial más útil desde tu primer login pagado.',
-              ].map((item) => (
-                <div key={item} className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
-                  <p className="text-sm leading-7 text-slate-300">{item}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-8 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-5">
-              <p className="text-sm font-semibold text-white">Primera activación</p>
-              <p className="mt-2 text-sm leading-7 text-slate-300">
-                El onboarding aparece solo una vez, justo después del pago confirmado, para que no entres al dashboard sin contexto.
-              </p>
-            </div>
-          </aside>
-        </div>
-      </div>
+      </section>
     </div>
   );
 }
