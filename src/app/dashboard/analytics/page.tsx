@@ -154,14 +154,17 @@ export default function AnalyticsPage() {
 
   if (!user?.entitlements?.capabilities.canUseAdvancedAnalytics) {
     return (
-      <section className="rounded-[30px] border border-slate-800 bg-slate-900/70 p-8">
-        <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Analitica avanzada</p>
+      <section className="rounded-2xl border border-white/6 bg-slate-900 p-8">
+        <p className="text-xs uppercase tracking-[0.28em] text-cyan-300">Analitica avanzada</p>
         <h1 className="mt-3 text-3xl font-semibold text-white">Desbloquea inteligencia de crecimiento.</h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">Esta vista une campañas, leads y pipeline en una lectura ejecutiva limpia.</p>
-        <div className="mt-5 rounded-2xl border border-slate-700 bg-slate-950/70 p-4 text-sm text-slate-300">
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">Esta vista une campañas, leads y pipeline en una lectura ejecutiva limpia.</p>
+        <div className="mt-5 rounded-2xl border border-white/6 bg-[#080e1a] p-4 text-sm text-slate-300">
           {user?.entitlements?.capabilities.upgradeCta}
         </div>
-        <Link href="/dashboard/billing" className="mt-5 inline-flex rounded-xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950">
+        <Link
+          href="/dashboard/billing"
+          className="mt-5 inline-flex rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
+        >
           Ver upgrade
         </Link>
       </section>
@@ -181,12 +184,12 @@ export default function AnalyticsPage() {
   ];
 
   return (
-    <div className="space-y-5">
-      <section className="rounded-[30px] border border-slate-800 bg-slate-900/70 p-6">
+    <div className="space-y-5 bg-[#080e1a]">
+      <section className="rounded-2xl border border-white/6 bg-slate-900 p-6">
         <p className="text-xs uppercase tracking-[0.26em] text-cyan-300">Control ejecutivo</p>
-        <h1 className="mt-2 text-3xl font-semibold text-white">Analitica sin ruido visual</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
-          Lectura compacta de gasto, retorno, captacion y pipeline comercial para decidir rapido.
+        <h1 className="mt-2 text-3xl font-semibold text-white">Analítica</h1>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+          Gasto, retorno, captación y pipeline en una sola vista.
         </p>
       </section>
 
@@ -199,19 +202,19 @@ export default function AnalyticsPage() {
         <Kpi label="Cierres" value={metrics.crmWon.toLocaleString()} />
       </section>
 
-      <section className="rounded-[24px] border border-slate-800 bg-slate-900/70 p-5">
+      <section className="rounded-2xl border border-white/6 bg-slate-900 p-5">
         <h2 className="text-lg font-semibold text-white">Embudo de capturas</h2>
         <div className="mt-4 grid gap-4 md:grid-cols-3">
-          <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-4">
-            <p className="text-3xl font-semibold text-white">{metrics.capturedLeads.toLocaleString()}</p>
-            <p className="mt-1 text-xs uppercase tracking-[0.14em] text-slate-500">Capturas totales</p>
+          <div className="rounded-2xl border border-white/6 bg-[#080e1a] px-4 py-4">
+            <p className="text-3xl font-bold text-white">{metrics.capturedLeads.toLocaleString()}</p>
+            <p className="mt-1 text-xs uppercase tracking-[0.14em] text-slate-400">Capturas totales</p>
             <p className="mt-2 text-sm text-slate-400">
               {metrics.capturedLeads > 0 ? '100' : '0'}% del total
             </p>
           </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-4">
-            <p className="text-3xl font-semibold text-white">{metrics.convertedCaptures.toLocaleString()}</p>
-            <p className="mt-1 text-xs uppercase tracking-[0.14em] text-slate-500">Pasaron a CRM</p>
+          <div className="rounded-2xl border border-white/6 bg-[#080e1a] px-4 py-4">
+            <p className="text-3xl font-bold text-white">{metrics.convertedCaptures.toLocaleString()}</p>
+            <p className="mt-1 text-xs uppercase tracking-[0.14em] text-slate-400">Pasaron a CRM</p>
             <p className="mt-2 text-sm text-slate-400">
               {metrics.capturedLeads > 0
                 ? ((metrics.convertedCaptures / metrics.capturedLeads) * 100).toFixed(0)
@@ -219,9 +222,9 @@ export default function AnalyticsPage() {
               % del total
             </p>
           </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-4">
-            <p className="text-3xl font-semibold text-white">{metrics.paidCaptures.toLocaleString()}</p>
-            <p className="mt-1 text-xs uppercase tracking-[0.14em] text-slate-500">Pagaron</p>
+          <div className="rounded-2xl border border-white/6 bg-[#080e1a] px-4 py-4">
+            <p className="text-3xl font-bold text-white">{metrics.paidCaptures.toLocaleString()}</p>
+            <p className="mt-1 text-xs uppercase tracking-[0.14em] text-slate-400">Pagaron</p>
             <p className="mt-2 text-sm text-slate-400">
               {metrics.capturedLeads > 0
                 ? ((metrics.paidCaptures / metrics.capturedLeads) * 100).toFixed(0)
@@ -233,7 +236,7 @@ export default function AnalyticsPage() {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-        <div className="rounded-[24px] border border-slate-800 bg-slate-900/70 p-5">
+        <div className="rounded-2xl border border-white/6 bg-slate-900 p-5">
           <h2 className="text-lg font-semibold text-white">Rendimiento clave</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <Row label="Impresiones" value={metrics.impressions.toLocaleString()} />
@@ -244,14 +247,14 @@ export default function AnalyticsPage() {
             <Row label="Pipeline abierto" value={`$${Math.round(metrics.pipelineValue).toLocaleString()}`} />
           </div>
 
-          <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Top plataformas por gasto</p>
+          <div className="mt-4 rounded-2xl border border-white/6 bg-[#080e1a] p-3">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Top plataformas por gasto</p>
             <div className="mt-2 space-y-2">
               {metrics.topPlatforms.length === 0 ? (
                 <p className="text-sm text-slate-500">Sin gasto registrado todavia.</p>
               ) : (
                 metrics.topPlatforms.map(([platform, spend]) => (
-                  <div key={platform} className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900 px-3 py-2">
+                  <div key={platform} className="flex items-center justify-between rounded-xl border border-white/6 bg-slate-900 px-3 py-2">
                     <span className="text-sm capitalize text-slate-200">{platform}</span>
                     <span className="text-sm font-semibold text-white">${Math.round(spend).toLocaleString()}</span>
                   </div>
@@ -261,21 +264,27 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        <div className="rounded-[24px] border border-slate-800 bg-slate-900/70 p-5">
+        <div className="rounded-2xl border border-white/6 bg-slate-900 p-5">
           <h2 className="text-lg font-semibold text-white">Proximas jugadas</h2>
           <div className="mt-4 space-y-2">
             {actionItems.map((item) => (
-              <div key={item} className="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-3 text-sm text-slate-300">
+              <div key={item} className="rounded-2xl border border-white/6 bg-[#080e1a] px-3 py-3 text-sm text-slate-300">
                 {item}
               </div>
             ))}
           </div>
 
           <div className="mt-4 grid gap-2">
-            <Link href="/dashboard/connect" className="rounded-lg bg-cyan-500 px-3 py-2 text-center text-sm font-semibold text-slate-950">
+            <Link
+              href="/dashboard/connect"
+              className="rounded-xl border border-white/10 px-3 py-2 text-center text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
+            >
               Ir a Campanas + Canales
             </Link>
-            <Link href="/dashboard/clientes/pipeline" className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-center text-sm font-semibold text-slate-200">
+            <Link
+              href="/dashboard/clientes/pipeline"
+              className="rounded-xl border border-white/10 px-3 py-2 text-center text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
+            >
               Abrir Motor de Ventas
             </Link>
           </div>
@@ -287,17 +296,17 @@ export default function AnalyticsPage() {
 
 function Kpi({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/70 px-4 py-3">
-      <p className="text-xs uppercase tracking-[0.14em] text-slate-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-white">{value}</p>
+    <div className="rounded-2xl border border-white/6 bg-slate-900 px-4 py-4">
+      <p className="text-xs uppercase tracking-[0.18em] text-slate-400">{label}</p>
+      <p className="mt-2 text-3xl font-bold text-white">{value}</p>
     </div>
   );
 }
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2">
-      <p className="text-xs text-slate-500">{label}</p>
+    <div className="rounded-2xl border border-white/6 bg-[#080e1a] px-3 py-3">
+      <p className="text-xs text-slate-400">{label}</p>
       <p className="text-base font-semibold text-white">{value}</p>
     </div>
   );
