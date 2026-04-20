@@ -171,7 +171,7 @@ export default function LeadsPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 bg-[#080e1a]">
       <div>
         <h1 className="text-2xl font-semibold text-white">Leads</h1>
         <p className="mt-1 text-sm text-slate-400">Gestiona contactos simples. También aparecen en tu CRM.</p>
@@ -182,13 +182,13 @@ export default function LeadsPage() {
       )}
 
       {leads.length === 0 && !showForm ? (
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 px-8 py-12 text-center">
+        <div className="rounded-2xl border border-white/6 bg-slate-900 px-8 py-12 text-center">
           <p className="text-lg font-medium text-white">Aún no tienes leads</p>
           <p className="mt-2 text-sm text-slate-400">Agrega tu primer lead para empezar a gestionar oportunidades</p>
           <button
             type="button"
             onClick={() => setShowForm(true)}
-            className="btn-primary mt-8 px-6 py-2.5 text-sm"
+            className="mt-8 rounded-2xl border border-white/10 px-6 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
           >
             Agregar lead
           </button>
@@ -196,7 +196,7 @@ export default function LeadsPage() {
       ) : null}
 
       {showForm || leads.length > 0 ? (
-        <form onSubmit={handleSubmit} className="max-w-md space-y-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+        <form onSubmit={handleSubmit} className="max-w-md space-y-4 rounded-2xl border border-white/6 bg-slate-900 p-6">
           <p className="text-sm font-medium text-white">Nuevo lead</p>
           <div>
             <label htmlFor="lead-name" className="mb-1 block text-xs font-medium text-slate-400">
@@ -207,7 +207,7 @@ export default function LeadsPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-white outline-none focus:border-cyan-500/50"
+              className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-4 py-2.5 text-sm text-white outline-none focus:border-cyan-500"
               placeholder="Nombre del contacto"
               autoComplete="name"
             />
@@ -222,7 +222,7 @@ export default function LeadsPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-white outline-none focus:border-cyan-500/50"
+              className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-4 py-2.5 text-sm text-white outline-none focus:border-cyan-500"
               placeholder="correo@ejemplo.com"
               autoComplete="email"
             />
@@ -235,7 +235,7 @@ export default function LeadsPage() {
               id="lead-campaign"
               value={campaignId}
               onChange={(e) => setCampaignId(e.target.value)}
-              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-white outline-none focus:border-cyan-500/50"
+              className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-4 py-2.5 text-sm text-white outline-none focus:border-cyan-500"
             >
               <option value="">Sin campaña</option>
               {campaigns.map((c) => (
@@ -245,16 +245,20 @@ export default function LeadsPage() {
               ))}
             </select>
           </div>
-          <button type="submit" disabled={submitting} className="btn-primary w-full py-2.5 text-sm disabled:opacity-50">
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full rounded-2xl border border-white/10 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white disabled:opacity-50"
+          >
             {submitting ? 'Guardando…' : 'Guardar lead'}
           </button>
         </form>
       ) : null}
 
       {leads.length > 0 ? (
-        <div className="overflow-hidden rounded-2xl border border-slate-800">
+        <div className="overflow-hidden rounded-2xl border border-white/6 bg-slate-900">
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-slate-800 bg-slate-900/80 text-xs uppercase tracking-wide text-slate-500">
+            <thead className="border-b border-white/6 bg-slate-900 text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="px-4 py-3 font-medium">Nombre</th>
                 <th className="px-4 py-3 font-medium">Correo</th>
@@ -262,7 +266,7 @@ export default function LeadsPage() {
                 <th className="px-4 py-3 font-medium">Creado</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800 bg-slate-900/40">
+            <tbody className="divide-y divide-white/6 bg-slate-900">
               {leads.map((lead) => {
                 const created = new Date(lead.createdAt);
                 const dateLabel = Number.isFinite(created.getTime())

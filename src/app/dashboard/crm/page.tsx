@@ -809,15 +809,15 @@ export default function DashboardCrmPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 bg-[#080e1a]">
       {/* ── Header ─────────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-[10px] uppercase tracking-[0.22em] text-cyan-400">CRM Comercial</p>
-          <h1 className="mt-0.5 text-xl font-semibold text-white">Motor de ventas</h1>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white">Motor de ventas</h1>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-2">
+          <div className="flex items-center gap-2 rounded-2xl border border-white/6 bg-slate-900 px-4 py-2">
             <span className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Pipeline</span>
             <span className="font-mono text-sm font-bold text-emerald-400">${Math.round(metrics.pipeline).toLocaleString()}</span>
             <span className="text-slate-700">·</span>
@@ -831,22 +831,22 @@ export default function DashboardCrmPage() {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Buscar..."
-            className="w-52 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-cyan-600 focus:outline-none"
+            className="w-52 rounded-2xl border border-slate-700 bg-slate-800/50 px-3 py-2 text-sm text-slate-100 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
           />
         </div>
       </div>
 
       {message ? (
-        <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-200">{message}</div>
+        <div className="rounded-2xl border border-white/6 bg-slate-900 px-4 py-3 text-sm text-slate-300">{message}</div>
       ) : null}
 
       {/* ── View tabs ──────────────────────────────────── */}
-      <div className="flex items-center gap-1 rounded-xl border border-slate-800 bg-slate-900/60 p-1 w-fit">
+      <div className="flex w-fit items-center gap-1 rounded-2xl border border-white/6 bg-slate-900 p-1">
         <button
           type="button"
           onClick={() => setViewMode('crm')}
           className={`rounded-lg px-4 py-1.5 text-xs font-semibold transition ${
-            viewMode === 'crm' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
+            viewMode === 'crm' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           CRM comercial
@@ -855,14 +855,14 @@ export default function DashboardCrmPage() {
           type="button"
           onClick={() => setViewMode('motor')}
           className={`rounded-lg px-4 py-1.5 text-xs font-semibold transition ${
-            viewMode === 'motor' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
+            viewMode === 'motor' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           Motor IA + Calendario
         </button>
       </div>
 
-      <section className={`rounded-[28px] border border-slate-800 bg-slate-900/70 p-4 shadow-[0_16px_55px_rgba(2,6,23,0.45)] ${viewMode === 'crm' ? '' : 'hidden'}`}>
+      <section className={`rounded-2xl border border-white/6 bg-slate-900 p-4 ${viewMode === 'crm' ? '' : 'hidden'}`}>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Flujo comercial</h2>
           <span className="text-xs text-slate-400">Arranca en Entrantes y avanza hasta Ganados</span>
@@ -873,14 +873,14 @@ export default function DashboardCrmPage() {
             const stageLeads = filteredLeads.filter((lead) => lead.stage === stage.key);
 
             return (
-              <div key={stage.key} className="rounded-2xl border border-slate-800 bg-slate-950/70 p-3">
+              <div key={stage.key} className="rounded-2xl border border-white/6 bg-slate-900 p-3">
                 <div className="mb-3 flex items-center justify-between">
                   <p className="text-sm font-semibold text-slate-100">{stage.label}</p>
                   <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-400">{stageLeads.length}</span>
                 </div>
 
                 {stage.key === 'lead' ? (
-                  <div className="mb-2 rounded-lg border border-cyan-500/20 bg-slate-900/90 px-2 py-2">
+                  <div className="mb-2 rounded-xl border border-white/6 bg-[#080e1a] px-2 py-2">
                     <p className="text-[10px] text-cyan-100/90">Contactar en menos de 24h</p>
                     <button
                       type="button"
@@ -889,26 +889,26 @@ export default function DashboardCrmPage() {
                         if (first) void sendFollowUp(first);
                         else setMessage('Añade un lead en Entrantes para enviar el primer mensaje.');
                       }}
-                      className="mt-1.5 w-full rounded-lg border border-cyan-500/35 bg-cyan-500/10 px-2 py-1.5 text-[10px] font-semibold text-cyan-200 hover:bg-cyan-500/15"
+                      className="mt-1.5 w-full rounded-xl border border-white/10 px-2 py-1.5 text-[10px] font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
                     >
                       Enviar primer mensaje
                     </button>
                   </div>
                 ) : null}
                 {stage.key === 'contacted' ? (
-                  <div className="mb-2 rounded-lg border border-cyan-500/20 bg-slate-900/90 px-2 py-2">
+                  <div className="mb-2 rounded-xl border border-white/6 bg-[#080e1a] px-2 py-2">
                     <p className="text-[10px] text-cyan-100/90">Agendar llamada</p>
                     <button
                       type="button"
                       onClick={() => openMeetingLink(salesEngine.meetingLinks.calendlyUrl, 'Calendly')}
-                      className="mt-1.5 w-full rounded-lg border border-cyan-500/35 bg-cyan-500/10 px-2 py-1.5 text-[10px] font-semibold text-cyan-200 hover:bg-cyan-500/15"
+                      className="mt-1.5 w-full rounded-xl border border-white/10 px-2 py-1.5 text-[10px] font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
                     >
                       Enviar link de agenda
                     </button>
                   </div>
                 ) : null}
                 {stage.key === 'qualified' ? (
-                  <div className="mb-2 rounded-lg border border-cyan-500/20 bg-slate-900/90 px-2 py-2">
+                  <div className="mb-2 rounded-xl border border-white/6 bg-[#080e1a] px-2 py-2">
                     <p className="text-[10px] text-cyan-100/90">Enviar propuesta</p>
                     <button
                       type="button"
@@ -916,14 +916,14 @@ export default function DashboardCrmPage() {
                         console.log('[CRM guidance] Enviar propuesta');
                         setMessage('Prepara la propuesta y envíala con Follow-up o tu canal habitual.');
                       }}
-                      className="mt-1.5 w-full rounded-lg border border-cyan-500/35 bg-cyan-500/10 px-2 py-1.5 text-[10px] font-semibold text-cyan-200 hover:bg-cyan-500/15"
+                      className="mt-1.5 w-full rounded-xl border border-white/10 px-2 py-1.5 text-[10px] font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
                     >
                       Enviar propuesta
                     </button>
                   </div>
                 ) : null}
                 {stage.key === 'proposal' ? (
-                  <div className="mb-2 rounded-lg border border-cyan-500/20 bg-slate-900/90 px-2 py-2">
+                  <div className="mb-2 rounded-xl border border-white/6 bg-[#080e1a] px-2 py-2">
                     <p className="text-[10px] text-cyan-100/90">Hacer seguimiento en 48h</p>
                     <button
                       type="button"
@@ -932,7 +932,7 @@ export default function DashboardCrmPage() {
                         if (first) void sendFollowUp(first);
                         else setMessage('Añade un lead en Propuesta para enviar el recordatorio.');
                       }}
-                      className="mt-1.5 w-full rounded-lg border border-cyan-500/35 bg-cyan-500/10 px-2 py-1.5 text-[10px] font-semibold text-cyan-200 hover:bg-cyan-500/15"
+                      className="mt-1.5 w-full rounded-xl border border-white/10 px-2 py-1.5 text-[10px] font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
                     >
                       Enviar recordatorio
                     </button>
@@ -941,13 +941,13 @@ export default function DashboardCrmPage() {
 
                 <div className="space-y-2">
                   {stageLeads.length === 0 ? (
-                    <p className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-3 text-xs text-slate-500">Sin oportunidades</p>
+                    <p className="rounded-2xl border border-white/6 bg-[#080e1a] px-3 py-3 text-xs text-slate-500">Sin oportunidades</p>
                   ) : (
                     stageLeads.map((lead) => {
                       const outcome = getEstadoFromNotes(lead.notes);
                       const notesPreview = displayNotesPreview(lead.notes);
                       return (
-                        <article key={lead.id} className="rounded-xl border border-slate-800 bg-slate-900 p-3">
+                        <article key={lead.id} className="rounded-2xl border border-white/6 bg-[#080e1a] p-3">
                           <p className="text-sm font-semibold text-white">{lead.name}</p>
                           <p className="mt-1 text-xs text-slate-400">{lead.company || 'Sin empresa'} · {lead.source}</p>
                           {outcome ? (
@@ -973,7 +973,7 @@ export default function DashboardCrmPage() {
                                 type="button"
                                 onClick={() => void sendFollowUp(lead)}
                                 disabled={sendingFollowUpId === lead.id}
-                                className="flex-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5 text-xs font-medium text-emerald-200 disabled:opacity-50"
+                                className="flex-1 rounded-xl border border-white/10 px-2 py-1.5 text-xs font-medium text-slate-200 transition hover:border-cyan-400/30 hover:text-white disabled:opacity-50"
                               >
                                 {sendingFollowUpId === lead.id ? 'Enviando...' : 'Follow-up'}
                               </button>
@@ -981,7 +981,7 @@ export default function DashboardCrmPage() {
                                 type="button"
                                 onClick={() => void applyPlaybook(lead)}
                                 disabled={busyLeadId === lead.id}
-                                className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-400 hover:border-cyan-500 hover:text-cyan-300"
+                                className="rounded-xl border border-white/10 px-2 py-1.5 text-xs text-slate-300 transition hover:border-cyan-400/30 hover:text-white"
                                 title="Aplicar playbook"
                               >
                                 ✦
@@ -992,7 +992,7 @@ export default function DashboardCrmPage() {
                               <select
                                 value={lead.stage}
                                 onChange={(event) => void moveLead(lead, event.target.value)}
-                                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-200 focus:outline-none"
+                                className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-2 py-1.5 text-xs text-slate-200 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
                               >
                                 {STAGES.map((option) => (
                                   <option key={option.key} value={option.key}>
@@ -1047,21 +1047,21 @@ export default function DashboardCrmPage() {
       </section>
 
       <section className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className={`rounded-[28px] border border-slate-800 bg-slate-900/70 p-5 shadow-[0_16px_55px_rgba(2,6,23,0.45)] lg:col-span-2 ${viewMode === 'motor' ? '' : 'hidden'}`}>
+        <div className={`rounded-2xl border border-white/6 bg-slate-900 p-5 lg:col-span-2 ${viewMode === 'motor' ? '' : 'hidden'}`}>
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-white">Motor de ventas</h2>
             <button
               type="button"
               onClick={() => void saveSalesEngine(salesEngine)}
               disabled={savingEngine}
-              className="rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-900 disabled:opacity-60"
+              className="rounded-xl border border-white/10 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white disabled:opacity-60"
             >
               {savingEngine ? 'Guardando...' : 'Guardar configuración'}
             </button>
           </div>
 
           <div className="mt-4 grid gap-4 lg:grid-cols-3">
-            <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+            <div className="rounded-2xl border border-white/6 bg-[#080e1a] p-4">
               <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Calendario semanal</p>
               <div className="mt-3 space-y-2 text-sm">
                 <div className="flex items-center justify-between text-slate-300">
@@ -1075,7 +1075,7 @@ export default function DashboardCrmPage() {
                     type="button"
                     onClick={() => void connectGoogleCalendar()}
                     disabled={connectingCalendar}
-                    className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-1.5 text-xs font-semibold text-cyan-200"
+                    className="rounded-xl border border-white/10 px-2.5 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
                   >
                     {connectingCalendar ? 'Conectando...' : 'Conectar Google Calendar'}
                   </button>
@@ -1083,7 +1083,7 @@ export default function DashboardCrmPage() {
                     <button
                       type="button"
                       onClick={() => void disconnectCalendar()}
-                      className="rounded-lg border border-slate-600 bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-slate-200"
+                      className="rounded-xl border border-white/10 px-2.5 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
                     >
                       Desconectar
                     </button>
@@ -1098,7 +1098,7 @@ export default function DashboardCrmPage() {
                       calendar: { ...current.calendar, provider: event.target.value as 'google' | 'outlook' },
                     }))
                   }
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-slate-200"
+                  className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-2 py-1.5 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
                 >
                   <option value="google">Google Calendar</option>
                   <option value="outlook">Outlook Calendar</option>
@@ -1114,7 +1114,7 @@ export default function DashboardCrmPage() {
                       calendar: { ...current.calendar, weeklyCapacity: Number(event.target.value) || 1 },
                     }))
                   }
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-slate-200"
+                  className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-2 py-1.5 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
                 />
                 <label className="block text-slate-400">Reuniones agendadas</label>
                 <input
@@ -1127,9 +1127,9 @@ export default function DashboardCrmPage() {
                       calendar: { ...current.calendar, bookedThisWeek: Number(event.target.value) || 0 },
                     }))
                   }
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-slate-200"
+                  className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-2 py-1.5 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
                 />
-                <div className="mt-3 rounded-lg border border-slate-800 bg-slate-900 p-2">
+                <div className="mt-3 rounded-2xl border border-white/6 bg-slate-900 p-2">
                   <div className="mb-2 flex items-center justify-between">
                     <button
                       type="button"
@@ -1138,7 +1138,7 @@ export default function DashboardCrmPage() {
                           (current) => new Date(current.getFullYear(), current.getMonth() - 1, 1)
                         )
                       }
-                      className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-300"
+                      className="rounded-lg border border-white/10 px-2 py-1 text-xs text-slate-300 transition hover:border-cyan-400/30 hover:text-white"
                     >
                       ←
                     </button>
@@ -1150,7 +1150,7 @@ export default function DashboardCrmPage() {
                           (current) => new Date(current.getFullYear(), current.getMonth() + 1, 1)
                         )
                       }
-                      className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-300"
+                      className="rounded-lg border border-white/10 px-2 py-1 text-xs text-slate-300 transition hover:border-cyan-400/30 hover:text-white"
                     >
                       →
                     </button>
@@ -1163,7 +1163,7 @@ export default function DashboardCrmPage() {
                   <div className="grid grid-cols-7 gap-1">
                     {monthGrid.map((cell) => {
                       if (!cell.day) {
-                        return <div key={cell.key} className="h-8 rounded bg-slate-950/40" />;
+                        return <div key={cell.key} className="h-8 rounded bg-[#080e1a]" />;
                       }
 
                       const cellDate = new Date(
@@ -1183,8 +1183,8 @@ export default function DashboardCrmPage() {
                           onClick={() => handleSelectCalendarDay(cell.day as number)}
                           className={`relative h-8 rounded text-xs font-medium ${
                             hasEvents
-                              ? 'border border-cyan-400/40 bg-cyan-500/10 text-cyan-200'
-                              : 'border border-slate-800 bg-slate-950 text-slate-300 hover:border-cyan-500/40'
+                              ? 'border border-cyan-400/30 bg-cyan-500/10 text-cyan-200'
+                              : 'border border-white/6 bg-[#080e1a] text-slate-300 hover:border-cyan-400/30'
                           } ${isToday ? 'ring-1 ring-emerald-400' : ''}`}
                           title={
                             isToday
@@ -1207,14 +1207,14 @@ export default function DashboardCrmPage() {
                   <p className="mt-2 text-[10px] text-slate-500">Selecciona un día para ver agenda y usar el formulario de cita.</p>
                 </div>
 
-                <div className="mt-3 rounded-lg border border-slate-800 bg-slate-900 p-3">
+                <div className="mt-3 rounded-2xl border border-white/6 bg-slate-900 p-3">
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Agenda del día {selectedDateKey}</p>
                   <div className="mt-2 space-y-2">
                     {selectedDateAppointments.length === 0 ? (
                       <p className="text-xs text-slate-500">No hay citas para este día.</p>
                     ) : (
                       selectedDateAppointments.map((appointment) => (
-                        <div key={appointment.id} className="rounded-lg border border-slate-800 bg-slate-950 p-2 text-xs">
+                        <div key={appointment.id} className="rounded-2xl border border-white/6 bg-[#080e1a] p-2 text-xs">
                           <p className="font-semibold text-slate-200">{appointment.title}</p>
                           <p className="mt-1 text-slate-400">
                             {new Date(appointment.startsAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
@@ -1226,7 +1226,7 @@ export default function DashboardCrmPage() {
                               <button
                                 type="button"
                                 onClick={() => window.open(appointment.externalUrl, '_blank', 'noopener,noreferrer')}
-                                className="rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-1 text-[11px] font-semibold text-cyan-200"
+                                className="rounded-lg border border-white/10 px-2 py-1 text-[11px] font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
                               >
                                 Abrir enlace
                               </button>
@@ -1244,12 +1244,12 @@ export default function DashboardCrmPage() {
                     )}
                   </div>
 
-                  <div className="mt-3 space-y-2 border-t border-slate-800 pt-3">
+                  <div className="mt-3 space-y-2 border-t border-white/6 pt-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Nueva cita (formulario simple)</p>
                     <input
                       value={appointmentForm.title}
                       onChange={(event) => setAppointmentForm((current) => ({ ...current, title: event.target.value }))}
-                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm text-slate-200"
+                      className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-2 py-1.5 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
                       placeholder="Título"
                     />
                     <div className="grid gap-2 sm:grid-cols-2">
@@ -1260,12 +1260,12 @@ export default function DashboardCrmPage() {
                           setSelectedDateKey(event.target.value);
                           setAppointmentForm((current) => ({ ...current, dateKey: event.target.value }));
                         }}
-                        className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm text-slate-200"
+                        className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-2 py-1.5 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
                       />
                       <select
                         value={appointmentForm.time}
                         onChange={(event) => setAppointmentForm((current) => ({ ...current, time: event.target.value }))}
-                        className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm text-slate-200"
+                        className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-2 py-1.5 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
                       >
                         {TIME_OPTIONS.map((option) => (
                           <option key={option} value={option}>
@@ -1286,7 +1286,7 @@ export default function DashboardCrmPage() {
                             duration: Math.max(15, Number(event.target.value) || 30),
                           }))
                         }
-                        className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm text-slate-200"
+                        className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-2 py-1.5 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
                         placeholder="Duración"
                       />
                       <select
@@ -1297,13 +1297,13 @@ export default function DashboardCrmPage() {
                             provider: event.target.value as 'google' | 'outlook' | 'calendly',
                           }))
                         }
-                        className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm text-slate-200"
+                        className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-2 py-1.5 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
                       >
                         <option value="google">Google</option>
                         <option value="outlook">Outlook</option>
                         <option value="calendly">Calendly</option>
                       </select>
-                      <label className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-300">
+                      <label className="inline-flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-800/50 px-2 py-1.5 text-xs text-slate-300">
                         <input
                           type="checkbox"
                           checked={appointmentForm.openExternal}
@@ -1317,14 +1317,14 @@ export default function DashboardCrmPage() {
                     <textarea
                       value={appointmentForm.notes}
                       onChange={(event) => setAppointmentForm((current) => ({ ...current, notes: event.target.value }))}
-                      className="min-h-[72px] w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm text-slate-200"
+                      className="min-h-[72px] w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-2 py-1.5 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
                       placeholder="Notas de la cita"
                     />
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
                         onClick={() => void handleCreateAppointment()}
-                        className="rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-950"
+                        className="rounded-xl border border-white/10 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
                       >
                         Guardar cita
                       </button>
@@ -1332,7 +1332,7 @@ export default function DashboardCrmPage() {
                         type="button"
                         onClick={() => void handleSuggestAppointmentWithAi()}
                         disabled={aiDraftingAppointment}
-                        className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-200 disabled:opacity-60"
+                        className="rounded-xl border border-white/10 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white disabled:opacity-60"
                       >
                         {aiDraftingAppointment ? 'IA pensando...' : 'Sugerir con IA'}
                       </button>
@@ -1342,7 +1342,7 @@ export default function DashboardCrmPage() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+            <div className="rounded-2xl border border-white/6 bg-[#080e1a] p-4">
               <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Links de reunión</p>
               <div className="mt-3 space-y-2 text-sm">
                 <label className="block text-slate-400">Calendly URL</label>
@@ -1355,7 +1355,7 @@ export default function DashboardCrmPage() {
                     }))
                   }
                   placeholder="https://calendly.com/..."
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-slate-200"
+                  className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-2 py-1.5 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
                 />
                 <label className="block text-slate-400">Zoom URL</label>
                 <input
@@ -1367,14 +1367,14 @@ export default function DashboardCrmPage() {
                     }))
                   }
                   placeholder="https://zoom.us/j/..."
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-slate-200"
+                  className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-2 py-1.5 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
                 />
                 <div className="flex gap-2 pt-1">
                   <button
                     type="button"
                     onClick={() => void saveSalesEngine(salesEngine)}
                     disabled={savingEngine}
-                    className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-1.5 text-xs font-semibold text-cyan-200"
+                    className="rounded-xl border border-white/10 px-2.5 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
                   >
                     Guardar links
                   </button>
@@ -1382,7 +1382,7 @@ export default function DashboardCrmPage() {
                     <button
                       type="button"
                       onClick={() => openMeetingLink(salesEngine.meetingLinks.calendlyUrl, 'Calendly')}
-                      className="rounded-lg border border-slate-600 bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-slate-200"
+                      className="rounded-xl border border-white/10 px-2.5 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
                     >
                       Probar Calendly
                     </button>
@@ -1391,7 +1391,7 @@ export default function DashboardCrmPage() {
                     <button
                       type="button"
                       onClick={() => openMeetingLink(salesEngine.meetingLinks.zoomUrl, 'Zoom')}
-                      className="rounded-lg border border-slate-600 bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-slate-200"
+                      className="rounded-xl border border-white/10 px-2.5 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
                     >
                       Probar Zoom
                     </button>
@@ -1400,14 +1400,14 @@ export default function DashboardCrmPage() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+            <div className="rounded-2xl border border-white/6 bg-[#080e1a] p-4">
               <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Seguimientos enviados</p>
               <div className="mt-3 max-h-48 space-y-2 overflow-y-auto">
                 {salesEngine.sentLogs.length === 0 ? (
                   <p className="text-xs text-slate-500">Aún no hay follow-ups enviados.</p>
                 ) : (
                   salesEngine.sentLogs.slice(0, 8).map((log) => (
-                    <div key={log.id} className="rounded-lg border border-slate-800 bg-slate-900 px-2 py-2 text-xs">
+                    <div key={log.id} className="rounded-2xl border border-white/6 bg-slate-900 px-2 py-2 text-xs">
                       <p className="truncate text-slate-200">{log.to}</p>
                       <p className="truncate text-slate-400">{log.subject}</p>
                       <p className="text-slate-500">{new Date(log.sentAt).toLocaleString('es-ES')} · {log.status}</p>
@@ -1418,11 +1418,11 @@ export default function DashboardCrmPage() {
             </div>
           </div>
 
-          <div id="crm-automation-section" className="scroll-mt-24 mt-4 rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+          <div id="crm-automation-section" className="scroll-mt-24 mt-4 rounded-2xl border border-white/6 bg-[#080e1a] p-4">
             <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Secuencia de emails (editable y automática)</p>
             <div className="mt-3 space-y-3">
               {salesEngine.followUpTemplates.map((template, idx) => (
-                <div key={template.id} className="rounded-lg border border-slate-800 bg-slate-900 p-3">
+                <div key={template.id} className="rounded-2xl border border-white/6 bg-slate-900 p-3">
                   <div className="grid gap-2 md:grid-cols-4">
                     <input
                       value={template.name}
@@ -1433,7 +1433,7 @@ export default function DashboardCrmPage() {
                           return { ...current, followUpTemplates: next };
                         })
                       }
-                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm text-slate-200"
+                      className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-2 py-1.5 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
                       placeholder="Nombre del template"
                     />
                     <select
@@ -1448,7 +1448,7 @@ export default function DashboardCrmPage() {
                           return { ...current, followUpTemplates: next };
                         })
                       }
-                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm text-slate-200"
+                      className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-2 py-1.5 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
                     >
                       <option value="on_signup">Registro inmediato</option>
                       <option value="after_signup">Después del registro</option>
@@ -1465,10 +1465,10 @@ export default function DashboardCrmPage() {
                           return { ...current, followUpTemplates: next };
                         })
                       }
-                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm text-slate-200"
+                      className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-2 py-1.5 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
                       placeholder="Retraso (horas)"
                     />
-                    <label className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm text-slate-200">
+                    <label className="inline-flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-800/50 px-2 py-1.5 text-sm text-slate-200">
                       <input
                         type="checkbox"
                         checked={template.active}
@@ -1492,7 +1492,7 @@ export default function DashboardCrmPage() {
                         return { ...current, followUpTemplates: next };
                       })
                     }
-                    className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm text-slate-200"
+                    className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-2 py-1.5 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
                     placeholder="Asunto"
                   />
                   <textarea
@@ -1504,10 +1504,10 @@ export default function DashboardCrmPage() {
                         return { ...current, followUpTemplates: next };
                       })
                     }
-                    className="mt-2 min-h-[90px] w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm text-slate-200"
+                    className="mt-2 min-h-[90px] w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-2 py-1.5 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
                     placeholder="Cuerpo del correo"
                   />
-                  <div className="mt-3 space-y-2 rounded-lg border border-slate-800 bg-slate-950 p-2">
+                  <div className="mt-3 space-y-2 rounded-2xl border border-white/6 bg-[#080e1a] p-2">
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Adjuntos</p>
                       <button
@@ -1530,7 +1530,7 @@ export default function DashboardCrmPage() {
                             return { ...current, followUpTemplates: next };
                           })
                         }
-                        className="rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-1 text-[11px] font-semibold text-cyan-200"
+                        className="rounded-lg border border-white/10 px-2 py-1 text-[11px] font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
                       >
                         + Agregar archivo
                       </button>
@@ -1551,7 +1551,7 @@ export default function DashboardCrmPage() {
                                 return { ...current, followUpTemplates: next };
                               })
                             }
-                            className="w-full rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-200"
+                            className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-2 py-1.5 text-xs text-slate-200 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
                             placeholder="Nombre"
                           />
                           <input
@@ -1565,7 +1565,7 @@ export default function DashboardCrmPage() {
                                 return { ...current, followUpTemplates: next };
                               })
                             }
-                            className="w-full rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-200"
+                            className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-2 py-1.5 text-xs text-slate-200 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
                             placeholder="https://..."
                           />
                           <button
@@ -1593,14 +1593,14 @@ export default function DashboardCrmPage() {
           </div>
         </div>
 
-        <div className={`rounded-[28px] border border-slate-800 bg-slate-900/70 p-5 shadow-[0_16px_55px_rgba(2,6,23,0.45)] ${viewMode === 'crm' ? '' : 'hidden'}`}>
+        <div className={`rounded-2xl border border-white/6 bg-slate-900 p-5 ${viewMode === 'crm' ? '' : 'hidden'}`}>
           <h2 className="text-lg font-semibold text-white">Interesados captados</h2>
           <div className="mt-4 space-y-2">
             {captures.length === 0 ? (
-              <p className="rounded-xl border border-slate-800 bg-slate-950 px-3 py-3 text-sm text-slate-500">Sin captados recientes.</p>
+              <p className="rounded-2xl border border-white/6 bg-[#080e1a] px-3 py-3 text-sm text-slate-500">Sin captados recientes.</p>
             ) : (
               captures.slice(0, 8).map((capture) => (
-                <div key={capture.id} className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950 px-3 py-3">
+                <div key={capture.id} className="flex items-center justify-between rounded-2xl border border-white/6 bg-[#080e1a] px-3 py-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-100">{capture.name || 'Sin nombre'}</p>
                     <p className="truncate text-xs text-slate-400">{capture.email} · {capture.source}</p>
@@ -1611,7 +1611,7 @@ export default function DashboardCrmPage() {
                     <button
                       type="button"
                       onClick={() => void promoteCapture(capture.id)}
-                      className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-300"
+                      className="rounded-xl border border-white/10 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
                     >
                       Pasar a CRM
                     </button>
@@ -1622,33 +1622,33 @@ export default function DashboardCrmPage() {
           </div>
         </div>
 
-        <div className={`rounded-[28px] border border-slate-800 bg-slate-900/70 p-5 shadow-[0_16px_55px_rgba(2,6,23,0.45)] ${viewMode === 'crm' ? '' : 'hidden'}`}>
+        <div className={`rounded-2xl border border-white/6 bg-slate-900 p-5 ${viewMode === 'crm' ? '' : 'hidden'}`}>
           <h2 className="text-lg font-semibold text-white">Nuevo contacto</h2>
           <div className="mt-4 space-y-3">
-            <input value={form.name} onChange={(event) => setForm((v) => ({ ...v, name: event.target.value }))} className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" placeholder="Nombre" />
-            <input value={form.email} onChange={(event) => setForm((v) => ({ ...v, email: event.target.value }))} className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" placeholder="Email" />
-            <input value={form.phone} onChange={(event) => setForm((v) => ({ ...v, phone: event.target.value }))} className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" placeholder="Teléfono" />
+            <input value={form.name} onChange={(event) => setForm((v) => ({ ...v, name: event.target.value }))} className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-3 py-2 text-sm text-slate-100 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10" placeholder="Nombre" />
+            <input value={form.email} onChange={(event) => setForm((v) => ({ ...v, email: event.target.value }))} className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-3 py-2 text-sm text-slate-100 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10" placeholder="Email" />
+            <input value={form.phone} onChange={(event) => setForm((v) => ({ ...v, phone: event.target.value }))} className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-3 py-2 text-sm text-slate-100 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10" placeholder="Teléfono" />
             <div>
               <p className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Tu producto o empresa</p>
               <input
                 value={form.company}
                 onChange={(event) => setForm((v) => ({ ...v, company: event.target.value }))}
-                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+                className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-3 py-2 text-sm text-slate-100 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
                 placeholder="Su nombre o empresa"
               />
               <p className="mt-1 text-[11px] text-slate-500">Su nombre o empresa</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <input type="number" value={form.value} onChange={(event) => setForm((v) => ({ ...v, value: Number(event.target.value) || 0 }))} className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" placeholder="Valor" />
-              <input type="number" min={0} max={100} value={form.confidence} onChange={(event) => setForm((v) => ({ ...v, confidence: Number(event.target.value) || 0 }))} className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" placeholder="Confianza" />
+              <input type="number" value={form.value} onChange={(event) => setForm((v) => ({ ...v, value: Number(event.target.value) || 0 }))} className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-3 py-2 text-sm text-slate-100 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10" placeholder="Valor" />
+              <input type="number" min={0} max={100} value={form.confidence} onChange={(event) => setForm((v) => ({ ...v, confidence: Number(event.target.value) || 0 }))} className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-3 py-2 text-sm text-slate-100 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10" placeholder="Confianza" />
             </div>
-            <input value={form.nextAction} onChange={(event) => setForm((v) => ({ ...v, nextAction: event.target.value }))} className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" placeholder="Siguiente acción" />
+            <input value={form.nextAction} onChange={(event) => setForm((v) => ({ ...v, nextAction: event.target.value }))} className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-3 py-2 text-sm text-slate-100 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10" placeholder="Siguiente acción" />
 
             <button
               type="button"
               onClick={() => void createLead()}
               disabled={saving}
-              className="w-full rounded-xl bg-cyan-500 px-4 py-2.5 text-sm font-semibold text-slate-950 hover:bg-cyan-400 disabled:opacity-60"
+              className="w-full rounded-2xl border border-white/10 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white disabled:opacity-60"
             >
               {saving ? 'Guardando...' : 'Guardar en CRM'}
             </button>
@@ -1661,8 +1661,8 @@ export default function DashboardCrmPage() {
 
 function KpiCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3">
-      <p className="text-xs uppercase tracking-[0.16em] text-slate-500">{label}</p>
+    <div className="rounded-2xl border border-white/6 bg-slate-900 px-4 py-3">
+      <p className="text-xs uppercase tracking-[0.16em] text-slate-400">{label}</p>
       <p className="mt-2 text-2xl font-semibold text-white">{value}</p>
     </div>
   );

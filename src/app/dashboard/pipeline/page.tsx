@@ -487,10 +487,10 @@ export default function PipelineUnifiedPage() {
   };
 
   return (
-    <div className="-m-6 flex h-[calc(100vh-5.8rem)] bg-slate-950 text-slate-200">
+    <div className="-m-6 flex h-[calc(100vh-5.8rem)] bg-[#080e1a] text-slate-200">
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* ── Header ─────────────────────────────────── */}
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950 px-5">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/6 bg-[#080e1a] px-5">
           <div className="flex items-center gap-3">
             <h1 className="text-sm font-semibold text-white">Pipeline</h1>
             <div className="relative">
@@ -500,21 +500,21 @@ export default function PipelineUnifiedPage() {
                 placeholder="Buscar..."
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
-                className="w-44 rounded-lg border border-slate-800 bg-slate-900 py-1.5 pl-8 pr-3 text-xs text-white placeholder:text-slate-600 focus:border-cyan-600 focus:outline-none"
+                className="w-44 rounded-2xl border border-slate-700 bg-slate-800/50 py-1.5 pl-8 pr-3 text-xs text-white placeholder:text-slate-600 focus:border-cyan-500 focus:outline-none"
               />
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setViewMode(viewMode === 'kanban' ? 'list' : 'kanban')}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-400 hover:border-slate-600 hover:text-white"
+              className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-slate-900 px-3 py-1.5 text-xs text-slate-300 hover:border-cyan-400/30 hover:text-white"
             >
               {viewMode === 'kanban' ? <List size={13} /> : <LayoutGrid size={13} />}
               {viewMode === 'kanban' ? 'Lista' : 'Kanban'}
             </button>
             <button
               onClick={() => setShowNewLeadModal(true)}
-              className="flex items-center gap-1.5 rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-cyan-400"
+              className="flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
             >
               <Plus size={13} />
               Lead
@@ -523,9 +523,9 @@ export default function PipelineUnifiedPage() {
         </header>
 
         {/* ── Metrics + Filters ──────────────────────── */}
-        <section className="shrink-0 border-b border-slate-800 bg-slate-950 px-5 py-3">
+        <section className="shrink-0 border-b border-white/6 bg-[#080e1a] px-5 py-3">
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 px-4 py-2.5">
+              <div className="flex items-center gap-3 rounded-2xl border border-white/6 bg-slate-900 px-4 py-2.5">
               <TrendingUp size={16} className="shrink-0 text-emerald-400" />
               <div>
                 <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Pipeline</p>
@@ -534,7 +534,7 @@ export default function PipelineUnifiedPage() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 px-4 py-2.5">
+              <div className="flex items-center gap-3 rounded-2xl border border-white/6 bg-slate-900 px-4 py-2.5">
               <Users size={16} className="shrink-0 text-blue-400" />
               <div>
                 <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Activos</p>
@@ -543,14 +543,14 @@ export default function PipelineUnifiedPage() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 px-4 py-2.5">
+              <div className="flex items-center gap-3 rounded-2xl border border-white/6 bg-slate-900 px-4 py-2.5">
               <Flame size={16} className="shrink-0 text-rose-400" />
               <div>
                 <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Prioridad alta</p>
                 <p className="text-lg font-bold leading-tight text-white">{queueStats.hot}</p>
               </div>
             </div>
-            <div className="ml-auto flex items-center gap-1 rounded-xl border border-slate-800 bg-slate-900 p-1">
+              <div className="ml-auto flex items-center gap-1 rounded-2xl border border-white/6 bg-slate-900 p-1">
               {(
                 [
                   { id: 'all', label: 'Todo', count: undefined },
@@ -562,13 +562,13 @@ export default function PipelineUnifiedPage() {
                 <button
                   key={tab.id}
                   onClick={() => setQueueFilter(tab.id)}
-                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                    queueFilter === tab.id ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'
-                  }`}
+                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                      queueFilter === tab.id ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-300'
+                    }`}
                 >
                   {tab.label}
                   {tab.count !== undefined && tab.count > 0 ? (
-                    <span className="rounded-full bg-slate-600 px-1.5 py-0.5 text-[10px] leading-none text-slate-200">
+                      <span className="rounded-full border border-white/6 bg-slate-900 px-1.5 py-0.5 text-[10px] leading-none text-slate-300">
                       {tab.count}
                     </span>
                   ) : null}
@@ -617,7 +617,7 @@ export default function PipelineUnifiedPage() {
                   return (
                     <div
                       key={lead.id}
-                      className="flex items-center justify-between gap-4 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 hover:border-slate-700"
+                      className="flex items-center justify-between gap-4 rounded-2xl border border-white/6 bg-slate-900 px-4 py-3 hover:border-cyan-400/20"
                     >
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-white">{lead.name}</p>
@@ -660,13 +660,13 @@ export default function PipelineUnifiedPage() {
 
           {/* Agenda sidebar */}
           <div
-            className={`relative shrink-0 border-l border-slate-800 bg-slate-900/30 transition-all duration-200 ${
+            className={`relative shrink-0 border-l border-white/6 bg-slate-900/30 transition-all duration-200 ${
               agendaOpen ? 'w-60' : 'w-10'
             }`}
           >
             <button
               onClick={() => setAgendaOpen((open) => !open)}
-              className="absolute -left-3 top-4 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-500 hover:text-white"
+              className="absolute -left-3 top-4 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-slate-900 text-slate-500 transition hover:border-cyan-400/30 hover:text-white"
               title={agendaOpen ? 'Cerrar agenda' : 'Ver agenda'}
             >
               {agendaOpen ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
@@ -676,7 +676,7 @@ export default function PipelineUnifiedPage() {
                 <p className="mb-3 text-[10px] uppercase tracking-[0.2em] text-slate-500">Agenda hoy</p>
                 <div className="space-y-2">
                   {todayAgenda.map((item) => (
-                    <div key={item.id} className="rounded-lg border border-slate-800 bg-slate-950 p-2.5">
+                    <div key={item.id} className="rounded-2xl border border-white/6 bg-slate-900 p-2.5">
                       <p className="truncate text-xs font-semibold text-white">{item.name}</p>
                       <p className="mt-0.5 text-[10px] uppercase tracking-wide text-slate-500">{item.stage}</p>
                       <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-slate-400">
@@ -701,7 +701,7 @@ export default function PipelineUnifiedPage() {
       {/* ── New lead modal ──────────────────────────── */}
       {showNewLeadModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+            <div className="w-full max-w-sm rounded-2xl border border-white/6 bg-slate-900 p-6 shadow-2xl">
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-base font-semibold text-white">Nuevo lead</h2>
               <button
@@ -720,14 +720,14 @@ export default function PipelineUnifiedPage() {
                 onChange={(event) => setNewLeadName(event.target.value)}
                 placeholder="Nombre del lead"
                 autoFocus
-                className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-cyan-500 focus:outline-none"
+                className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-cyan-500 focus:outline-none"
               />
               <input
                 value={newLeadEmail}
                 onChange={(event) => setNewLeadEmail(event.target.value)}
                 placeholder="Email (opcional)"
                 type="email"
-                className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-cyan-500 focus:outline-none"
+                className="w-full rounded-2xl border border-slate-700 bg-slate-800/50 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-cyan-500 focus:outline-none"
               />
             </div>
             {message ? <p className="mt-3 text-xs text-amber-300">{message}</p> : null}
@@ -738,7 +738,7 @@ export default function PipelineUnifiedPage() {
                   void createLead();
                 }}
                 disabled={saving}
-                className="flex-1 rounded-xl bg-cyan-500 py-2.5 text-sm font-semibold text-slate-950 hover:bg-cyan-400 disabled:opacity-60"
+                className="flex-1 rounded-2xl border border-white/10 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white disabled:opacity-60"
               >
                 {saving ? 'Guardando...' : 'Crear lead'}
               </button>
@@ -747,7 +747,7 @@ export default function PipelineUnifiedPage() {
                   setShowNewLeadModal(false);
                   setMessage('');
                 }}
-                className="rounded-xl border border-slate-700 px-4 py-2.5 text-sm text-slate-400 hover:text-white"
+                className="rounded-2xl border border-white/10 px-4 py-2.5 text-sm text-slate-400 transition hover:border-cyan-400/30 hover:text-white"
               >
                 Cancelar
               </button>
@@ -796,10 +796,10 @@ function PipelineColumn({
         }
       }}
       className={`flex w-[340px] flex-col rounded-2xl border transition-colors ${
-        isOver ? 'border-cyan-500/50 bg-slate-800/60' : 'border-slate-800 bg-slate-900/20'
+        isOver ? 'border-cyan-400/30 bg-slate-900/70' : 'border-white/6 bg-slate-900/50'
       }`}
     >
-      <div className="relative rounded-t-2xl border-b border-slate-800 px-4 py-3">
+      <div className="relative rounded-t-2xl border-b border-white/6 px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <span className="text-base">{stage.icon}</span>
@@ -808,7 +808,7 @@ function PipelineColumn({
           </div>
           <button
             onClick={() => setShowPlaybook((current) => !current)}
-            className="rounded-lg p-1 text-slate-600 hover:bg-slate-800 hover:text-slate-300"
+            className="rounded-lg p-1 text-slate-600 transition hover:bg-slate-800 hover:text-slate-300"
             aria-label={`Acciones clave ${stage.label}`}
           >
             <MoreHorizontal size={15} />
@@ -816,7 +816,7 @@ function PipelineColumn({
         </div>
 
         {showPlaybook ? (
-          <div className="absolute left-0 top-full z-20 mt-2 w-64 rounded-xl border border-slate-700 bg-slate-800 p-3 shadow-xl">
+          <div className="absolute left-0 top-full z-20 mt-2 w-64 rounded-2xl border border-white/6 bg-slate-900 p-3 shadow-xl">
             <p className="mb-2 text-xs font-semibold text-white">Acciones en {stage.label}</p>
             <ul className="space-y-1.5 text-xs text-slate-400">
               {stagePlaybook.map((action) => (
@@ -831,50 +831,50 @@ function PipelineColumn({
       </div>
 
       {stage.id === 'new' ? (
-        <div className="mx-3 mb-2 rounded-lg border border-cyan-500/20 bg-slate-900/90 px-2 py-2">
+        <div className="mx-3 mb-2 rounded-xl border border-white/6 bg-slate-900 px-2 py-2">
           <p className="text-[10px] text-cyan-100/90">Contactar en menos de 24h</p>
           <button
             type="button"
             onClick={() => onGuidance('new', leads)}
             disabled={Boolean(sendingFollowUpId)}
-            className="mt-1.5 w-full rounded-lg border border-cyan-500/35 bg-cyan-500/10 px-2 py-1.5 text-[10px] font-semibold text-cyan-200 hover:bg-cyan-500/15 disabled:opacity-50"
+            className="mt-1.5 w-full rounded-xl border border-white/10 px-2 py-1.5 text-[10px] font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white disabled:opacity-50"
           >
             Enviar primer mensaje
           </button>
         </div>
       ) : null}
       {stage.id === 'contacted' ? (
-        <div className="mx-3 mb-2 rounded-lg border border-cyan-500/20 bg-slate-900/90 px-2 py-2">
+        <div className="mx-3 mb-2 rounded-xl border border-white/6 bg-slate-900 px-2 py-2">
           <p className="text-[10px] text-cyan-100/90">Agendar llamada</p>
           <button
             type="button"
             onClick={() => onGuidance('contacted', leads)}
-            className="mt-1.5 w-full rounded-lg border border-cyan-500/35 bg-cyan-500/10 px-2 py-1.5 text-[10px] font-semibold text-cyan-200 hover:bg-cyan-500/15"
+            className="mt-1.5 w-full rounded-xl border border-white/10 px-2 py-1.5 text-[10px] font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
           >
             Enviar link de agenda
           </button>
         </div>
       ) : null}
       {stage.id === 'qualified' ? (
-        <div className="mx-3 mb-2 rounded-lg border border-cyan-500/20 bg-slate-900/90 px-2 py-2">
+        <div className="mx-3 mb-2 rounded-xl border border-white/6 bg-slate-900 px-2 py-2">
           <p className="text-[10px] text-cyan-100/90">Enviar propuesta</p>
           <button
             type="button"
             onClick={() => onGuidance('qualified', leads)}
-            className="mt-1.5 w-full rounded-lg border border-cyan-500/35 bg-cyan-500/10 px-2 py-1.5 text-[10px] font-semibold text-cyan-200 hover:bg-cyan-500/15"
+            className="mt-1.5 w-full rounded-xl border border-white/10 px-2 py-1.5 text-[10px] font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
           >
             Enviar propuesta
           </button>
         </div>
       ) : null}
       {stage.id === 'proposal' ? (
-        <div className="mx-3 mb-2 rounded-lg border border-cyan-500/20 bg-slate-900/90 px-2 py-2">
+        <div className="mx-3 mb-2 rounded-xl border border-white/6 bg-slate-900 px-2 py-2">
           <p className="text-[10px] text-cyan-100/90">Hacer seguimiento en 48h</p>
           <button
             type="button"
             onClick={() => onGuidance('proposal', leads)}
             disabled={Boolean(sendingFollowUpId)}
-            className="mt-1.5 w-full rounded-lg border border-cyan-500/35 bg-cyan-500/10 px-2 py-1.5 text-[10px] font-semibold text-cyan-200 hover:bg-cyan-500/15 disabled:opacity-50"
+            className="mt-1.5 w-full rounded-xl border border-white/10 px-2 py-1.5 text-[10px] font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white disabled:opacity-50"
           >
             Enviar recordatorio
           </button>
@@ -886,7 +886,7 @@ function PipelineColumn({
           <LeadCard key={lead.id} lead={lead} busyLeadId={busyLeadId} onPatchOutcome={onPatchOutcome} />
         ))}
         {leads.length === 0 ? (
-          <div className="flex h-20 items-center justify-center rounded-xl border-2 border-dashed border-slate-800 text-xs text-slate-700">
+          <div className="flex h-20 items-center justify-center rounded-2xl border border-dashed border-white/6 text-xs text-slate-500">
             Arrastra aquí
           </div>
         ) : null}
@@ -933,7 +933,7 @@ function LeadCard({
         event.dataTransfer.setData('text/plain', lead.id);
       }}
       onDragEnd={() => setIsDragging(false)}
-      className={`group cursor-move rounded-xl border border-slate-700/60 bg-slate-800 p-3.5 transition-all hover:border-slate-600 ${
+      className={`group cursor-move rounded-2xl border border-white/6 bg-slate-900 p-3.5 transition-all hover:border-cyan-400/20 ${
         isDragging ? 'rotate-1 opacity-50 shadow-lg' : ''
       }`}
     >
@@ -960,7 +960,7 @@ function LeadCard({
         <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${priorityStyles}`}>
           {priority}
         </span>
-        <span className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold text-cyan-300">
+        <span className="rounded-full border border-white/6 bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-cyan-300">
           {probability}%
         </span>
         <span className={`ml-auto text-[10px] ${isOverdue ? 'text-amber-400' : 'text-slate-600'}`}>
