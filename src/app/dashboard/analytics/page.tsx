@@ -157,7 +157,9 @@ export default function AnalyticsPage() {
       <section className="rounded-2xl border border-white/6 bg-slate-900 p-8">
         <p className="text-xs uppercase tracking-[0.28em] text-cyan-300">Analitica avanzada</p>
         <h1 className="mt-3 text-3xl font-semibold text-white">Desbloquea inteligencia de crecimiento.</h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">Esta vista une campañas, leads y pipeline en una lectura ejecutiva limpia.</p>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
+          Esta vista une campañas, leads y pipeline en una lectura ejecutiva limpia.
+        </p>
         <div className="mt-5 rounded-2xl border border-white/6 bg-[#080e1a] p-4 text-sm text-slate-300">
           {user?.entitlements?.capabilities.upgradeCta}
         </div>
@@ -254,9 +256,14 @@ export default function AnalyticsPage() {
                 <p className="text-sm text-slate-500">Sin gasto registrado todavia.</p>
               ) : (
                 metrics.topPlatforms.map(([platform, spend]) => (
-                  <div key={platform} className="flex items-center justify-between rounded-xl border border-white/6 bg-slate-900 px-3 py-2">
+                  <div
+                    key={platform}
+                    className="flex items-center justify-between rounded-xl border border-white/6 bg-slate-900 px-3 py-2"
+                  >
                     <span className="text-sm capitalize text-slate-200">{platform}</span>
-                    <span className="text-sm font-semibold text-white">${Math.round(spend).toLocaleString()}</span>
+                    <span className="text-sm font-semibold text-white">
+                      ${Math.round(spend).toLocaleString()}
+                    </span>
                   </div>
                 ))
               )}
@@ -268,7 +275,10 @@ export default function AnalyticsPage() {
           <h2 className="text-lg font-semibold text-white">Proximas jugadas</h2>
           <div className="mt-4 space-y-2">
             {actionItems.map((item) => (
-              <div key={item} className="rounded-2xl border border-white/6 bg-[#080e1a] px-3 py-3 text-sm text-slate-300">
+              <div
+                key={item}
+                className="rounded-2xl border border-white/6 bg-[#080e1a] px-3 py-3 text-sm text-slate-300"
+              >
                 {item}
               </div>
             ))}
