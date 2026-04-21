@@ -116,6 +116,12 @@ export default function DashboardStudioPage() {
     setSubmitting(true);
     setMessage('');
 
+    if (!form.offer.trim() || !form.prompt.trim()) {
+      setMessage('Completa la oferta y la idea base antes de generar.');
+      setSubmitting(false);
+      return;
+    }
+
     try {
       const token = localStorage.getItem('token');
       const response = await fetch('/api/ai/studio', {
