@@ -746,7 +746,10 @@ async function tryOpenRouterAiStudio(params: {
   smartEditOptions?: unknown;
 }): Promise<AiOutputPayload | null> {
   const apiKey = String(process.env.OPENROUTER_API_KEY || '').trim();
-  if (!apiKey) return null;
+  if (!apiKey) {
+    console.error('[ai-studio] tryOpenRouterAiStudio: OPENROUTER_API_KEY missing at runtime');
+    return null;
+  }
 
   const generationConfig = buildGenerationConfig({
     tone: params.tone,
@@ -795,20 +798,78 @@ async function tryOpenRouterAiStudio(params: {
       }),
     });
 
-    if (!response.ok) return null;
+    const responseText = await response.text();
+    if (!response.ok) {
+      console.error('[ai-studio] tryOpenRouterAiStudio: OpenRouter HTTP error', {
+        status: response.status,
+        statusText: response.statusText,
+        model: AI_STUDIO_OPENROUTER_MODEL,
+        bodyPreview: responseText.slice(0, 2000),
+      });
+      return null;
+    }
 
-    const payload = (await response.json()) as {
+    let payload: {
       choices?: Array<{ message?: { content?: string } }>;
+      error?: { message?: string; code?: number };
     };
+    try {
+      payload = JSON.parse(responseText) as typeof payload;
+    } catch (parseErr) {
+      console.error('[ai-studio] tryOpenRouterAiStudio: response body is not JSON', {
+        err: String(parseErr),
+        preview: responseText.slice(0, 800),
+      });
+      return null;
+    }
+
+    if (payload.error?.message) {
+      console.error('[ai-studio] tryOpenRouterAiStudio: OpenRouter error field in body', {
+        message: payload.error.message,
+        code: payload.error.code,
+        rawPreview: responseText.slice(0, 1500),
+      });
+      return null;
+    }
+
     const text = (payload.choices || [])
       .map((c) => c.message?.content || '')
       .join('\n')
       .trim();
-    if (!text) return null;
+    if (!text) {
+      console.error('[ai-studio] tryOpenRouterAiStudio: empty assistant content', {
+        model: AI_STUDIO_OPENROUTER_MODEL,
+        payloadPreview: responseText.slice(0, 1500),
+      });
+      return null;
+    }
 
-    const raw = JSON.parse(extractLlmJsonObject(text));
-    return normalizeLlmAiOutputPayload(raw, generationConfig);
-  } catch {
+    let raw: unknown;
+    try {
+      raw = JSON.parse(extractLlmJsonObject(text));
+    } catch (parseErr) {
+      console.error('[ai-studio] tryOpenRouterAiStudio: LLM output JSON parse failed', {
+        err: String(parseErr),
+        textPreview: text.slice(0, 1200),
+      });
+      return null;
+    }
+
+    const normalized = normalizeLlmAiOutputPayload(raw, generationConfig);
+    if (!normalized) {
+      console.error('[ai-studio] tryOpenRouterAiStudio: normalizeLlmAiOutputPayload rejected', {
+        rawKeys: raw && typeof raw === 'object' ? Object.keys(raw as object) : [],
+        rawPreview: JSON.stringify(raw).slice(0, 1200),
+      });
+      return null;
+    }
+
+    return normalized;
+  } catch (err) {
+    console.error('[ai-studio] tryOpenRouterAiStudio: fetch or unexpected error', {
+      message: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+    });
     return null;
   }
 }
