@@ -1,5 +1,7 @@
 import { BillingPlan, getBillingPlan } from '@/lib/billing';
 
+const AI_STUDIO_OPENROUTER_MODEL = 'meta-llama/llama-3.1-8b-instruct:free';
+
 export type AiToolKey =
   | 'ad-copy'
   | 'creative-brief'
@@ -614,6 +616,203 @@ function buildInstagramAdCopy(params: {
   };
 }
 
+function extractLlmJsonObject(text: string) {
+  const trimmed = text.trim();
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) return trimmed;
+  const fenced = trimmed.match(/```json\s*([\s\S]*?)```/i);
+  if (fenced?.[1]) return fenced[1].trim();
+  const first = trimmed.indexOf('{');
+  const last = trimmed.lastIndexOf('}');
+  if (first >= 0 && last > first) return trimmed.slice(first, last + 1);
+  return trimmed;
+}
+
+function normalizeLlmAiOutputPayload(
+  parsed: unknown,
+  generationConfig: GenerationConfig
+): AiOutputPayload | null {
+  if (!parsed || typeof parsed !== 'object') return null;
+  const o = parsed as Record<string, unknown>;
+  const headline = String(o.headline || '').trim();
+  if (!headline) return null;
+
+  let bullets = Array.isArray(o.bullets)
+    ? o.bullets.map((b) => String(b || '').trim()).filter(Boolean)
+    : [];
+
+  const slides: AiOutputSlide[] = Array.isArray(o.slides)
+    ? o.slides
+        .map((s) => {
+          if (!s || typeof s !== 'object') return null;
+          const x = s as Record<string, unknown>;
+          const title = String(x.title || '').trim();
+          const bl = Array.isArray(x.bullets)
+            ? x.bullets.map((b) => String(b || '').trim()).filter(Boolean)
+            : [];
+          if (!title && !bl.length) return null;
+          return { title: title || 'Slide', bullets: bl };
+        })
+        .filter((x): x is AiOutputSlide => Boolean(x))
+    : [];
+
+  const sections: AiOutputSection[] = Array.isArray(o.sections)
+    ? o.sections
+        .map((s) => {
+          if (!s || typeof s !== 'object') return null;
+          const x = s as Record<string, unknown>;
+          const title = String(x.title || '').trim();
+          const items = Array.isArray(x.items)
+            ? x.items.map((i) => String(i || '').trim()).filter(Boolean)
+            : [];
+          if (!title && !items.length) return null;
+          return { title: title || 'Sección', items };
+        })
+        .filter((x): x is AiOutputSection => Boolean(x))
+    : [];
+
+  const beatIds = new Set(['hook', 'conflict', 'resolution', 'cta']);
+  const beats: AiStoryboardBeat[] = Array.isArray(o.beats)
+    ? o.beats
+        .map((b) => {
+          if (!b || typeof b !== 'object') return null;
+          const x = b as Record<string, unknown>;
+          const id = String(x.id || '');
+          if (!beatIds.has(id)) return null;
+          return {
+            id: id as AiStoryboardBeat['id'],
+            label: String(x.label || '').trim() || id.toUpperCase(),
+            timeLabel: String(x.timeLabel || '').trim(),
+            startSec: Number(x.startSec) || 0,
+            endSec: Number(x.endSec) || 0,
+            text: String(x.text || '').trim(),
+            visual: String(x.visual || '').trim(),
+          };
+        })
+        .filter((x): x is AiStoryboardBeat => Boolean(x))
+    : [];
+
+  if (!bullets.length && slides.length) {
+    bullets = slides.flatMap((s) => [s.title, ...s.bullets]).filter(Boolean).slice(0, 16);
+  }
+  if (!bullets.length && sections.length) {
+    bullets = sections.flatMap((s) => [s.title, ...s.items]).filter(Boolean).slice(0, 16);
+  }
+  if (!bullets.length && beats.length) {
+    bullets = beats.map((b) => `${b.timeLabel}: ${b.text}`.trim()).filter(Boolean);
+  }
+
+  if (!bullets.length && !slides.length && !sections.length) return null;
+
+  const angle = String(o.angle || '').trim() || headline;
+  const cta = String(o.cta || '').trim();
+
+  return {
+    headline,
+    bullets: bullets.length ? bullets : [headline],
+    angle,
+    cta: cta || undefined,
+    slides: slides.length ? slides : undefined,
+    sections: sections.length ? sections : undefined,
+    beats: beats.length ? beats : undefined,
+    generationConfig,
+  };
+}
+
+function buildAiStudioOpenRouterSystemPrompt(): string {
+  return [
+    'Eres un estratega y copywriter de marketing para Nexora.',
+    'Generas contenido en español, claro, persuasivo y orientado a conversión.',
+    'Responde SOLO con un JSON válido (sin markdown, sin texto antes ni después).',
+    'Claves permitidas: headline (string), bullets (array de strings, mínimo 3 si aplica), angle (string),',
+    'cta (string, opcional), slides (opcional, array de {title, bullets}),',
+    'sections (opcional, array de {title, items}), beats (opcional, array de {id: hook|conflict|resolution|cta, label, timeLabel, startSec, endSec, text, visual}).',
+    'headline y angle son obligatorios; bullets debe ser útil y concreto salvo que slides o sections cubran el detalle.',
+  ].join(' ');
+}
+
+async function tryOpenRouterAiStudio(params: {
+  tool: AiToolKey;
+  prompt: string;
+  offer: string;
+  audience: string;
+  channel: string;
+  tone?: ContentTone;
+  format?: ContentFormat;
+  platform?: ContentPlatform;
+  duration?: 15 | 30 | 60;
+  sourceAsset?: string;
+  outputFormat?: string;
+  captionStyle?: string;
+  smartEditOptions?: unknown;
+}): Promise<AiOutputPayload | null> {
+  const apiKey = String(process.env.OPENROUTER_API_KEY || '').trim();
+  if (!apiKey) return null;
+
+  const generationConfig = buildGenerationConfig({
+    tone: params.tone,
+    format: params.format,
+    platform: params.platform,
+    duration: params.duration,
+  });
+
+  const userPayload = {
+    tool: params.tool,
+    offer: params.offer,
+    audience: params.audience,
+    channel: params.channel,
+    userPrompt: params.prompt,
+    tone: params.tone,
+    format: params.format,
+    platform: params.platform,
+    duration: params.duration,
+    sourceAsset: params.sourceAsset,
+    outputFormat: params.outputFormat,
+    captionStyle: params.captionStyle,
+    smartEditOptions: params.smartEditOptions,
+    constraints: [
+      'Adapta el formato al tool (anuncio, brief, guion UGC, repurpose, email, pitch).',
+      'No inventes datos legales, métricas o casos que el usuario no haya insinuado.',
+    ],
+  };
+
+  try {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'https://www.gotnexora.com',
+        'X-Title': 'Nexora AI Studio',
+      },
+      body: JSON.stringify({
+        model: AI_STUDIO_OPENROUTER_MODEL,
+        messages: [
+          { role: 'system', content: buildAiStudioOpenRouterSystemPrompt() },
+          { role: 'user', content: JSON.stringify(userPayload, null, 2) },
+        ],
+        temperature: 0.45,
+        max_tokens: 2500,
+      }),
+    });
+
+    if (!response.ok) return null;
+
+    const payload = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const text = (payload.choices || [])
+      .map((c) => c.message?.content || '')
+      .join('\n')
+      .trim();
+    if (!text) return null;
+
+    const raw = JSON.parse(extractLlmJsonObject(text));
+    return normalizeLlmAiOutputPayload(raw, generationConfig);
+  } catch {
+    return null;
+  }
+}
+
 export function getAiPlanConfig(plan?: string | null, founderAccess = false) {
   const normalizedPlan = (getBillingPlan(plan)?.key || 'starter') as BillingPlan;
   const config = AI_PLAN_CONFIG[normalizedPlan];
@@ -634,7 +833,7 @@ export function getCurrentCycleRange(referenceDate = new Date()) {
   return { cycleKey, cycleStart, cycleEnd };
 }
 
-export function buildAiOutput(params: {
+function buildAiOutputLocal(params: {
   tool: AiToolKey;
   prompt: string;
   offer: string;
@@ -800,4 +999,24 @@ export function buildAiOutput(params: {
         ],
       };
   }
+}
+
+export async function buildAiOutput(params: {
+  tool: AiToolKey;
+  prompt: string;
+  offer: string;
+  audience: string;
+  channel: string;
+  tone?: ContentTone;
+  format?: ContentFormat;
+  platform?: ContentPlatform;
+  duration?: 15 | 30 | 60;
+  sourceAsset?: string;
+  outputFormat?: string;
+  captionStyle?: string;
+  smartEditOptions?: unknown;
+}): Promise<AiOutputPayload> {
+  const fromLlm = await tryOpenRouterAiStudio(params);
+  if (fromLlm) return fromLlm;
+  return buildAiOutputLocal(params);
 }

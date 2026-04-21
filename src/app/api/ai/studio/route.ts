@@ -187,7 +187,7 @@ export async function POST(request: NextRequest) {
           offer,
           audience,
         })
-      : buildAiOutput({
+      : await buildAiOutput({
           tool,
           prompt,
           offer,
