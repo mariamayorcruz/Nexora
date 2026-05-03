@@ -1,119 +1,100 @@
 'use client';
 
-import RevealOnScroll from '@/components/ui/RevealOnScroll';
+import Link from 'next/link';
+import { useLang } from '@/context/LanguageContext';
+import DashboardMockupHero from '@/components/DashboardMockupHero';
 
-const quickStats = [
-  { value: '-12h', label: 'semana ahorrada' },
-  { value: '3.4x', label: 'ROAS promedio' },
-  { value: '<10 min', label: 'nueva cuenta' },
+const stats = [
+  { value: '3.4x', label: 'Average ROAS', labelEs: 'ROAS promedio' },
+  { value: '−12h', label: 'Saved per week', labelEs: 'ahorradas / semana' },
+  { value: '<10min', label: 'To set up', labelEs: 'para empezar' },
 ];
 
-const workspaceModules = [
-  { name: 'Meta Ads', status: 'Conectado', tone: 'emerald' },
-  { name: 'Google Ads', status: 'Conectado', tone: 'emerald' },
-  { name: 'TikTok Ads', status: 'Conectado', tone: 'emerald' },
-  { name: 'CRM', status: 'Pipeline activo', tone: 'cyan' },
-  { name: 'Facturacion', status: 'Stripe activo', tone: 'amber' },
-];
+const copy = {
+  en: {
+    badge: 'CRM + AI + Automation — in one place',
+    h1a: 'Turn leads into clients.',
+    h1b: 'Automatically.',
+    sub: 'Nexora gives your business the AI-powered system to attract, follow up, and close — without agencies, without chaos.',
+    cta1: 'Start free trial',
+    cta2: 'Watch demo',
+    trial: '7-day trial · $1 today · Cancel anytime',
+  },
+  es: {
+    badge: 'CRM + IA + Automatización — en un solo lugar',
+    h1a: 'Convierte leads en clientes.',
+    h1b: 'Automáticamente.',
+    sub: 'Nexora le da a tu negocio el sistema con IA para atraer, hacer seguimiento y cerrar — sin agencias, sin caos.',
+    cta1: 'Prueba gratis 7 días',
+    cta2: 'Ver demo',
+    trial: 'Prueba 7 días · Solo $1 hoy · Cancela cuando quieras',
+  },
+};
 
 export default function Hero() {
+  const { lang } = useLang();
+  const t = copy[lang];
+
   return (
-    <section className="relative flex min-h-screen items-center overflow-hidden bg-[#060816]">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.25),transparent_40%),radial-gradient(circle_at_20%_20%,rgba(56,189,248,0.18),transparent_35%)]" />
+    <section className="relative overflow-hidden bg-white pt-24 pb-16">
+      {/* Subtle background */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(14,165,233,0.06),transparent_50%),radial-gradient(circle_at_20%_80%,rgba(14,165,233,0.04),transparent_40%)]" />
 
-      <div className="relative z-10 mx-auto grid max-w-7xl items-center gap-12 px-6 py-20 md:grid-cols-2">
-        <div>
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm text-cyan-100 backdrop-blur-md">
-            ✅ Reemplaza 4 plataformas + Excel
-          </div>
-
-          <h1 className="mb-6 text-5xl font-bold leading-tight text-white md:text-7xl">
-            Una sola plataforma.<br />
-            <span className="bg-gradient-to-r from-orange-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">
-              4 anuncios. 0 caos.
-            </span>
-          </h1>
-
-          <p className="mb-8 text-xl leading-relaxed text-slate-300">
-            Centraliza Meta, Google, TikTok, CRM y facturación.<br />
-            IA que te ayuda a vender más, no solo a reportar.
-          </p>
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
-            <a
-              href="#diagnostico"
-              className="w-full rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-500 px-8 py-4 text-center text-lg font-semibold text-slate-950 transition hover:brightness-110 sm:w-auto"
-            >
-              Quiero mi auditoría gratis (7 min)
-            </a>
-            <a
-              href="#demo"
-              className="w-full rounded-2xl border border-cyan-300/35 bg-slate-900/70 px-8 py-4 text-center text-lg font-semibold text-cyan-100 transition hover:bg-slate-800 sm:w-auto"
-            >
-              Ver demo en vivo
-            </a>
-          </div>
-
-          <div className="mt-12 grid grid-cols-3 gap-2 text-center sm:gap-4">
-            {quickStats.map((item, index) => (
-              <RevealOnScroll key={item.label} delayMs={index * 100}>
-                <div className="rounded-2xl border border-white/10 bg-white/5 px-2 py-3 sm:px-3 sm:py-4">
-                  <p className="text-2xl font-bold text-emerald-400 sm:text-3xl">{item.value}</p>
-                  <p className="text-xs text-slate-400 sm:text-sm">{item.label}</p>
-                </div>
-              </RevealOnScroll>
-            ))}
-          </div>
-        </div>
-
-        <div className="relative space-y-4">
-          <div className="overflow-hidden rounded-3xl border border-white/10 bg-black shadow-2xl">
-            <div className="aspect-video">
-              <video
-                className="h-full w-full object-cover"
-                controls
-                autoPlay
-                muted
-                loop
-                playsInline
-                preload="metadata"
-              >
-                <source src="/videos/nexora-demo.mp4" type="video/mp4" />
-                Tu navegador no pudo cargar el video.
-              </video>
+      <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="grid items-center gap-12 lg:grid-cols-2">
+          {/* Left */}
+          <div>
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-700">
+              ✦ {t.badge}
             </div>
-          </div>
-          <div className="absolute right-3 top-3 rounded-2xl bg-emerald-500 px-6 py-2 text-sm font-bold text-black shadow-xl">
-            Live Workspace
-          </div>
-          <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-5 backdrop-blur">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-semibold text-white">Nexora Live Workspace</h3>
-              <span className="rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-200">
-                4 anuncios activos
-              </span>
-            </div>
-            <p className="mt-2 text-sm leading-6 text-slate-300">
-              Vista operativa única para campañas, seguimiento comercial y facturación.
+
+            <h1 className="text-5xl font-extrabold leading-[1.05] tracking-tight text-slate-900 md:text-6xl lg:text-7xl">
+              {t.h1a}<br />
+              <span className="text-sky-500">{t.h1b}</span>
+            </h1>
+
+            <p className="mt-6 max-w-lg text-lg leading-relaxed text-slate-500">
+              {t.sub}
             </p>
 
-            <div className="mt-4 grid gap-2">
-              {workspaceModules.map((module) => (
-                <div key={module.name} className="flex items-center justify-between rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2">
-                  <span className="text-sm text-slate-200">{module.name}</span>
-                  <span
-                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                      module.tone === 'emerald'
-                        ? 'bg-emerald-500/15 text-emerald-300'
-                        : module.tone === 'amber'
-                          ? 'bg-amber-500/15 text-amber-300'
-                          : 'bg-cyan-500/15 text-cyan-300'
-                    }`}
-                  >
-                    {module.status}
-                  </span>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link
+                href="/auth/signup"
+                className="rounded-xl bg-[#0ea5e9] px-8 py-4 text-base font-semibold text-white transition hover:bg-[#0284c7]"
+              >
+                {t.cta1}
+              </Link>
+              <Link
+                href="#demo"
+                className="rounded-xl border border-slate-300 bg-transparent px-8 py-4 text-base font-semibold text-slate-800 transition hover:bg-slate-50"
+              >
+                {t.cta2} →
+              </Link>
+            </div>
+
+            <p className="mt-4 text-sm text-slate-400">{t.trial}</p>
+
+            <div className="mt-12 grid grid-cols-3 gap-6">
+              {stats.map((s) => (
+                <div key={s.value} className="border-l-2 border-sky-200 pl-4">
+                  <p className="text-3xl font-extrabold text-slate-900">{s.value}</p>
+                  <p className="mt-1 text-xs text-slate-500">{lang === 'en' ? s.label : s.labelEs}</p>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Right — mockup */}
+          <div className="relative">
+            <div className="rounded-2xl border border-slate-200 shadow-2xl overflow-hidden">
+              <DashboardMockupHero />
+            </div>
+            <div className="absolute -bottom-4 -left-4 rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-lg">
+              <p className="text-xs text-slate-400">Trusted by</p>
+              <p className="text-sm font-semibold text-slate-900">SMBs · Agencies · Creators</p>
+            </div>
+            <div className="absolute -right-4 -top-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-2 shadow-lg">
+              <p className="text-xs font-semibold text-sky-600">● Live AI</p>
             </div>
           </div>
         </div>

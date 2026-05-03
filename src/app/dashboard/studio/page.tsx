@@ -1,8 +1,6 @@
 'use client';
 
-import Link from 'next/link';
-
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 interface AiTool {
   key: string;
@@ -26,6 +24,7 @@ interface AiJob {
     slides?: { title: string; bullets: string[] }[];
     sections?: { title: string; items: string[] }[];
     cta?: string;
+    imageUrl?: string;
   } | null;
   createdAt: string;
 }
@@ -42,478 +41,767 @@ interface StudioUsage {
   supportLabel: string;
 }
 
-const DEFAULT_FORM = {
-  tool: 'ad-copy',
-  offer: '',
-  audience: '',
-  channel: 'Instagram',
-  prompt: '',
-};
+type Tab = 'create' | 'calendar' | 'templates' | 'history';
+type Panel = 'tools' | 'text' | 'media' | 'publish';
 
-const MODE_FAMILIES = [
+const CHANNELS = [
+  { key: 'Instagram', icon: '📸', color: '#E1306C' },
+  { key: 'Facebook', icon: '👤', color: '#1877F2' },
+  { key: 'TikTok', icon: '♪', color: '#010101' },
+  { key: 'YouTube', icon: '▶', color: '#FF0000' },
+  { key: 'WhatsApp', icon: '💬', color: '#25D366' },
+  { key: 'Email', icon: '✉', color: '#6366F1' },
+];
+
+const FONTS = [
+  { key: 'inter', label: 'Inter', style: 'font-sans' },
+  { key: 'bold', label: 'Bold', style: 'font-sans font-bold' },
+  { key: 'serif', label: 'Serif', style: 'font-serif' },
+  { key: 'mono', label: 'Mono', style: 'font-mono' },
+];
+
+const OVERLAYS = [
+  { key: 'none', label: 'Sin texto' },
+  { key: 'headline', label: 'Headline' },
+  { key: 'minimal', label: 'Minimal' },
+  { key: 'bold', label: 'Bold CTA' },
+];
+
+const TEMPLATES = [
+  { key: 'promo', label: 'Promoción', emoji: '🔥', desc: 'Oferta urgente con deadline' },
+  { key: 'testimonial', label: 'Testimonio', emoji: '⭐', desc: 'Prueba social poderosa' },
+  { key: 'educativo', label: 'Educativo', emoji: '💡', desc: 'Tip o dato de valor' },
+  { key: 'producto', label: 'Producto', emoji: '📦', desc: 'Showcase de servicio' },
+  { key: 'historia', label: 'Historia', emoji: '📖', desc: 'Storytelling de marca' },
+  { key: 'carrusel', label: 'Carrusel', emoji: '🎠', desc: 'Secuencia de slides' },
+];
+
+const CALENDAR_DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+const FAMILIES = [
   { key: 'copy', label: 'Copy Lab' },
-  { key: 'sales', label: 'Sales Assets' },
+  { key: 'sales', label: 'Sales' },
 ] as const;
 
 export default function DashboardStudioPage() {
   const [usage, setUsage] = useState<StudioUsage | null>(null);
   const [tools, setTools] = useState<AiTool[]>([]);
   const [jobs, setJobs] = useState<AiJob[]>([]);
-  const [form, setForm] = useState(DEFAULT_FORM);
-  const [activeFamily, setActiveFamily] = useState<(typeof MODE_FAMILIES)[number]['key']>('copy');
-  const [message, setMessage] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<Tab>('create');
+  const [activePanel, setActivePanel] = useState<Panel>('tools');
+  const [activeFamily, setActiveFamily] = useState<'copy' | 'sales'>('copy');
+  const [activeTool, setActiveTool] = useState('ad-copy');
+  const [channel, setChannel] = useState('Instagram');
+  const [offer, setOffer] = useState('');
+  const [audience, setAudience] = useState('');
+  const [prompt, setPrompt] = useState('');
+  const [customContext, setCustomContext] = useState('');
+  const [businessContext, setBusinessContext] = useState<Record<string, unknown> | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [showWelcome, setShowWelcome] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState('');
+  const [isError, setIsError] = useState(false);
+  const [activeJob, setActiveJob] = useState<AiJob | null>(null);
+  const [overlayStyle, setOverlayStyle] = useState('none');
+  const [activeFont, setActiveFont] = useState('inter');
+  const [overlayText, setOverlayText] = useState('');
+  const [selectedTemplate, setSelectedTemplate] = useState('');
+  const [connectedChannels] = useState<string[]>([]);
+  const [publishingTo, setPublishingTo] = useState<string[]>([]);
+  const [calendarMonth] = useState(new Date());
+  const canvasRef = useRef<HTMLDivElement>(null);
 
   const familyTools = useMemo(
-    () => tools.filter((tool) => (tool.family || 'copy') === activeFamily),
+    () => tools.filter((t) => (t.family || 'copy') === activeFamily),
     [tools, activeFamily]
   );
 
   const selectedTool = useMemo(
-    () => tools.find((tool) => tool.key === form.tool) || tools[0],
-    [tools, form.tool]
+    () => tools.find((t) => t.key === activeTool) || tools[0],
+    [tools, activeTool]
   );
-
-  const latestJob = jobs[0] || null;
 
   const fetchStudio = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/ai/studio', {
+      const res = await fetch('/api/ai/studio', {
         headers: { Authorization: `Bearer ${token}` },
         cache: 'no-store',
       });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'No se pudo cargar Nexora Studio.');
-      }
-
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
       setUsage(data.usage);
       setTools(data.tools || []);
       setJobs(data.jobs || []);
-    } catch (error) {
-      console.error('Error fetching Nexora Studio:', error);
-      setMessage(error instanceof Error ? error.message : 'No se pudo cargar Nexora Studio.');
+      setBusinessContext(data.businessContext ?? null);
+      if (data.jobs?.length) setActiveJob(data.jobs[0]);
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    void fetchStudio();
-  }, []);
+  useEffect(() => { void fetchStudio(); }, []);
 
   useEffect(() => {
-    if (familyTools.length > 0 && !familyTools.some((tool) => tool.key === form.tool)) {
-      setForm((current) => ({ ...current, tool: familyTools[0].key }));
+    if (familyTools.length && !familyTools.find((t) => t.key === activeTool)) {
+      setActiveTool(familyTools[0].key);
     }
-  }, [familyTools, form.tool]);
+  }, [familyTools, activeTool]);
+
+  const showMsg = (txt: string, err = false) => {
+    setMessage(txt);
+    setIsError(err);
+    setTimeout(() => setMessage(''), 4000);
+  };
+
+  const applyTemplate = (key: string) => {
+    setSelectedTemplate(key);
+    const tpl: Record<string, { offer: string; prompt: string; audience: string }> = {
+      promo: { offer: 'Oferta especial por tiempo limitado', prompt: 'Crea urgencia real. Usa countdown mental. Beneficio claro + consecuencia de no actuar.', audience: 'Clientes potenciales listos para comprar' },
+      testimonial: { offer: 'Resultado transformador de cliente real', prompt: 'Antes y después poderoso. Voz del cliente. Específico con números si es posible.', audience: 'Personas con el mismo problema resuelto' },
+      educativo: { offer: 'Tip de valor de tu industria', prompt: 'Un insight que nadie más comparte. Posiciónate como experto. Termina con CTA suave.', audience: 'Audiencia que quiere aprender' },
+      producto: { offer: 'Servicio o producto principal', prompt: 'Muestra el resultado, no el proceso. Habla de transformación. Precio si aplica.', audience: 'Cliente ideal del negocio' },
+      historia: { offer: 'Historia real del negocio o cliente', prompt: 'Arco narrativo: problema → momento de quiebre → solución → resultado. Emocional.', audience: 'Seguidores que conectan con la marca' },
+      carrusel: { offer: 'Tema educativo o proceso paso a paso', prompt: 'Slide 1: hook. Slides 2-5: pasos o tips. Slide final: CTA. Cada slide independiente.', audience: 'Audiencia que quiere aprender haciendo' },
+    };
+    if (tpl[key]) {
+      setOffer(tpl[key].offer);
+      setPrompt(tpl[key].prompt);
+      setAudience(tpl[key].audience);
+    }
+  };
 
   const handleGenerate = async () => {
-    setSubmitting(true);
-    setMessage('');
-
-    if (!form.offer.trim() || !form.prompt.trim()) {
-      setMessage('Completa la oferta y la idea base antes de generar.');
-      setSubmitting(false);
+    if (submitting) return;
+    if (!offer.trim() || !prompt.trim()) {
+      showMsg('Completa la oferta y el brief antes de generar.', true);
       return;
     }
-
+    if (selectedTool && usage && usage.creditsRemaining < selectedTool.credits) {
+      showMsg('Sin créditos suficientes. Sube de plan o espera al próximo ciclo.', true);
+      return;
+    }
+    setSubmitting(true);
+    setMessage('');
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/ai/studio', {
+      const res = await fetch('/api/ai/studio', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(form),
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tool: activeTool, offer, audience, channel, prompt, customContext, businessContext }),
       });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'No se pudo generar el recurso.');
-      }
-
-      setJobs((current) => [data.job, ...current].slice(0, 8));
-      setUsage((current) =>
-        current
-          ? {
-              ...current,
-              creditsIncluded: data.usage.creditsIncluded,
-              creditsPurchased: data.usage.creditsPurchased,
-              creditsUsed: data.usage.creditsUsed,
-              creditsRemaining: data.usage.creditsRemaining,
-            }
-          : current
-      );
-      setMessage(
-        data.reused
-          ? 'Recuperamos un resultado igual reciente y no descontamos créditos de nuevo.'
-          : 'La nueva pieza ya quedó lista dentro de tu estudio creativo.'
-      );
-    } catch (error) {
-      console.error('Error generating AI result:', error);
-      await fetchStudio();
-      setMessage(
-        error instanceof Error
-          ? `${error.message} Si se genero correctamente en segundo plano, ya aparece en el historial.`
-          : 'No se pudo generar el recurso. Si se completo en segundo plano, ya aparece en el historial.'
-      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      const newJobs = [data.job, ...jobs].slice(0, 20);
+      setJobs(newJobs);
+      setActiveJob(data.job);
+      if (data.usage) setUsage((u) => u ? { ...u, ...data.usage } : u);
+      showMsg(data.reused ? 'Resultado reutilizado — sin descuento.' : '¡Asset generado! Listo para editar y publicar.');
+      setActivePanel('media');
+    } catch (e) {
+      showMsg(e instanceof Error ? e.message : 'Error generando. Intenta de nuevo.', true);
     } finally {
       setSubmitting(false);
     }
   };
 
+  const handlePublish = async () => {
+    if (!publishingTo.length) { showMsg('Selecciona al menos una red social para publicar.', true); return; }
+    showMsg(`Publicando en ${publishingTo.join(', ')}... (Conecta tu cuenta en Ajustes → Integraciones)`);
+  };
+
+  const calendarDays = useMemo(() => {
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const days: (number | null)[] = Array(firstDay).fill(null);
+    for (let i = 1; i <= daysInMonth; i++) days.push(i);
+    return days;
+  }, [calendarMonth]);
+
+  const jobsByDay = useMemo(() => {
+    const map: Record<number, AiJob[]> = {};
+    jobs.forEach((j) => {
+      const d = new Date(j.createdAt).getDate();
+      if (!map[d]) map[d] = [];
+      map[d].push(j);
+    });
+    return map;
+  }, [jobs]);
+
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
-          <div className="inline-block h-12 w-12 animate-spin rounded-full border-b-2 border-b-primary" />
-          <p className="mt-4 text-gray-600">Cargando Nexora Studio...</p>
+          <div className="inline-block h-10 w-10 animate-spin rounded-full border-b-2 border-b-cyan-400" />
+          <p className="mt-3 text-sm text-slate-400">Cargando Studio...</p>
         </div>
       </div>
     );
   }
 
-  if (showWelcome) {
-    return (
-      <section className="rounded-[36px] bg-[linear-gradient(135deg,#0f172a_0%,#111827_42%,#0f766e_100%)] px-8 py-12 text-white shadow-[0_32px_110px_rgba(15,23,42,0.24)]">
-        <p className="text-xs uppercase tracking-[0.3em] text-cyan-200">Nexora Studio</p>
-        <h1 className="mt-3 max-w-3xl text-4xl font-semibold leading-tight md:text-5xl">
-          Bienvenida al workspace creativo de Nexora.
-        </h1>
-        <p className="mt-5 max-w-2xl text-base leading-7 text-slate-200">
-          Aqui puedes generar assets, revisar resultados en vivo y controlar creditos sin salir del mismo flujo.
-        </p>
-        <div className="mt-8 flex flex-wrap gap-3">
+  return (
+    <div className="flex flex-col h-[calc(100vh-64px)] bg-[#080e1a] overflow-hidden">
+      {/* TOP BAR */}
+      <div className="flex items-center justify-between px-4 h-12 bg-[#0c1423] border-b border-white/6 flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-lg bg-cyan-400 flex items-center justify-center">
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M7 1L9.5 5.5H13L9.5 8.5L11 13L7 10L3 13L4.5 8.5L1 5.5H4.5L7 1Z" fill="#000"/></svg>
+            </div>
+            <span className="text-sm font-semibold text-white">Nexora Studio</span>
+            <span className="text-[10px] text-cyan-400 border border-cyan-400/25 rounded-full px-2 py-0.5">Pro</span>
+          </div>
+          <div className="w-px h-4 bg-white/10" />
+          {(['create', 'calendar', 'templates', 'history'] as Tab[]).map((t) => (
+            <button
+              key={t}
+              onClick={() => setActiveTab(t)}
+              className={`px-3 h-12 text-xs font-medium border-b-2 transition ${
+                activeTab === t
+                  ? 'text-cyan-400 border-cyan-400'
+                  : 'text-slate-500 border-transparent hover:text-slate-300'
+              }`}
+            >
+              {t === 'create' ? 'Crear' : t === 'calendar' ? 'Calendario' : t === 'templates' ? 'Plantillas' : 'Historial'}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-3">
+          {usage && (
+            <div className="flex items-center gap-2 text-xs">
+              <div className="w-20 h-1.5 bg-white/8 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-cyan-400 rounded-full transition-all"
+                  style={{ width: `${Math.min(100, Math.round((usage.creditsRemaining / usage.creditsTotal) * 100))}%` }}
+                />
+              </div>
+              <span className="text-slate-400">{usage.creditsRemaining} créditos</span>
+            </div>
+          )}
           <button
-            onClick={() => setShowWelcome(false)}
-            className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
+            onClick={handleGenerate}
+            disabled={submitting}
+            className="flex items-center gap-2 bg-cyan-400 hover:bg-cyan-300 text-black text-xs font-bold px-4 py-2 rounded-lg transition disabled:opacity-50"
           >
-            Entrar a Nexora Studio
+            {submitting ? (
+              <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31" strokeDashoffset="10"/></svg>
+            ) : (
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M7 1L9.5 5.5H13L9.5 8.5L11 13L7 10L3 13L4.5 8.5L1 5.5H4.5L7 1Z" fill="currentColor"/></svg>
+            )}
+            {submitting ? 'Generando...' : `Generar — ${selectedTool?.credits ?? 0} créditos`}
           </button>
         </div>
-      </section>
-    );
-  }
+      </div>
 
-  return (
-    <div className="space-y-6">
-      <section className="rounded-2xl border border-cyan-200 bg-cyan-50 px-5 py-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-cyan-700">Nuevo</p>
-            <p className="mt-1 text-sm font-semibold text-slate-900">
-              Ya tienes Nexora Studio activo con canvas, inspector, saldo en vivo y bloqueo por creditos.
-            </p>
-          </div>
-          <Link href="/dashboard/studio" className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
-            Abrir Nexora Studio
-          </Link>
-        </div>
-      </section>
+      {/* MAIN AREA */}
+      {activeTab === 'create' && (
+        <div className="flex flex-1 overflow-hidden">
+          {/* LEFT PANEL */}
+          <div className="w-64 flex flex-col border-r border-white/6 bg-[#0c1423] flex-shrink-0 overflow-hidden">
+            <div className="flex border-b border-white/6">
+              {([
+                { key: 'tools', icon: '◈', label: 'Tools' },
+                { key: 'text', icon: 'T', label: 'Texto' },
+                { key: 'media', icon: '⊡', label: 'Media' },
+                { key: 'publish', icon: '↑', label: 'Publicar' },
+              ] as { key: Panel; icon: string; label: string }[]).map((p) => (
+                <button
+                  key={p.key}
+                  onClick={() => setActivePanel(p.key)}
+                  className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-[10px] transition ${
+                    activePanel === p.key ? 'text-cyan-400 bg-cyan-400/6' : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  <span className="text-base leading-none">{p.icon}</span>
+                  <span>{p.label}</span>
+                </button>
+              ))}
+            </div>
 
-      <section className="rounded-[36px] bg-[linear-gradient(135deg,#111827_0%,#0f172a_40%,#7c2d12_100%)] px-8 py-10 text-white shadow-[0_32px_110px_rgba(15,23,42,0.22)]">
-        <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
-          <div>
-            <p className="text-xs uppercase tracking-[0.32em] text-amber-200">Nexora Studio</p>
-            <h1 className="mt-3 text-4xl font-semibold leading-tight">
-              Una sola pantalla para crear, revisar y reutilizar todo.
-            </h1>
-            <p className="mt-4 max-w-2xl text-base leading-6 text-slate-300">
-              Workspace organizado: controles a la izquierda, resultado en tiempo real a la derecha e historial vivo abajo.
-            </p>
-            <p className="mt-4 text-sm text-amber-100/90">{usage?.supportLabel}</p>
-          </div>
+            <div className="flex-1 overflow-y-auto p-3 space-y-4">
+              {activePanel === 'tools' && (
+                <>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-slate-600 mb-2">Modo</p>
+                    <div className="flex gap-1">
+                      {FAMILIES.map((f) => (
+                        <button
+                          key={f.key}
+                          onClick={() => setActiveFamily(f.key)}
+                          className={`flex-1 py-1.5 rounded-lg text-[11px] font-medium transition ${
+                            activeFamily === f.key
+                              ? 'bg-cyan-400/10 border border-cyan-400/25 text-cyan-400'
+                              : 'border border-white/6 text-slate-500 hover:text-slate-300'
+                          }`}
+                        >
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    {familyTools.map((tool) => (
+                      <button
+                        key={tool.key}
+                        onClick={() => setActiveTool(tool.key)}
+                        className={`w-full text-left rounded-xl p-3 border transition ${
+                          activeTool === tool.key
+                            ? 'border-cyan-400/25 bg-[#080e1a]'
+                            : 'border-white/5 hover:border-white/10 hover:bg-[#080e1a]/50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-medium text-white">{tool.label}</span>
+                          {activeTool === tool.key && <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />}
+                        </div>
+                        <p className="text-[10px] text-slate-600 leading-relaxed">{tool.description}</p>
+                        <p className="text-[10px] text-slate-500 mt-1">{tool.credits} créditos</p>
+                      </button>
+                    ))}
+                  </div>
+                  {businessContext && (
+                    <div className="rounded-xl border border-white/5 bg-[#080e1a] p-3">
+                      <p className="text-[10px] text-slate-600 uppercase tracking-widest mb-1">Negocio</p>
+                      <p className="text-xs text-slate-300 font-medium">{String(businessContext.businessName || '')}</p>
+                      {Array.isArray(businessContext.industries) && (
+                        <p className="text-[10px] text-slate-500 mt-0.5">{(businessContext.industries as string[]).join(', ')}</p>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1">
-            <div className="rounded-[26px] border border-white/10 bg-white/5 p-6">
-              <p className="text-sm text-slate-300">Créditos disponibles</p>
-              <p className="mt-2 text-5xl font-semibold text-white">{usage?.creditsRemaining ?? 0}</p>
-              <p className="mt-1 text-sm text-slate-300">
-                de {usage?.creditsTotal ?? 0} para el ciclo {usage?.cycleKey}
-              </p>
+              {activePanel === 'text' && (
+                <>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-slate-600 mb-2">Fuente</p>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {FONTS.map((f) => (
+                        <button
+                          key={f.key}
+                          onClick={() => setActiveFont(f.key)}
+                          className={`py-2 rounded-lg border text-xs transition ${
+                            activeFont === f.key
+                              ? 'border-cyan-400/25 bg-cyan-400/8 text-cyan-300'
+                              : 'border-white/6 text-slate-400 hover:border-white/12'
+                          } ${f.style}`}
+                        >
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-slate-600 mb-2">Overlay</p>
+                    <div className="space-y-1">
+                      {OVERLAYS.map((o) => (
+                        <button
+                          key={o.key}
+                          onClick={() => setOverlayStyle(o.key)}
+                          className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition ${
+                            overlayStyle === o.key
+                              ? 'border-cyan-400/25 bg-cyan-400/8 text-cyan-300'
+                              : 'border-white/6 text-slate-400 hover:border-white/12'
+                          }`}
+                        >
+                          {o.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {overlayStyle !== 'none' && (
+                    <div>
+                      <p className="text-[10px] uppercase tracking-widest text-slate-600 mb-2">Texto sobre imagen</p>
+                      <textarea
+                        value={overlayText}
+                        onChange={(e) => setOverlayText(e.target.value)}
+                        rows={3}
+                        placeholder="Texto que aparece en el visual..."
+                        className="w-full bg-[#080e1a] border border-white/8 rounded-lg p-2.5 text-xs text-white placeholder-slate-600 outline-none focus:border-cyan-500/40 resize-none"
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+
+              {activePanel === 'media' && activeJob?.output && (
+                <>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-slate-600 mb-2">Output generado</p>
+                    <div className="rounded-xl border border-white/5 bg-[#080e1a] p-3 space-y-2">
+                      {activeJob.output.headline && (
+                        <p className="text-xs font-semibold text-white leading-snug">{activeJob.output.headline}</p>
+                      )}
+                      {activeJob.output.cta && (
+                        <p className="text-[11px] text-cyan-400">{activeJob.output.cta}</p>
+                      )}
+                    </div>
+                  </div>
+                  {activeJob.output.imageUrl && (
+                    <div>
+                      <p className="text-[10px] uppercase tracking-widest text-slate-600 mb-2">Imagen IA</p>
+                      <div className="rounded-xl overflow-hidden border border-white/5">
+                        <img src={activeJob.output.imageUrl} alt="Generated" className="w-full object-cover" />
+                      </div>
+                      <a
+                        href={activeJob.output.imageUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 flex items-center justify-center gap-1 text-[11px] text-cyan-400 hover:text-cyan-300 transition"
+                      >
+                        Descargar imagen →
+                      </a>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {activePanel === 'publish' && (
+                <>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-slate-600 mb-2">Publicar en</p>
+                    <div className="space-y-1.5">
+                      {CHANNELS.map((ch) => (
+                        <button
+                          key={ch.key}
+                          onClick={() => setPublishingTo((prev) =>
+                            prev.includes(ch.key) ? prev.filter((x) => x !== ch.key) : [...prev, ch.key]
+                          )}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-xs transition ${
+                            publishingTo.includes(ch.key)
+                              ? 'border-cyan-400/25 bg-cyan-400/6 text-white'
+                              : 'border-white/6 text-slate-400 hover:border-white/12'
+                          }`}
+                        >
+                          <span className="text-base">{ch.icon}</span>
+                          <span className="flex-1 text-left font-medium">{ch.key}</span>
+                          {connectedChannels.includes(ch.key) ? (
+                            <span className="text-[10px] text-emerald-400">Conectado</span>
+                          ) : (
+                            <span className="text-[10px] text-slate-600">Conectar</span>
+                          )}
+                          <div className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center ${
+                            publishingTo.includes(ch.key) ? 'bg-cyan-400 border-cyan-400' : 'border-white/20'
+                          }`}>
+                            {publishingTo.includes(ch.key) && (
+                              <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1 4L3 6L7 2" stroke="#000" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    onClick={handlePublish}
+                    className="w-full bg-cyan-400 hover:bg-cyan-300 text-black text-xs font-bold py-2.5 rounded-xl transition"
+                  >
+                    Publicar ahora
+                  </button>
+                  <p className="text-[10px] text-slate-600 text-center leading-relaxed">
+                    Conecta tus cuentas en Ajustes → Integraciones para publicar directamente.
+                  </p>
+                </>
+              )}
             </div>
           </div>
-        </div>
-      </section>
 
-      {message && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-sm">
-          {message}
+          {/* CANVAS CENTRAL */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-5 space-y-4" ref={canvasRef}>
+              {message && (
+                <div className={`rounded-xl px-4 py-3 text-xs border ${
+                  isError
+                    ? 'bg-red-500/6 border-red-500/20 text-red-400'
+                    : 'bg-cyan-400/6 border-cyan-400/20 text-cyan-300'
+                }`}>
+                  {message}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-1.5">Oferta o servicio</p>
+                    <input
+                      value={offer}
+                      onChange={(e) => setOffer(e.target.value)}
+                      className="w-full bg-[#0d1627] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 outline-none focus:border-cyan-500/40 focus:ring-1 focus:ring-cyan-500/10"
+                      placeholder="¿Qué vendes exactamente?"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-1.5">Audiencia objetivo</p>
+                    <input
+                      value={audience}
+                      onChange={(e) => setAudience(e.target.value)}
+                      className="w-full bg-[#0d1627] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 outline-none focus:border-cyan-500/40 focus:ring-1 focus:ring-cyan-500/10"
+                      placeholder="¿Para quién es esto?"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-1.5">Brief / idea base</p>
+                    <textarea
+                      value={prompt}
+                      onChange={(e) => setPrompt(e.target.value)}
+                      rows={4}
+                      className="w-full bg-[#0d1627] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 outline-none focus:border-cyan-500/40 focus:ring-1 focus:ring-cyan-500/10 resize-none"
+                      placeholder="Ángulo, dolor, promesa, estilo que buscas..."
+                    />
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-1.5">Contexto adicional</p>
+                    <input
+                      value={customContext}
+                      onChange={(e) => setCustomContext(e.target.value)}
+                      className="w-full bg-[#0d1627] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 outline-none focus:border-cyan-500/40 focus:ring-1 focus:ring-cyan-500/10"
+                      placeholder="Precio, promo vigente, propuesta única..."
+                    />
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-1.5">Canal</p>
+                    <div className="flex flex-wrap gap-2">
+                      {CHANNELS.map((ch) => (
+                        <button
+                          key={ch.key}
+                          onClick={() => setChannel(ch.key)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs transition ${
+                            channel === ch.key
+                              ? 'border-cyan-400/30 bg-cyan-400/10 text-cyan-300'
+                              : 'border-white/8 text-slate-500 hover:text-slate-300 hover:border-white/15'
+                          }`}
+                        >
+                          <span>{ch.icon}</span>
+                          {ch.key}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* PREVIEW */}
+                <div className="flex flex-col gap-3">
+                  <p className="text-[10px] uppercase tracking-widest text-slate-500">Preview — {channel}</p>
+                  <div className="bg-[#0d1627] border border-white/8 rounded-2xl overflow-hidden">
+                    <div className="flex items-center gap-2 px-3 py-2 border-b border-white/6">
+                      <div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-[10px] text-slate-400">
+                        {businessContext ? String(businessContext.businessName || 'N')[0] : 'N'}
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-medium text-white">{businessContext ? String(businessContext.businessName || 'Tu negocio') : 'Tu negocio'}</p>
+                        <p className="text-[10px] text-slate-500">Patrocinado</p>
+                      </div>
+                    </div>
+
+                    {activeJob?.output?.imageUrl ? (
+                      <div className="relative">
+                        <img src={activeJob.output.imageUrl} alt="preview" className="w-full aspect-square object-cover" />
+                        {overlayStyle !== 'none' && overlayText && (
+                          <div className={`absolute inset-0 flex items-end p-4 ${
+                            overlayStyle === 'bold' ? 'bg-black/50' : 'bg-gradient-to-t from-black/60 to-transparent'
+                          }`}>
+                            <p className={`text-white leading-tight ${
+                              overlayStyle === 'bold' ? 'text-lg font-bold' : 'text-sm font-medium'
+                            } ${activeFont === 'serif' ? 'font-serif' : activeFont === 'mono' ? 'font-mono' : 'font-sans'}`}>
+                              {overlayText}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="aspect-square bg-[#080e1a] flex flex-col items-center justify-center gap-3">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                          <rect x="3" y="3" width="18" height="18" rx="4" stroke="#334155" strokeWidth="1.5"/>
+                          <circle cx="8.5" cy="8.5" r="1.5" stroke="#334155" strokeWidth="1.5"/>
+                          <path d="M3 16l5-5 4 4 3-3 6 6" stroke="#334155" strokeWidth="1.5" strokeLinecap="round"/>
+                        </svg>
+                        <p className="text-xs text-slate-600 text-center px-6">Genera tu asset para ver el preview del post</p>
+                      </div>
+                    )}
+
+                    <div className="p-3 space-y-1.5">
+                      {activeJob?.output?.headline && (
+                        <p className="text-xs font-semibold text-white leading-snug">{activeJob.output.headline}</p>
+                      )}
+                      {activeJob?.output?.angle && (
+                        <p className="text-[11px] text-slate-400 leading-relaxed line-clamp-3">{activeJob.output.angle}</p>
+                      )}
+                      {activeJob?.output?.cta && (
+                        <p className="text-[11px] text-cyan-400 font-medium">{activeJob.output.cta}</p>
+                      )}
+                      {!activeJob && (
+                        <p className="text-[11px] text-slate-600">Tu copy aparece aquí...</p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-4 px-3 py-2 border-t border-white/6">
+                      {['♡', '💬', '↗'].map((icon) => (
+                        <span key={icon} className="text-slate-500 text-sm cursor-pointer hover:text-slate-300 transition">{icon}</span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {activeJob && (
+                    <button
+                      onClick={() => setActivePanel('publish')}
+                      className="w-full flex items-center justify-center gap-2 bg-[#0d1627] hover:bg-[#111c30] border border-white/8 hover:border-cyan-400/25 text-xs text-slate-300 hover:text-cyan-300 py-2.5 rounded-xl transition"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 2v9M4 7l4-5 4 5M3 13h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      Publicar en redes sociales
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {activeJob?.output && (
+                <div className="bg-[#0d1627] border border-white/6 rounded-2xl p-5 space-y-3">
+                  <p className="text-[10px] uppercase tracking-widest text-slate-500">Copy completo generado</p>
+                  {activeJob.output.angle && (
+                    <div className="bg-[#080e1a] rounded-xl p-4">
+                      <p className="text-[10px] text-slate-500 mb-1.5">Ángulo</p>
+                      <p className="text-sm text-slate-300 leading-relaxed">{activeJob.output.angle}</p>
+                    </div>
+                  )}
+                  {activeJob.output.bullets?.length ? (
+                    <div className="space-y-2">
+                      {activeJob.output.bullets.map((b, i) => (
+                        <div key={i} className="flex gap-3 bg-[#080e1a] rounded-xl p-3">
+                          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1.5 flex-shrink-0" />
+                          <p className="text-sm text-slate-300 leading-relaxed">{b}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  {activeJob.output.cta && (
+                    <div className="border border-cyan-400/20 bg-cyan-400/5 rounded-xl p-3 text-center">
+                      <p className="text-sm font-semibold text-cyan-300">{activeJob.output.cta}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
-      <section className="grid gap-4 md:grid-cols-4">
-        <MetricCard label="Créditos usados" value={String(usage?.creditsUsed ?? 0)} />
-        <MetricCard label="Créditos del plan" value={String(usage?.creditsIncluded ?? 0)} />
-        <MetricCard label="Créditos extra" value={String(usage?.creditsPurchased ?? 0)} />
-        <MetricCard
-          label="Renovación"
-          value={usage?.cycleEnd ? new Date(usage.cycleEnd).toLocaleDateString('es-ES') : '-'}
-        />
-      </section>
-
-      <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-        <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Builder</p>
-          <h2 className="mt-2 text-2xl font-semibold text-slate-900">Diseña tu siguiente asset</h2>
-
-          <div className="mt-6 flex flex-wrap gap-2">
-            {MODE_FAMILIES.map((family) => (
-              <button
-                key={family.key}
-                onClick={() => setActiveFamily(family.key)}
-                className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
-                  activeFamily === family.key ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-600'
-                }`}
-              >
-                {family.label}
-              </button>
-            ))}
+      {/* CALENDAR TAB */}
+      {activeTab === 'calendar' && (
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold text-white">
+                {calendarMonth.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+              </h2>
+              <div className="flex gap-2">
+                <button className="px-3 py-1.5 rounded-lg border border-white/8 text-xs text-slate-400 hover:text-slate-200 transition">← Anterior</button>
+                <button className="px-3 py-1.5 rounded-lg border border-white/8 text-xs text-slate-400 hover:text-slate-200 transition">Siguiente →</button>
+              </div>
+            </div>
+            <div className="grid grid-cols-7 gap-1 mb-2">
+              {CALENDAR_DAYS.map((d) => (
+                <div key={d} className="text-center text-[11px] text-slate-500 py-2 font-medium">{d}</div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {calendarDays.map((day, i) => (
+                <div
+                  key={i}
+                  className={`min-h-[80px] rounded-xl border p-2 ${
+                    day
+                      ? 'border-white/6 bg-[#0d1627] hover:border-white/12 cursor-pointer transition'
+                      : 'border-transparent'
+                  }`}
+                >
+                  {day && (
+                    <>
+                      <p className={`text-xs font-medium mb-1 ${
+                        day === new Date().getDate() ? 'text-cyan-400' : 'text-slate-400'
+                      }`}>{day}</p>
+                      {jobsByDay[day]?.slice(0, 2).map((j) => (
+                        <div key={j.id} className="text-[10px] bg-cyan-400/10 text-cyan-300 rounded px-1.5 py-0.5 mb-0.5 truncate">
+                          {j.title || j.tool}
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
+        </div>
+      )}
 
-          <div className="mt-7 space-y-5">
-            {familyTools.map((tool) => (
-              <button
-                key={tool.key}
-                onClick={() => setForm((current) => ({ ...current, tool: tool.key }))}
-                className={`w-full rounded-2xl border p-5 text-left transition ${
-                  form.tool === tool.key
-                    ? 'border-slate-950 bg-slate-950 text-white hover:bg-slate-900'
-                    : 'border-slate-200 bg-white text-slate-900 hover:bg-slate-50'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="font-semibold">{tool.label}</p>
-                    <p className={`mt-2 text-sm leading-6 ${form.tool === tool.key ? 'text-slate-300' : 'text-slate-600'}`}>
-                      {tool.description}
-                    </p>
-                  </div>
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                      form.tool === tool.key ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-600'
-                    }`}
+      {/* TEMPLATES TAB */}
+      {activeTab === 'templates' && (
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="max-w-4xl mx-auto">
+            <div className="mb-6">
+              <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-1">Plantillas</p>
+              <h2 className="text-lg font-semibold text-white">Elige una plantilla y genera en segundos</h2>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              {TEMPLATES.map((t) => (
+                <button
+                  key={t.key}
+                  onClick={() => { applyTemplate(t.key); setActiveTab('create'); }}
+                  className={`text-left rounded-2xl border p-5 transition ${
+                    selectedTemplate === t.key
+                      ? 'border-cyan-400/30 bg-cyan-400/5'
+                      : 'border-white/6 bg-[#0d1627] hover:border-white/12'
+                  }`}
+                >
+                  <div className="text-3xl mb-3">{t.emoji}</div>
+                  <p className="text-sm font-semibold text-white mb-1">{t.label}</p>
+                  <p className="text-xs text-slate-500 leading-relaxed">{t.desc}</p>
+                  <p className="mt-3 text-[11px] text-cyan-400">Usar plantilla →</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* HISTORY TAB */}
+      {activeTab === 'history' && (
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="max-w-4xl mx-auto">
+            <div className="mb-6">
+              <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-1">Historial</p>
+              <h2 className="text-lg font-semibold text-white">{jobs.length} assets generados</h2>
+            </div>
+            {jobs.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-4 text-slate-500">
+                <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-white/8 flex items-center justify-center text-2xl">✦</div>
+                <p className="text-sm">Aún no has generado assets</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                {jobs.map((job) => (
+                  <button
+                    key={job.id}
+                    onClick={() => { setActiveJob(job); setActiveTab('create'); }}
+                    className="text-left rounded-2xl border border-white/6 bg-[#0d1627] hover:border-white/12 transition overflow-hidden"
                   >
-                    {tool.credits} créditos
-                  </span>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          <div className="mt-8 space-y-5">
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-slate-700">Oferta o servicio</span>
-              <input
-                value={form.offer}
-                onChange={(event) => setForm((current) => ({ ...current, offer: event.target.value }))}
-                className="input-field"
-                placeholder="Qué vendes exactamente"
-              />
-            </label>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-700">Audiencia</span>
-                <input
-                  value={form.audience}
-                  onChange={(event) => setForm((current) => ({ ...current, audience: event.target.value }))}
-                  className="input-field"
-                  placeholder="Para quién va dirigido"
-                />
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-700">Canal</span>
-                <input
-                  value={form.channel}
-                  onChange={(event) => setForm((current) => ({ ...current, channel: event.target.value }))}
-                  className="input-field"
-                  placeholder="Instagram, WhatsApp..."
-                />
-              </label>
-            </div>
-
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-slate-700">Brief o idea base</span>
-              <textarea
-                value={form.prompt}
-                onChange={(event) => setForm((current) => ({ ...current, prompt: event.target.value }))}
-                className="input-field min-h-[130px]"
-                placeholder="Explica el ángulo, el dolor, la promesa o el estilo que buscas..."
-              />
-            </label>
-          </div>
-
-          <button onClick={handleGenerate} disabled={submitting} className="mt-8 btn-primary w-full py-4 text-base">
-            {submitting ? 'Generando...' : `Generar ${selectedTool?.label || 'asset'} (${selectedTool?.credits || 0} créditos)`}
-          </button>
-        </div>
-
-        <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Vista previa</p>
-          <h2 className="mt-2 text-2xl font-semibold text-slate-900">Resultado inmediato</h2>
-
-          {latestJob ? (
-            <div className="mt-6 space-y-5">
-              <div className="rounded-2xl bg-slate-950 p-5 text-white">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-300">Último output</p>
-                <p className="mt-2 text-lg font-semibold">{latestJob.title}</p>
-                <p className="mt-1 text-xs text-slate-400">
-                  {new Date(latestJob.createdAt).toLocaleString('es-ES')} · {latestJob.channel || 'Sin canal'}
-                </p>
-              </div>
-
-              {latestJob.output?.headline && (
-                <div className="rounded-2xl bg-amber-50 p-5 text-amber-900">
-                  <p className="text-xs uppercase tracking-[0.18em]">Ángulo recomendado</p>
-                  <p className="mt-2 text-sm">{latestJob.output.angle}</p>
-                </div>
-              )}
-
-              {latestJob.output?.bullets?.length ? (
-                <div className="space-y-3">
-                  {latestJob.output.bullets.slice(0, 4).map((bullet) => (
-                    <div key={bullet} className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
-                      {bullet}
+                    {job.output?.imageUrl ? (
+                      <img src={job.output.imageUrl} alt="" className="w-full aspect-video object-cover" />
+                    ) : (
+                      <div className="w-full aspect-video bg-[#080e1a] flex items-center justify-center text-slate-600 text-xs">Sin imagen</div>
+                    )}
+                    <div className="p-4">
+                      <p className="text-sm font-semibold text-white mb-1 line-clamp-1">{job.title || job.tool}</p>
+                      <p className="text-xs text-slate-500">{job.channel || 'Sin canal'} · {job.creditsUsed} créditos</p>
+                      <p className="text-[11px] text-slate-600 mt-1">{new Date(job.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                     </div>
-                  ))}
-                </div>
-              ) : null}
-
-              {latestJob.output?.cta && (
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-900">
-                  CTA sugerido: {latestJob.output.cta}
-                </div>
-              )}
-
-              <div className="rounded-2xl border border-slate-200 p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Historial rápido</p>
-                <div className="mt-3 space-y-3">
-                  {jobs.slice(0, 4).map((job) => (
-                    <div key={job.id} className="rounded-2xl bg-slate-50 p-3">
-                      <p className="text-sm font-semibold text-slate-900">{job.title}</p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {job.creditsUsed} créditos · {new Date(job.createdAt).toLocaleString('es-ES')}
-                      </p>
-                    </div>
-                  ))}
-                </div>
+                  </button>
+                ))}
               </div>
-            </div>
-          ) : (
-            <div className="mt-6 rounded-2xl bg-slate-50 p-5 text-sm text-slate-600">
-              Tu primer resultado aparecerá aquí para que el estudio se sienta como editor: controles a la izquierda y salida útil a la derecha.
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </section>
-
-      <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Historial completo</p>
-        <h2 className="mt-2 text-2xl font-semibold text-slate-900">Assets y outputs recientes</h2>
-
-        <div className="mt-6 space-y-6">
-          {jobs.length === 0 ? (
-            <div className="rounded-2xl bg-slate-50 p-5 text-sm text-slate-600">
-              Aún no has generado assets en este estudio. Tu primer output aparecerá aquí con estructura, secciones y CTA.
-            </div>
-          ) : (
-            jobs.map((job) => (
-              <article key={job.id} className="rounded-2xl border border-slate-200 p-6">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <p className="font-semibold text-slate-900">{job.title}</p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      {new Date(job.createdAt).toLocaleString('es-ES')} · {job.channel || 'Sin canal'}
-                    </p>
-                  </div>
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                    {job.creditsUsed} créditos
-                  </span>
-                </div>
-
-                {job.output?.headline && (
-                  <div className="mt-5 rounded-2xl bg-slate-950 px-5 py-5 text-white">
-                    <p className="text-xs uppercase tracking-[0.18em] text-slate-300">Idea central</p>
-                    <p className="mt-2 text-lg font-semibold">{job.output.headline}</p>
-                  </div>
-                )}
-
-                {job.output?.angle && (
-                  <p className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
-                    Ángulo recomendado: {job.output.angle}
-                  </p>
-                )}
-
-                {job.output?.sections?.length ? (
-                  <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                    {job.output.sections.map((section, index) => (
-                      <div key={`${job.id}-section-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4">
-                        <p className="text-xs uppercase tracking-[0.18em] text-slate-400">{section.title}</p>
-                        <div className="mt-3 space-y-2">
-                          {section.items.map((item) => (
-                            <div key={item} className="rounded-xl bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-700">
-                              {item}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-
-                {job.output?.slides?.length ? (
-                  <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                    {job.output.slides.map((slide, index) => (
-                      <div key={`${job.id}-slide-${index}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Slide {index + 1}</p>
-                        <p className="mt-2 font-semibold text-slate-900">{slide.title}</p>
-                        <div className="mt-3 space-y-2">
-                          {slide.bullets.map((bullet) => (
-                            <div key={bullet} className="rounded-xl bg-white px-3 py-2 text-sm leading-6 text-slate-700">
-                              {bullet}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : job.output?.bullets?.length ? (
-                  <div className="mt-4 grid gap-3 md:grid-cols-2">
-                    {job.output.bullets.map((bullet) => (
-                      <div key={bullet} className="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-                        {bullet}
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-
-                {job.output?.cta && (
-                  <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900">
-                    CTA sugerido: {job.output.cta}
-                  </div>
-                )}
-              </article>
-            ))
-          )}
-        </div>
-      </section>
+      )}
     </div>
   );
 }
-
-function MetricCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow">
-      <p className="text-sm text-slate-500">{label}</p>
-      <p className="mt-2 text-4xl font-semibold text-slate-900">{value}</p>
-    </div>
-  );
-}
-

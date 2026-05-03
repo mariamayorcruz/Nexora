@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       update: {
         name,
         password: hashedPassword,
-        onboardingCompletedAt: null,
+        onboardingCompletedAt: new Date(),
         onboardingData: Prisma.JsonNull,
         subscription: {
           upsert: {
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
         email,
         name,
         password: hashedPassword,
-        onboardingCompletedAt: null,
+        onboardingCompletedAt: new Date(),
         onboardingData: Prisma.JsonNull,
         subscription: {
           create: {

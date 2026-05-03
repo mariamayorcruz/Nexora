@@ -1,103 +1,125 @@
 'use client';
 
 import Link from 'next/link';
-import { Sparkles } from 'lucide-react';
-import CookiePreferences from '@/components/CookiePreferences';
+import { useLang } from '@/context/LanguageContext';
+
+const content = {
+  en: {
+    tagline: 'CRM + AI + Automation for businesses that want to grow without the chaos.',
+    product: 'Product',
+    productLinks: [
+      { href: '#solution', label: 'Features' },
+      { href: '#demo', label: 'Demo' },
+      { href: '#pricing', label: 'Pricing' },
+      { href: '#faq', label: 'FAQ' },
+    ],
+    access: 'Access',
+    accessLinks: [
+      { href: '/auth/login', label: 'Log in' },
+      { href: '/auth/signup', label: 'Sign up' },
+      { href: '/dashboard', label: 'Dashboard' },
+    ],
+    why: 'Why Nexora',
+    whyText: 'Because your business deserves a system that attracts, follows up, and closes — powered by AI, without agency fees.',
+    legal: 'Legal',
+    legalLinks: [
+      { href: '/legal/terms', label: 'Terms of Service' },
+      { href: '/legal/privacy', label: 'Privacy Policy' },
+      { href: '/security/disclosure', label: 'Responsible Disclosure' },
+      { href: '/trust', label: 'Trust' },
+      { href: '/contact', label: 'Contact' },
+    ],
+    copyright: '© 2026 Nexora, Inc. All rights reserved. San Francisco, CA.',
+  },
+  es: {
+    tagline: 'CRM + IA + Automatización para negocios que quieren crecer sin el caos.',
+    product: 'Producto',
+    productLinks: [
+      { href: '#solution', label: 'Características' },
+      { href: '#demo', label: 'Demo' },
+      { href: '#pricing', label: 'Precios' },
+      { href: '#faq', label: 'FAQ' },
+    ],
+    access: 'Acceso',
+    accessLinks: [
+      { href: '/auth/login', label: 'Iniciar sesión' },
+      { href: '/auth/signup', label: 'Crear cuenta' },
+      { href: '/dashboard', label: 'Dashboard' },
+    ],
+    why: 'Por qué Nexora',
+    whyText: 'Porque tu negocio merece un sistema que atraiga, haga seguimiento y cierre — con IA, sin tarifas de agencia.',
+    legal: 'Legal',
+    legalLinks: [
+      { href: '/legal/terms', label: 'Términos de servicio' },
+      { href: '/legal/privacy', label: 'Privacidad' },
+      { href: '/security/disclosure', label: 'Divulgación responsable' },
+      { href: '/trust', label: 'Confianza' },
+      { href: '/contact', label: 'Contacto' },
+    ],
+    copyright: '© 2026 Nexora, Inc. Todos los derechos reservados. San Francisco, CA.',
+  },
+};
 
 export default function Footer() {
+  const { lang } = useLang();
+  const t = content[lang];
+
   return (
-    <footer className="bg-[#050816] px-4 pb-10 pt-20 text-white sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl rounded-[2rem] border border-white/10 bg-white/[0.04] px-6 py-10 sm:px-8">
-        <div className="grid grid-cols-2 gap-8 lg:grid-cols-[1.2fr_0.7fr_0.7fr_0.9fr_1fr]">
+    <footer className="bg-slate-900 px-4 pb-10 pt-16 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl">
+        <div className="grid grid-cols-2 gap-8 lg:grid-cols-[1.4fr_0.8fr_0.8fr_1fr_0.8fr]">
+
+          {/* Brand */}
           <div className="col-span-2 lg:col-span-1">
-            <Link href="/" className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-400 via-amber-300 to-rose-500 text-slate-950">
-                <Sparkles className="h-5 w-5" />
-              </div>
+            <Link href="/" className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-slate-900 text-sm font-bold">NX</div>
               <div>
-                <p className="font-semibold">Nexora</p>
-                <p className="text-sm text-slate-400">AI Ads Operating System</p>
+                <p className="font-bold text-white">Nexora</p>
+                <p className="text-xs text-slate-500">gotnexora.com</p>
               </div>
             </Link>
-            <p className="mt-5 max-w-md text-sm leading-7 text-slate-400">
-              Plataforma para centralizar campañas, CRM, funnel, cobros y asistencia IA dentro de una operación más clara y más seria.
-            </p>
+            <p className="mt-4 max-w-xs text-sm leading-6 text-slate-400">{t.tagline}</p>
           </div>
 
+          {/* Product */}
           <div>
-            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Producto</h3>
-            <div className="mt-4 space-y-3 text-sm text-slate-300">
-              <Link href="#solution" className="block transition hover:text-white">
-                Solución
-              </Link>
-              <Link href="#demo" className="block transition hover:text-white">
-                Demo
-              </Link>
-              <Link href="#diagnostico" className="block transition hover:text-white">
-                Diagnóstico
-              </Link>
-              <Link href="#pricing" className="block transition hover:text-white">
-                Precios
-              </Link>
-              <Link href="#faq" className="block transition hover:text-white">
-                FAQ
-              </Link>
+            <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">{t.product}</h3>
+            <div className="mt-4 space-y-3">
+              {t.productLinks.map((link) => (
+                <Link key={link.href} href={link.href} className="block text-sm text-slate-500 transition hover:text-white">{link.label}</Link>
+              ))}
             </div>
           </div>
 
+          {/* Access */}
           <div>
-            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Acceso</h3>
-            <div className="mt-4 space-y-3 text-sm text-slate-300">
-              <Link href="/auth/login" className="block transition hover:text-white">
-                Iniciar sesión
-              </Link>
-              <Link href="/auth/signup" className="block transition hover:text-white">
-                Crear cuenta
-              </Link>
-              <Link href="/dashboard" className="block transition hover:text-white">
-                Dashboard
-              </Link>
+            <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">{t.access}</h3>
+            <div className="mt-4 space-y-3">
+              {t.accessLinks.map((link) => (
+                <Link key={link.href} href={link.href} className="block text-sm text-slate-500 transition hover:text-white">{link.label}</Link>
+              ))}
             </div>
           </div>
 
+          {/* Why */}
           <div>
-            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">¿Por qué Nexora?</h3>
-            <p className="mt-4 text-sm leading-7 text-slate-300">
-              Porque te ayuda a pasar de acciones sueltas a un sistema comercial claro: atraer, seguir, convertir y tomar decisiones con apoyo de IA.
-            </p>
+            <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">{t.why}</h3>
+            <p className="mt-4 text-sm leading-6 text-slate-500">{t.whyText}</p>
           </div>
 
+          {/* Legal */}
           <div>
-            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Legal</h3>
-            <div className="mt-4 space-y-3 text-sm text-slate-300">
-              <Link href="/legal/terms" className="block transition hover:text-white">
-                Terms of Service
-              </Link>
-              <Link href="/legal/privacy" className="block transition hover:text-white">
-                Privacy Information
-              </Link>
-              <Link href="/security/disclosure" className="block transition hover:text-white">
-                Responsible Disclosure
-              </Link>
-              <Link href="/trust" className="block transition hover:text-white">
-                Trust
-              </Link>
-              <Link href="/contact" className="block transition hover:text-white">
-                Contact
-              </Link>
-              <Link href="/cookies" className="block transition hover:text-white">
-                Cookie Preferences
-              </Link>
+            <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">{t.legal}</h3>
+            <div className="mt-4 space-y-3">
+              {t.legalLinks.map((link) => (
+                <Link key={link.href} href={link.href} className="block text-sm text-slate-500 transition hover:text-white">{link.label}</Link>
+              ))}
             </div>
           </div>
         </div>
 
-        <div className="mt-10 space-y-4 border-t border-white/10 pt-6 text-sm text-slate-400">
-          <CookiePreferences />
-          <p>
-            © Copyright 2026 Nexora, Inc. All rights reserved. Various trademarks held by their respective owners.
-            Nexora, Inc. Mission District, San Francisco, CA, United States.
-          </p>
+        <div className="mt-12 border-t border-slate-800 pt-6">
+          <p className="text-xs text-slate-600">{t.copyright}</p>
         </div>
       </div>
     </footer>

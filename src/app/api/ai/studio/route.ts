@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { fal } from '@fal-ai/client';
 import { prisma } from '@/lib/prisma';
 import {
   AI_TOOL_DEFINITIONS,
@@ -53,7 +54,12 @@ export async function GET(request: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: { subscription: true },
+      select: {
+        id: true,
+        email: true,
+        subscription: true,
+        onboardingData: true,
+      },
     });
 
     if (!user) {
@@ -84,6 +90,7 @@ export async function GET(request: NextRequest) {
       },
       tools: AI_TOOL_DEFINITIONS,
       jobs,
+      businessContext: user.onboardingData ?? null,
     });
   } catch (error) {
     console.error('Error fetching Nexora Studio data:', error);
@@ -100,7 +107,12 @@ export async function POST(request: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: { subscription: true },
+      select: {
+        id: true,
+        email: true,
+        subscription: true,
+        onboardingData: true,
+      },
     });
 
     if (!user) {
@@ -201,7 +213,29 @@ export async function POST(request: NextRequest) {
           outputFormat,
           captionStyle,
           smartEditOptions,
-        });
+          businessContext: user.onboardingData ?? null,
+          customContext: String(body.customContext || '').trim(),
+        } as Parameters<typeof buildAiOutput>[0]);
+
+    let imageUrl: string | null = null;
+    try {
+      fal.config({ credentials: process.env.FAL_KEY || '' });
+      const imagePrompt = `Professional marketing ad image for: ${offer}. Target audience: ${audience}. Channel: ${channel}. Clean, modern, high quality advertising photo.`;
+      const imageResult = await fal.subscribe('fal-ai/flux/schnell', {
+        input: {
+          prompt: imagePrompt,
+          image_size: 'landscape_4_3',
+          num_images: 1,
+          num_inference_steps: 4,
+        },
+      });
+      const images = (imageResult as any)?.data?.images;
+      if (images && images.length > 0) {
+        imageUrl = images[0].url;
+      }
+    } catch (error) {
+      console.error('[studio] Image generation failed:', error);
+    }
 
     if (!output?.headline || (!output?.bullets?.length && !output?.slides?.length && !output?.sections?.length)) {
       return NextResponse.json(
@@ -210,7 +244,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const serializedOutput = JSON.parse(JSON.stringify(output)) as Prisma.InputJsonValue;
+    const serializedOutput = JSON.parse(JSON.stringify({
+      ...output,
+      ...(imageUrl ? { imageUrl } : {}),
+    })) as Prisma.InputJsonValue;
 
     const result = await prisma.$transaction(async (tx) => {
       const job = await tx.aiWorkspaceJob.create({

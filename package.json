@@ -16,6 +16,7 @@
     "db:seed": "node prisma/seed.js"
   },
   "dependencies": {
+    "@fal-ai/client": "^1.10.0",
     "@prisma/client": "^5.0.0",
     "@supabase/supabase-js": "^2.103.0",
     "@types/nodemailer": "^8.0.0",

@@ -34,8 +34,8 @@ export const BILLING_PLANS: Record<BillingPlan, BillingPlanConfig> = {
     key: 'starter',
     label: 'Starter',
     marketingLabel: 'Starter',
-    monthlyPrice: 30,
-    yearlyPrice: 24,
+    monthlyPrice: 29,
+    yearlyPrice: 300,
     aiCreditsMonthly: 250,
     description: 'Para negocios que quieren ordenar su operación publicitaria sin subir estructura fija.',
     features: [
@@ -53,7 +53,7 @@ export const BILLING_PLANS: Record<BillingPlan, BillingPlanConfig> = {
     label: 'Professional',
     marketingLabel: 'Growth',
     monthlyPrice: 79,
-    yearlyPrice: 64,
+    yearlyPrice: 790,
     aiCreditsMonthly: 1800,
     description: 'La mejor combinación entre control, analítica, IA y capacidad operativa para crecer.',
     features: [
@@ -72,8 +72,8 @@ export const BILLING_PLANS: Record<BillingPlan, BillingPlanConfig> = {
     key: 'enterprise',
     label: 'Enterprise',
     marketingLabel: 'Scale',
-    monthlyPrice: 149,
-    yearlyPrice: 124,
+    monthlyPrice: 199,
+    yearlyPrice: 1990,
     aiCreditsMonthly: 6500,
     description: 'Para equipos que quieren operar marketing, contenido y seguimiento con amplitud real.',
     features: [

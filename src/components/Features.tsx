@@ -1,138 +1,101 @@
 'use client';
 
-import RevealOnScroll from '@/components/ui/RevealOnScroll';
-import {
-  Activity,
-  BarChart3,
-  CreditCard,
-  LayoutDashboard,
-  MessageSquareText,
-  Shield,
-  Target,
-  Users,
-} from 'lucide-react';
+import Link from 'next/link';
+import { BarChart2, Bot, Users, Zap } from 'lucide-react';
+import { useLang } from '@/context/LanguageContext';
 
-const painPoints = [
-  {
-    stat: '14h',
-    title: 'Perdidas por operar en plataformas separadas',
-    description:
-      'Saltas entre Meta, Google, TikTok, hojas de cálculo y mensajes internos. Cada cambio operativo corta foco y retrasa decisiones.',
+const content = {
+  en: {
+    tag: 'Why Nexora',
+    h2: 'Everything your business needs to grow.',
+    sub: 'CRM, AI, campaigns and automation — unified in one clean workspace.',
+    metrics: [
+      { value: '2.8x', label: 'More leads closed', detail: 'Teams using Nexora close nearly 3x more leads in their first 60 days.' },
+      { value: '91%', label: 'Less manual follow-up', detail: '91% of follow-ups are automated — your team focuses on closing.' },
+      { value: '99%', label: 'Lower cost vs agencies', detail: 'Agency-level results at a fraction of the price.' },
+    ],
+    features: [
+      { icon: Users, title: 'Smart CRM', desc: 'Track every lead, deal, and client in one place. AI suggests next actions so nothing falls through the cracks.' },
+      { icon: Bot, title: 'AI Content Studio', desc: 'Generate ads, UGC scripts, email sequences and pitch decks in seconds — trained on what actually converts.' },
+      { icon: Zap, title: 'Automation Engine', desc: 'Set up follow-up sequences, campaign triggers and reminders once. Nexora runs them for you, 24/7.' },
+      { icon: BarChart2, title: 'Campaign Analytics', desc: 'Connect Meta, Google and TikTok. See what\'s working and where to move your budget — in real time.' },
+    ],
+    cta: 'Start free trial →',
   },
-  {
-    stat: '0 visibilidad',
-    title: 'Inviertes sin una lectura central del negocio',
-    description:
-      'Sin una consola unificada es difícil saber qué campaña empuja negocio y cuál solo consume presupuesto.',
+  es: {
+    tag: 'Por qué Nexora',
+    h2: 'Todo lo que tu negocio necesita para crecer.',
+    sub: 'CRM, IA, campañas y automatización — unificados en un solo workspace.',
+    metrics: [
+      { value: '2.8x', label: 'Más leads cerrados', detail: 'Los equipos que usan Nexora cierran casi 3 veces más leads en sus primeros 60 días.' },
+      { value: '91%', label: 'Menos seguimiento manual', detail: 'El 91% de los seguimientos se automatizan — tu equipo se enfoca en cerrar.' },
+      { value: '99%', label: 'Menor costo vs agencias', detail: 'Resultados de agencia a una fracción del precio.' },
+    ],
+    features: [
+      { icon: Users, title: 'CRM Inteligente', desc: 'Gestiona cada lead, negocio y cliente en un solo lugar. La IA sugiere próximas acciones para que nada se pierda.' },
+      { icon: Bot, title: 'Studio IA de Contenido', desc: 'Genera anuncios, guiones UGC, secuencias de email y pitch decks en segundos — entrenado en lo que realmente convierte.' },
+      { icon: Zap, title: 'Motor de Automatización', desc: 'Configura secuencias de seguimiento, disparadores de campaña y recordatorios una vez. Nexora los ejecuta por ti, 24/7.' },
+      { icon: BarChart2, title: 'Analítica de Campañas', desc: 'Conecta Meta, Google y TikTok. Ve qué funciona y dónde mover tu presupuesto — en tiempo real.' },
+    ],
+    cta: 'Empezar prueba gratis →',
   },
-  {
-    stat: '1 sola fuente',
-    title: 'Tu operación necesita un sistema, no otro parche',
-    description:
-      'Cuando campañas, seguimiento y resultados viven en el mismo lugar, es más fácil vender con consistencia.',
-  },
-];
-
-const pillars = [
-  {
-    icon: LayoutDashboard,
-    title: 'Dashboard unificado',
-    description: 'Métricas, gasto, campañas y estados en un layout que reduce ruido y acelera lectura.',
-  },
-  {
-    icon: Activity,
-    title: 'Centro de campañas',
-    description: 'Consulta actividad, presupuestos y rendimiento desde una sola vista operativa.',
-  },
-  {
-    icon: Users,
-    title: 'CRM y seguimiento',
-    description: 'Organiza leads, etapas, próximas acciones y seguimiento comercial sin salir de Nexora.',
-  },
-  {
-    icon: Target,
-    title: 'Funnel y captación',
-    description: 'Conecta campañas con formularios, embudos y oportunidades para ver mejor qué termina convirtiendo.',
-  },
-  {
-    icon: MessageSquareText,
-    title: 'Asistente IA en el panel',
-    description: 'El usuario puede preguntar en lenguaje natural sobre campañas, rendimiento, conexiones y próximos pasos dentro del dashboard.',
-  },
-  {
-    icon: CreditCard,
-    title: 'Cobro y suscripciones',
-    description: 'Nexora ya incluye flujo con Stripe para planes, suscripciones y facturación lista para operar.',
-  },
-  {
-    icon: BarChart3,
-    title: 'Analítica y control',
-    description: 'Lee ROI, CTR, conversiones y desempeño general sin perseguir datos en varias herramientas.',
-  },
-  {
-    icon: Shield,
-    title: 'Gestión centralizada',
-    description: 'Administra usuarios, planes y configuración desde una sola consola con una experiencia más seria y consistente.',
-  },
-];
+};
 
 export default function Features() {
-  return (
-    <section id="solution" className="bg-[#050816] px-4 py-24 text-slate-100 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
-        <div className="grid gap-12 lg:grid-cols-[0.95fr_1.05fr] lg:items-end">
-          <div>
-            <span className="section-tag section-tag-dark">El problema</span>
-            <h2 className="mt-6 max-w-2xl text-4xl font-semibold leading-tight md:text-5xl">
-              Si operas en caos, el crecimiento se vuelve impredecible.
-            </h2>
-            <p className="mt-5 max-w-xl text-lg leading-8 text-slate-300">
-              La mayoría de equipos no falla por falta de esfuerzo, sino por falta de sistema. Nexora une campañas,
-              analítica y seguimiento comercial para convertir datos en acciones claras.
-            </p>
-          </div>
+  const { lang } = useLang();
+  const t = content[lang];
 
-          <div className="grid gap-4 md:grid-cols-3">
-            {painPoints.map((item, index) => (
-              <RevealOnScroll key={item.title} delayMs={index * 90}>
-                <div className="rounded-[1.75rem] border border-white/10 bg-slate-900/70 p-6 shadow-[0_20px_60px_rgba(2,6,23,0.45)]">
-                  <p className="text-3xl font-semibold text-cyan-300">{item.stat}</p>
-                  <h3 className="mt-5 text-lg font-semibold text-white">{item.title}</h3>
-                  <p className="mt-3 text-sm leading-7 text-slate-300">{item.description}</p>
-                </div>
-              </RevealOnScroll>
-            ))}
-          </div>
+  return (
+    <section id="solution" className="bg-slate-50 px-4 py-24 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl">
+
+        {/* Header */}
+        <div className="max-w-2xl">
+          <span className="inline-flex items-center rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-sky-700">
+            {t.tag}
+          </span>
+          <h2 className="mt-4 text-4xl font-extrabold leading-tight text-slate-900 md:text-5xl">{t.h2}</h2>
+          <p className="mt-4 text-lg text-slate-500">{t.sub}</p>
         </div>
 
-        <div className="mt-20">
-          <div className="max-w-3xl">
-            <span className="section-tag section-tag-dark">La solución</span>
-            <h3 className="mt-6 text-3xl font-semibold text-white md:text-4xl">
-              Una plataforma única para atraer, seguir y cerrar mejor.
-            </h3>
-            <p className="mt-4 text-lg leading-8 text-slate-300">
-              Nexora está diseñada para dar claridad operativa: campañas, CRM, funnel, cobro y ayuda asistida por IA en una misma base de trabajo.
-            </p>
-          </div>
+        {/* Metrics */}
+        <div className="mt-16 grid gap-px overflow-hidden rounded-2xl border border-slate-200 shadow-sm md:grid-cols-3">
+          {t.metrics.map((m) => (
+            <div key={m.value} className="bg-white px-8 py-10">
+              <p className="text-5xl font-extrabold text-slate-900">{m.value}</p>
+              <p className="mt-2 text-base font-semibold text-slate-800">{m.label}</p>
+              <p className="mt-2 text-sm leading-6 text-slate-500">{m.detail}</p>
+            </div>
+          ))}
+        </div>
 
-          <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {pillars.map((pillar, index) => {
-              const Icon = pillar.icon;
+        {/* Feature grid */}
+        <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {t.features.map((f) => {
+            const Icon = f.icon;
+            return (
+              <div
+                key={f.title}
+                className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md"
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-100">
+                  <Icon className="h-5 w-5 text-sky-600" />
+                </div>
+                <h3 className="mt-4 text-base font-bold text-slate-900">{f.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-500">{f.desc}</p>
+              </div>
+            );
+          })}
+        </div>
 
-              return (
-                <RevealOnScroll key={pillar.title} delayMs={120 + index * 70}>
-                  <article className="rounded-[1.75rem] border border-white/10 bg-slate-900/70 p-7 shadow-[0_18px_50px_rgba(2,6,23,0.4)] transition duration-300 hover:-translate-y-1 hover:border-cyan-400/40 hover:shadow-[0_24px_70px_rgba(8,47,73,0.45)]">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-500/20 text-cyan-200">
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <h4 className="mt-5 text-xl font-semibold text-white">{pillar.title}</h4>
-                    <p className="mt-3 text-sm leading-7 text-slate-300">{pillar.description}</p>
-                  </article>
-                </RevealOnScroll>
-              );
-            })}
-          </div>
+        {/* CTA */}
+        <div className="mt-14 text-center">
+          <Link
+            href="/auth/signup"
+            className="inline-block rounded-xl bg-[#0ea5e9] px-8 py-4 text-base font-semibold text-white transition hover:bg-[#0284c7]"
+          >
+            {t.cta}
+          </Link>
         </div>
       </div>
     </section>

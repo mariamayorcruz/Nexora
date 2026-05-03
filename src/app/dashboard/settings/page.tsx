@@ -40,17 +40,10 @@ export default function SettingsPage() {
     try {
       const raw = localStorage.getItem(`nexora-notifications-${userId}`);
       if (!raw) return;
-
-      const parsed = JSON.parse(raw) as {
-        campaignAlerts?: boolean;
-        weeklyReports?: boolean;
-      };
-
+      const parsed = JSON.parse(raw) as { campaignAlerts?: boolean; weeklyReports?: boolean };
       if (typeof parsed.campaignAlerts === 'boolean') setCampaignAlerts(parsed.campaignAlerts);
       if (typeof parsed.weeklyReports === 'boolean') setWeeklyReports(parsed.weeklyReports);
-    } catch {
-      // Ignore malformed local preference payloads.
-    }
+    } catch { /* ignore */ }
   };
 
   useEffect(() => {
@@ -63,22 +56,10 @@ export default function SettingsPage() {
         const metaConnected = Boolean(s.metaAppId && s.metaAppId.length > 10 && !s.metaAppId.includes('example'));
         let aiProvider = '';
         let aiConnected = false;
-        if (s.anthropicApiKey && s.anthropicApiKey.length > 10) {
-          aiProvider = 'Claude (Anthropic)';
-          aiConnected = true;
-        } else if (s.openRouterApiKey && s.openRouterApiKey.length > 10) {
-          aiProvider = 'OpenRouter';
-          aiConnected = true;
-        } else if (s.geminiApiKey && s.geminiApiKey.length > 10) {
-          aiProvider = 'Gemini';
-          aiConnected = true;
-        }
-        setIntegrationStatus({
-          metaConnected,
-          metaAppId: s.metaAppId || '',
-          aiProvider,
-          aiConnected,
-        });
+        if (s.anthropicApiKey && s.anthropicApiKey.length > 10) { aiProvider = 'Claude (Anthropic)'; aiConnected = true; }
+        else if (s.openRouterApiKey && s.openRouterApiKey.length > 10) { aiProvider = 'OpenRouter'; aiConnected = true; }
+        else if (s.geminiApiKey && s.geminiApiKey.length > 10) { aiProvider = 'Gemini'; aiConnected = true; }
+        setIntegrationStatus({ metaConnected, metaAppId: s.metaAppId || '', aiProvider, aiConnected });
       } catch {
         setIntegrationStatus(null);
       } finally {
@@ -89,16 +70,12 @@ export default function SettingsPage() {
     const fetchUser = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch('/api/users/me', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const response = await fetch('/api/users/me', { headers: { Authorization: `Bearer ${token}` } });
         const data = await response.json();
         setUser(data.user);
         setProfileName(data.user?.name || '');
         setOffers(Boolean(data.user?.marketingOptIn));
-        if (data.user?.id) {
-          loadNotificationPreferences(data.user.id);
-        }
+        if (data.user?.id) loadNotificationPreferences(data.user.id);
       } catch (error) {
         console.error('Error fetching user:', error);
       } finally {
@@ -117,28 +94,17 @@ export default function SettingsPage() {
 
   const handleSaveProfile = async () => {
     const cleanName = profileName.trim();
-    if (!cleanName) {
-      showStatus('El nombre no puede estar vacío.');
-      return;
-    }
-
+    if (!cleanName) { showStatus('El nombre no puede estar vacío.'); return; }
     setSavingProfile(true);
     try {
       const token = localStorage.getItem('token');
       const response = await fetch('/api/users/me', {
         method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: cleanName }),
       });
-
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(data.error || 'No se pudo guardar el perfil.');
-      }
-
+      if (!response.ok) throw new Error(data.error || 'No se pudo guardar el perfil.');
       setUser((current: any) => ({ ...current, name: cleanName }));
       showStatus('Perfil actualizado correctamente.');
     } catch (error) {
@@ -150,28 +116,17 @@ export default function SettingsPage() {
 
   const handleSaveNotifications = async () => {
     if (!user?.id) return;
-
     setSavingNotifications(true);
     try {
       const token = localStorage.getItem('token');
       const response = await fetch('/api/users/me', {
         method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ marketingOptIn: offers }),
       });
-
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(data.error || 'No se pudieron guardar preferencias.');
-      }
-
-      localStorage.setItem(
-        `nexora-notifications-${user.id}`,
-        JSON.stringify({ campaignAlerts, weeklyReports })
-      );
+      if (!response.ok) throw new Error(data.error || 'No se pudieron guardar preferencias.');
+      localStorage.setItem(`nexora-notifications-${user.id}`, JSON.stringify({ campaignAlerts, weeklyReports }));
       setUser((current: any) => ({ ...current, marketingOptIn: offers }));
       showStatus('Preferencias guardadas.');
     } catch (error) {
@@ -184,29 +139,18 @@ export default function SettingsPage() {
   const handlePasswordChange = async () => {
     const currentPassword = window.prompt('Escribe tu contraseña actual');
     if (!currentPassword) return;
-
-    const newPassword = window.prompt(
-      'Escribe tu nueva contraseña (mínimo 8 caracteres, mayúscula, minúscula y número)'
-    );
+    const newPassword = window.prompt('Escribe tu nueva contraseña (mínimo 8 caracteres, mayúscula, minúscula y número)');
     if (!newPassword) return;
-
     setProcessingPassword(true);
     try {
       const token = localStorage.getItem('token');
       const response = await fetch('/api/users/me', {
         method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ currentPassword, newPassword }),
       });
-
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(data.error || 'No se pudo cambiar la contraseña.');
-      }
-
+      if (!response.ok) throw new Error(data.error || 'No se pudo cambiar la contraseña.');
       showStatus('Contraseña actualizada correctamente.');
     } catch (error) {
       showStatus(error instanceof Error ? error.message : 'No se pudo cambiar la contraseña.');
@@ -217,45 +161,25 @@ export default function SettingsPage() {
 
   const handleTwoFactor = () => {
     const token = localStorage.getItem('token');
-    if (!token) {
-      showStatus('Tu sesión expiró. Inicia sesión nuevamente.');
-      return;
-    }
-
+    if (!token) { showStatus('Tu sesión expiró. Inicia sesión nuevamente.'); return; }
     localStorage.setItem(`nexora-2fa-request-${user?.id || 'anonymous'}`, new Date().toISOString());
-    showStatus(
-      'Solicitud de activación 2FA registrada. Mientras tanto, mantén contraseña robusta y revisa sesiones activas.'
-    );
+    showStatus('Solicitud de activación 2FA registrada. Mantén contraseña robusta y revisa sesiones activas.');
   };
 
   const handleSessions = () => {
     const token = localStorage.getItem('token');
-    if (!token) {
-      showStatus('No se detectaron sesiones activas en este navegador.');
-      return;
-    }
-
+    if (!token) { showStatus('No se detectaron sesiones activas en este navegador.'); return; }
     setSessionsVisible((current) => !current);
-    if (!sessionsVisible) {
-      void fetchSessions();
-    }
+    if (!sessionsVisible) void fetchSessions();
   };
 
   const fetchSessions = async () => {
     setLoadingSessions(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/users/sessions', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
+      const response = await fetch('/api/users/sessions', { headers: { Authorization: `Bearer ${token}` } });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(data.error || 'No se pudieron cargar las sesiones.');
-      }
-
+      if (!response.ok) throw new Error(data.error || 'No se pudieron cargar las sesiones.');
       setSessions(Array.isArray(data.sessions) ? data.sessions : []);
     } catch (error) {
       showStatus(error instanceof Error ? error.message : 'No se pudieron cargar las sesiones.');
@@ -268,18 +192,9 @@ export default function SettingsPage() {
     setClosingSessions(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/users/sessions', {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
+      const response = await fetch('/api/users/sessions', { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(data.error || 'No se pudieron cerrar las otras sesiones.');
-      }
-
+      if (!response.ok) throw new Error(data.error || 'No se pudieron cerrar las otras sesiones.');
       await fetchSessions();
       showStatus(`Se cerraron ${Number(data.removed || 0)} sesión(es) en otros dispositivos.`);
     } catch (error) {
@@ -292,28 +207,17 @@ export default function SettingsPage() {
   const handleCancelSubscription = async () => {
     const confirmed = window.confirm('Se cancelará tu suscripción al final del período actual. ¿Deseas continuar?');
     if (!confirmed) return;
-
     setProcessingCancelSubscription(true);
     try {
       const token = localStorage.getItem('token');
       const response = await fetch('/api/users/me', {
         method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ cancelSubscription: true }),
       });
-
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(data.error || 'No se pudo cancelar la suscripción.');
-      }
-
-      setUser((current: any) => ({
-        ...current,
-        subscription: data.subscription || current?.subscription,
-      }));
+      if (!response.ok) throw new Error(data.error || 'No se pudo cancelar la suscripción.');
+      setUser((current: any) => ({ ...current, subscription: data.subscription || current?.subscription }));
       showStatus(data.message || 'Suscripción cancelada al final del período actual.');
     } catch (error) {
       showStatus(error instanceof Error ? error.message : 'No se pudo cancelar la suscripción.');
@@ -324,171 +228,166 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="py-12 text-center">
-        <div className="inline-block h-12 w-12 animate-spin rounded-full border-b-2 border-cyan-500" />
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="inline-block h-12 w-12 animate-spin rounded-full border-b-2 border-b-cyan-400" />
       </div>
     );
   }
 
-  // Sección de estado de integraciones
-  const renderIntegrationStatus = () => {
-    if (loadingIntegration) {
-      return (
-        <div className="rounded-xl border border-slate-800 bg-slate-900 p-6 mb-6">
-          <h3 className="mb-2 text-lg font-bold text-white">Integraciones</h3>
-          <p className="text-slate-400">Cargando estado de integraciones...</p>
-        </div>
-      );
-    }
-    if (!integrationStatus) {
-      return (
-        <div className="rounded-xl border border-slate-800 bg-slate-900 p-6 mb-6">
-          <h3 className="mb-2 text-lg font-bold text-white">Integraciones</h3>
-          <p className="text-rose-400">No se pudo obtener el estado de las integraciones.</p>
-        </div>
-      );
-    }
-    return (
-      <div className="rounded-xl border border-slate-800 bg-slate-900 p-6 mb-6">
-        <h3 className="mb-2 text-lg font-bold text-white">Integraciones</h3>
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-3">
-            <span className="font-medium text-slate-300">Meta (Facebook/Instagram)</span>
-            {integrationStatus.metaConnected ? (
-              <span className="rounded-full bg-emerald-500/20 px-2 py-1 text-xs font-semibold text-emerald-300">Conectado</span>
-            ) : (
-              <span className="rounded-full bg-rose-500/20 px-2 py-1 text-xs font-semibold text-rose-300">No conectado</span>
-            )}
-            {integrationStatus.metaAppId && (
-              <span className="ml-2 text-xs text-slate-500">{integrationStatus.metaAppId}</span>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="font-medium text-slate-300">Proveedor IA</span>
-            {integrationStatus.aiConnected ? (
-              <span className="rounded-full bg-emerald-500/20 px-2 py-1 text-xs font-semibold text-emerald-300">{integrationStatus.aiProvider} conectado</span>
-            ) : (
-              <span className="rounded-full bg-rose-500/20 px-2 py-1 text-xs font-semibold text-rose-300">No conectado</span>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   return (
-    <div className="space-y-6 text-slate-200">
-      {renderIntegrationStatus()}
-      <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-        <h2 className="text-2xl font-bold text-white">Configuración de Cuenta</h2>
+    <div className="space-y-6">
+      {/* Header */}
+      <section className="rounded-2xl border border-white/6 bg-slate-900 px-8 py-8">
+        <p className="text-xs uppercase tracking-wider text-cyan-400">Configuración</p>
+        <h1 className="mt-2 text-3xl font-bold text-white">Configuración de Cuenta</h1>
         <p className="mt-2 text-sm text-slate-400">Preferencias personales, notificaciones y seguridad en una sola vista.</p>
       </section>
 
-      {statusMessage ? (
-        <div className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-4 text-cyan-200">{statusMessage}</div>
-      ) : null}
+      {/* Status message */}
+      {statusMessage && (
+        <div className="rounded-2xl border border-cyan-400/20 bg-slate-900 p-4 text-sm text-cyan-300">
+          {statusMessage}
+        </div>
+      )}
 
-      {/* Profile Settings */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
-        <h3 className="mb-6 text-lg font-bold text-white">Información de Perfil</h3>
-        <div className="space-y-6">
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-400">Nombre Completo</label>
+      {/* Integrations */}
+      <section className="rounded-2xl border border-white/6 bg-slate-900 p-6">
+        <p className="text-xs uppercase tracking-wider text-slate-400">Integraciones</p>
+        <h2 className="mt-2 text-xl font-semibold text-white">Conexiones activas</h2>
+        {loadingIntegration ? (
+          <p className="mt-4 text-sm text-slate-400">Cargando estado de integraciones...</p>
+        ) : !integrationStatus ? (
+          <p className="mt-4 text-sm text-rose-400">No se pudo obtener el estado de las integraciones.</p>
+        ) : (
+          <div className="mt-4 space-y-3">
+            <div className="flex items-center justify-between rounded-2xl border border-white/6 bg-[#080e1a] px-5 py-4">
+              <div>
+                <p className="text-sm font-medium text-white">Meta (Facebook / Instagram)</p>
+                {integrationStatus.metaAppId && (
+                  <p className="mt-0.5 text-xs text-slate-500">{integrationStatus.metaAppId}</p>
+                )}
+              </div>
+              {integrationStatus.metaConnected ? (
+                <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">Conectado</span>
+              ) : (
+                <span className="rounded-full border border-rose-400/20 bg-rose-500/10 px-3 py-1 text-xs font-semibold text-rose-300">No conectado</span>
+              )}
+            </div>
+            <div className="flex items-center justify-between rounded-2xl border border-white/6 bg-[#080e1a] px-5 py-4">
+              <p className="text-sm font-medium text-white">Proveedor IA</p>
+              {integrationStatus.aiConnected ? (
+                <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">{integrationStatus.aiProvider} conectado</span>
+              ) : (
+                <span className="rounded-full border border-rose-400/20 bg-rose-500/10 px-3 py-1 text-xs font-semibold text-rose-300">No conectado</span>
+              )}
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Profile */}
+      <section className="rounded-2xl border border-white/6 bg-slate-900 p-6">
+        <p className="text-xs uppercase tracking-wider text-slate-400">Perfil</p>
+        <h2 className="mt-2 text-xl font-semibold text-white">Información de Perfil</h2>
+        <div className="mt-6 space-y-5">
+          <label className="block">
+            <span className="mb-2 block text-xs uppercase tracking-wider text-slate-400">Nombre completo</span>
             <input
               type="text"
               value={profileName}
-              onChange={(event) => setProfileName(event.target.value)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-2 text-slate-100 focus:border-cyan-500"
+              onChange={(e) => setProfileName(e.target.value)}
+              className="w-full rounded-xl bg-slate-800/50 border border-slate-700 px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
             />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-400">Email</label>
+          </label>
+          <label className="block">
+            <span className="mb-2 block text-xs uppercase tracking-wider text-slate-400">Email</span>
             <input
               type="email"
               defaultValue={user?.email}
               disabled
-              className="w-full cursor-not-allowed rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-slate-400"
+              className="w-full cursor-not-allowed rounded-xl bg-slate-800/30 border border-slate-700/50 px-4 py-3 text-sm text-slate-500"
             />
-            <p className="mt-2 text-xs text-slate-500">El email no puede ser modificado</p>
-          </div>
+            <p className="mt-1 text-xs text-slate-500">El email no puede ser modificado</p>
+          </label>
           <button
             onClick={() => void handleSaveProfile()}
             disabled={savingProfile}
-            className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-500 disabled:opacity-60"
+            className="rounded-xl border border-white/10 px-5 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white disabled:opacity-50"
           >
-            {savingProfile ? 'Guardando...' : 'Guardar Cambios'}
+            {savingProfile ? 'Guardando...' : 'Guardar cambios'}
           </button>
         </div>
-      </div>
+      </section>
 
       {/* Notifications */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
-        <h3 className="mb-6 text-lg font-bold text-white">Notificaciones</h3>
-        <div className="space-y-4">
-          <label className="flex items-center rounded-lg border border-slate-800 bg-slate-800/40 px-3 py-3">
-            <input
-              type="checkbox"
-              checked={campaignAlerts}
-              onChange={(event) => setCampaignAlerts(event.target.checked)}
-              className="h-4 w-4 rounded"
-            />
-            <span className="ml-3 text-slate-300">Alertas de campañas con bajo rendimiento</span>
-          </label>
-          <label className="flex items-center rounded-lg border border-slate-800 bg-slate-800/40 px-3 py-3">
-            <input
-              type="checkbox"
-              checked={weeklyReports}
-              onChange={(event) => setWeeklyReports(event.target.checked)}
-              className="h-4 w-4 rounded"
-            />
-            <span className="ml-3 text-slate-300">Reportes semanales</span>
-          </label>
-          <label className="flex items-center rounded-lg border border-slate-800 bg-slate-800/40 px-3 py-3">
-            <input
-              type="checkbox"
-              checked={offers}
-              onChange={(event) => setOffers(event.target.checked)}
-              className="h-4 w-4 rounded"
-            />
-            <span className="ml-3 text-slate-300">Ofertas y promociones</span>
-          </label>
+      <section className="rounded-2xl border border-white/6 bg-slate-900 p-6">
+        <p className="text-xs uppercase tracking-wider text-slate-400">Notificaciones</p>
+        <h2 className="mt-2 text-xl font-semibold text-white">Preferencias</h2>
+        <div className="mt-6 space-y-3">
+          {[
+            { label: 'Alertas de campañas con bajo rendimiento', checked: campaignAlerts, onChange: setCampaignAlerts },
+            { label: 'Reportes semanales', checked: weeklyReports, onChange: setWeeklyReports },
+            { label: 'Ofertas y promociones', checked: offers, onChange: setOffers },
+          ].map(({ label, checked, onChange }) => (
+            <label key={label} className="flex cursor-pointer items-center gap-4 rounded-2xl border border-white/6 bg-[#080e1a] px-5 py-4">
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={(e) => onChange(e.target.checked)}
+                className="h-4 w-4 rounded accent-cyan-400"
+              />
+              <span className="text-sm text-slate-300">{label}</span>
+            </label>
+          ))}
           <button
             onClick={() => void handleSaveNotifications()}
             disabled={savingNotifications}
-            className="mt-4 rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-700 disabled:opacity-60"
+            className="mt-2 rounded-xl border border-white/10 px-5 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white disabled:opacity-50"
           >
-            {savingNotifications ? 'Guardando...' : 'Guardar Preferencias'}
+            {savingNotifications ? 'Guardando...' : 'Guardar preferencias'}
           </button>
         </div>
-      </div>
+      </section>
 
-      {/* Privacy & Security */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
-        <h3 className="mb-6 text-lg font-bold text-white">Seguridad</h3>
-        <div className="space-y-4">
-          <button onClick={() => void handlePasswordChange()} className="w-full rounded-lg border border-slate-800 bg-slate-800/40 px-4 py-3 text-left transition hover:bg-slate-800 disabled:opacity-60" disabled={processingPassword}>
-            <p className="font-medium text-white">Cambiar Contraseña</p>
-            <p className="text-sm text-slate-400">Actualiza tu contraseña regularmente</p>
+      {/* Security */}
+      <section className="rounded-2xl border border-white/6 bg-slate-900 p-6">
+        <p className="text-xs uppercase tracking-wider text-slate-400">Seguridad</p>
+        <h2 className="mt-2 text-xl font-semibold text-white">Acceso y privacidad</h2>
+        <div className="mt-6 space-y-3">
+          <button
+            onClick={() => void handlePasswordChange()}
+            disabled={processingPassword}
+            className="w-full rounded-2xl border border-white/6 bg-[#080e1a] px-5 py-4 text-left transition hover:border-white/10 disabled:opacity-50"
+          >
+            <p className="text-sm font-semibold text-white">Cambiar Contraseña</p>
+            <p className="mt-0.5 text-xs text-slate-400">Actualiza tu contraseña regularmente</p>
           </button>
-          <button onClick={handleTwoFactor} className="w-full rounded-lg border border-slate-800 bg-slate-800/40 px-4 py-3 text-left transition hover:bg-slate-800">
-            <div className="flex items-center justify-between gap-3">
-              <p className="font-medium text-white">Autenticación de Dos Factores</p>
-              <span className="rounded-full bg-cyan-500/20 px-2 py-1 text-xs font-semibold text-cyan-300">Solicitar</span>
+          <button
+            onClick={handleTwoFactor}
+            className="w-full rounded-2xl border border-white/6 bg-[#080e1a] px-5 py-4 text-left transition hover:border-white/10"
+          >
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-white">Autenticación de Dos Factores</p>
+              <span className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-300">Solicitar</span>
             </div>
-            <p className="text-sm text-slate-400">Registra tu solicitud de activación de 2FA para esta cuenta.</p>
+            <p className="mt-0.5 text-xs text-slate-400">Registra tu solicitud de activación de 2FA para esta cuenta.</p>
           </button>
-          <button onClick={handleSessions} className="w-full rounded-lg border border-slate-800 bg-slate-800/40 px-4 py-3 text-left transition hover:bg-slate-800">
-            <p className="font-medium text-white">Sesiones Activas</p>
-            <p className="text-sm text-slate-400">Gestiona tus sesiones conectadas</p>
+          <button
+            onClick={handleSessions}
+            className="w-full rounded-2xl border border-white/6 bg-[#080e1a] px-5 py-4 text-left transition hover:border-white/10"
+          >
+            <p className="text-sm font-semibold text-white">Sesiones Activas</p>
+            <p className="mt-0.5 text-xs text-slate-400">Gestiona tus sesiones conectadas</p>
           </button>
-          {sessionsVisible ? (
-            <div className="rounded-lg border border-slate-800 bg-slate-950 p-4">
-              <div className="mb-3 flex items-center justify-between">
+
+          {sessionsVisible && (
+            <div className="rounded-2xl border border-white/6 bg-[#080e1a] p-5">
+              <div className="mb-4 flex items-center justify-between">
                 <p className="text-sm font-semibold text-slate-200">Dispositivos con sesión</p>
                 <button
                   onClick={() => void handleCloseOtherSessions()}
                   disabled={closingSessions}
-                  className="rounded-md border border-rose-500/40 bg-rose-500/10 px-2.5 py-1 text-xs font-semibold text-rose-200 disabled:opacity-60"
+                  className="rounded-lg border border-rose-400/20 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-300 disabled:opacity-50"
                 >
                   {closingSessions ? 'Cerrando...' : 'Cerrar otras sesiones'}
                 </button>
@@ -510,15 +409,15 @@ export default function SettingsPage() {
                     </thead>
                     <tbody>
                       {sessions.map((session) => (
-                        <tr key={session.id} className="border-t border-slate-800">
+                        <tr key={session.id} className="border-t border-white/6">
                           <td className="px-2 py-2">{session.userAgent}</td>
                           <td className="px-2 py-2">{session.ip}</td>
                           <td className="px-2 py-2">{new Date(session.lastSeenAt).toLocaleString('es-ES')}</td>
                           <td className="px-2 py-2">
                             {session.current ? (
-                              <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">Actual</span>
+                              <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">Actual</span>
                             ) : (
-                              <span className="rounded-full bg-slate-700 px-2 py-0.5 text-[10px] font-semibold text-slate-300">Otra</span>
+                              <span className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-400">Otra</span>
                             )}
                           </td>
                         </tr>
@@ -528,18 +427,23 @@ export default function SettingsPage() {
                 </div>
               )}
             </div>
-          ) : null}
+          )}
         </div>
-      </div>
+      </section>
 
-      {/* Subscription Action */}
-      <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-6">
-        <h3 className="mb-6 text-lg font-bold text-rose-300">Suscripción</h3>
-        <button onClick={() => void handleCancelSubscription()} disabled={processingCancelSubscription} className="rounded-lg bg-rose-600 px-6 py-3 font-semibold text-white transition hover:bg-rose-500 disabled:opacity-60">
+      {/* Cancel subscription */}
+      <section className="rounded-2xl border border-rose-400/20 bg-slate-900 p-6">
+        <p className="text-xs uppercase tracking-wider text-rose-400">Zona de peligro</p>
+        <h2 className="mt-2 text-xl font-semibold text-white">Cancelar Suscripción</h2>
+        <p className="mt-2 text-sm text-slate-400">Tu cuenta y datos se mantienen. La cancelación aplica al cierre del período vigente.</p>
+        <button
+          onClick={() => void handleCancelSubscription()}
+          disabled={processingCancelSubscription}
+          className="mt-5 rounded-xl border border-rose-400/20 bg-rose-500/10 px-6 py-3 text-sm font-semibold text-rose-300 transition hover:border-rose-400/40 hover:text-rose-200 disabled:opacity-50"
+        >
           {processingCancelSubscription ? 'Cancelando...' : 'Cancelar Suscripción'}
         </button>
-        <p className="mt-2 text-sm text-rose-200">Tu cuenta y datos se mantienen. La cancelación aplica al cierre del período vigente.</p>
-      </div>
+      </section>
     </div>
   );
 }

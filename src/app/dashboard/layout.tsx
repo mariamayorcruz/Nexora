@@ -120,6 +120,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         setUser(data.user);
       } catch (error) {
         console.error('Error fetching user:', error);
+        localStorage.removeItem('token');
         router.push('/auth/login');
       } finally {
         setLoading(false);
@@ -127,7 +128,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     };
 
     void fetchUser();
-  }, [pathname]);
+  }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const menuRows: MenuRow[] = [
     { kind: 'link', label: language === 'en' ? 'Overview' : 'Resumen', href: '/dashboard', icon: 'OV' },

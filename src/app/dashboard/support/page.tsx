@@ -32,10 +32,10 @@ interface DashboardSupportUser {
 }
 
 const PROVIDER_META: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
-  claude: { label: 'Claude (Anthropic)', icon: <Cpu className="h-3 w-3" />, color: 'text-violet-600 bg-violet-50 border-violet-200' },
-  gemini: { label: 'Gemini (Google)', icon: <Layers className="h-3 w-3" />, color: 'text-blue-600 bg-blue-50 border-blue-200' },
-  openrouter: { label: 'OpenRouter (Llama / Mistral)', icon: <Zap className="h-3 w-3" />, color: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
-  heuristic: { label: 'Motor Nexora', icon: <Bot className="h-3 w-3" />, color: 'text-slate-600 bg-slate-50 border-slate-200' },
+  claude: { label: 'Claude (Anthropic)', icon: <Cpu className="h-3 w-3" />, color: 'border-cyan-400/20 bg-cyan-500/10 text-cyan-300' },
+  gemini: { label: 'Gemini (Google)', icon: <Layers className="h-3 w-3" />, color: 'border-blue-400/20 bg-blue-500/10 text-blue-300' },
+  openrouter: { label: 'OpenRouter (Llama / Mistral)', icon: <Zap className="h-3 w-3" />, color: 'border-emerald-400/20 bg-emerald-500/10 text-emerald-300' },
+  heuristic: { label: 'Motor Nexora', icon: <Bot className="h-3 w-3" />, color: 'border-white/10 bg-slate-800 text-slate-300' },
 };
 
 export default function SupportPage() {
@@ -73,7 +73,7 @@ export default function SupportPage() {
       }
     };
 
-    loadUser();
+    void loadUser();
   }, []);
 
   const handleAsk = async () => {
@@ -87,10 +87,8 @@ export default function SupportPage() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ message, aiProvider, aiApiKey: aiApiKey.trim() || undefined }),
       });
-
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'No pudimos responder.');
-
       setReply(data.reply);
       setSupportEmail(data.supportEmail || 'support@nexora.com');
       setProviderUsed(data?.ai?.providerUsed || 'heuristic');
@@ -143,47 +141,52 @@ export default function SupportPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-[32px] border border-slate-200 bg-[linear-gradient(135deg,#ffffff_0%,#f8fafc_55%,#ecfeff_100%)] p-8 shadow-[0_20px_70px_rgba(15,23,42,0.07)]">
-        <p className="text-xs uppercase tracking-[0.28em] text-slate-400">Postventa y soporte</p>
-        <h1 className="mt-3 text-3xl font-semibold text-slate-900">Asistente IA + Media Buyer autónomo</h1>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+      {/* Header */}
+      <section className="rounded-2xl border border-white/6 bg-slate-900 px-8 py-8">
+        <p className="text-xs uppercase tracking-wider text-cyan-400">Soporte</p>
+        <h1 className="mt-2 text-3xl font-bold text-white">Asistente IA + Media Buyer autónomo</h1>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
           Pregunta sobre campañas, métricas, configuración o pide que el asistente cree borradores ejecutables. Los borradores se guardan directamente en tu cuenta con un clic.
         </p>
         <div className="mt-6 grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.05)]">
-            <p className="text-sm text-slate-500">Plan actual</p>
-            <p className="mt-2 text-2xl font-semibold text-slate-900">{user?.entitlements?.marketingLabel || 'Starter'}</p>
+          <div className="rounded-2xl border border-white/6 bg-[#080e1a] p-5">
+            <p className="text-xs uppercase tracking-wider text-slate-400">Plan actual</p>
+            <p className="mt-2 text-3xl font-bold text-white">{user?.entitlements?.marketingLabel || 'Starter'}</p>
           </div>
-          <div className="rounded-2xl bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.05)]">
-            <p className="text-sm text-slate-500">Soporte IA</p>
-            <p className="mt-2 text-2xl font-semibold text-slate-900">Activo · 4 proveedores</p>
+          <div className="rounded-2xl border border-white/6 bg-[#080e1a] p-5">
+            <p className="text-xs uppercase tracking-wider text-slate-400">Soporte IA</p>
+            <p className="mt-2 text-3xl font-bold text-white">Activo · 4 proveedores</p>
           </div>
-          <div className="rounded-2xl bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.05)]">
-            <p className="text-sm text-slate-500">Escalado humano</p>
-            <p className="mt-2 text-2xl font-semibold text-slate-900">
+          <div className="rounded-2xl border border-white/6 bg-[#080e1a] p-5">
+            <p className="text-xs uppercase tracking-wider text-slate-400">Escalado humano</p>
+            <p className="mt-2 text-3xl font-bold text-white">
               {user?.entitlements?.capabilities.canUsePrioritySupport ? 'Prioritario' : 'Por email'}
             </p>
           </div>
         </div>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[1fr_1fr]">
-        <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_16px_55px_rgba(15,23,42,0.06)]">
-          <h2 className="text-xl font-semibold text-slate-900">Asistente IA</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
+      {/* Main grid */}
+      <section className="grid gap-6 lg:grid-cols-2">
+        {/* Left — input */}
+        <div className="rounded-2xl border border-white/6 bg-slate-900 p-6">
+          <p className="text-xs uppercase tracking-wider text-slate-400">Asistente</p>
+          <h2 className="mt-2 text-xl font-semibold text-white">Asistente IA</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-400">
             Escribe tu duda o pide que genere una campaña. Puede crear borradores ejecutables directamente desde el chat.
           </p>
 
-          <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Proveedor IA</p>
+          {/* AI config */}
+          <div className="mt-5 rounded-2xl border border-white/6 bg-[#080e1a] p-4">
+            <p className="text-xs uppercase tracking-wider text-slate-400">Proveedor IA</p>
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               <select
                 value={aiProvider}
                 onChange={(e) => setAiProvider(e.target.value as typeof aiProvider)}
-                className="input-field"
+                className="w-full rounded-xl bg-slate-800/50 border border-slate-700 px-4 py-3 text-sm text-white focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
               >
-                <option value="auto">Auto — Claude → Gemini → Llama (gratis)</option>
-                <option value="openrouter">OpenRouter (Llama / Mistral gratis)</option>
+                <option value="auto">Auto — Claude → Gemini → Llama</option>
+                <option value="openrouter">OpenRouter (Llama / Mistral)</option>
                 <option value="claude">Forzar Claude</option>
                 <option value="gemini">Forzar Gemini</option>
                 <option value="heuristic">Solo Nexora (sin proveedor externo)</option>
@@ -192,12 +195,16 @@ export default function SupportPage() {
                 type="password"
                 value={aiApiKey}
                 onChange={(e) => setAiApiKey(e.target.value)}
-                placeholder="API key BYOK (Claude, Gemini o OpenRouter)"
-                className="input-field"
+                placeholder="API key BYOK (opcional)"
+                className="w-full rounded-xl bg-slate-800/50 border border-slate-700 px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
               />
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              <button onClick={handleSaveAiConfig} type="button" className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white">
+              <button
+                onClick={handleSaveAiConfig}
+                type="button"
+                className="rounded-xl border border-white/10 px-4 py-2 text-xs font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
+              >
                 Guardar configuración IA
               </button>
               <button
@@ -207,33 +214,41 @@ export default function SupportPage() {
                   setAiStatus('Clave local eliminada de este navegador.');
                 }}
                 type="button"
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
+                className="rounded-xl border border-white/10 px-4 py-2 text-xs font-semibold text-slate-400 transition hover:text-slate-200"
               >
                 Limpiar clave local
               </button>
             </div>
-            {aiStatus ? <p className="mt-2 text-xs text-slate-500">{aiStatus}</p> : null}
+            {aiStatus && <p className="mt-2 text-xs text-slate-400">{aiStatus}</p>}
           </div>
 
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { void handleAsk(); } }}
-            className="input-field mt-5 min-h-[180px] w-full"
+            onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void handleAsk(); }}
+            className="mt-5 w-full rounded-xl bg-slate-800/50 border border-slate-700 px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10 min-h-[180px] resize-none"
             placeholder="Ejemplo: mi campaña tiene gasto pero no convierte, ¿qué debería revisar primero? O: crea una campaña de reconocimiento de marca para Instagram con $50/día"
           />
-          <p className="mt-1 text-xs text-slate-400">Ctrl+Enter para enviar</p>
+          <p className="mt-1 text-xs text-slate-500">Ctrl+Enter para enviar</p>
 
-          <button onClick={handleAsk} disabled={loading} className="mt-4 btn-primary disabled:opacity-60">
+          <button
+            onClick={() => void handleAsk()}
+            disabled={loading}
+            className="mt-4 w-full rounded-xl border border-white/10 py-3 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white disabled:opacity-50"
+          >
             {loading ? 'Analizando...' : 'Preguntar al asistente IA'}
           </button>
         </div>
 
-        <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_16px_55px_rgba(15,23,42,0.06)]">
+        {/* Right — response */}
+        <div className="rounded-2xl border border-white/6 bg-slate-900 p-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-slate-900">Respuesta y acciones</h2>
+            <div>
+              <p className="text-xs uppercase tracking-wider text-slate-400">Respuesta</p>
+              <h2 className="mt-2 text-xl font-semibold text-white">Respuesta y acciones</h2>
+            </div>
             {providerBadge && (
-              <span className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${providerBadge.color}`}>
+              <span className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${providerBadge.color}`}>
                 {providerBadge.icon}
                 {providerBadge.label}
               </span>
@@ -242,37 +257,41 @@ export default function SupportPage() {
 
           {reply ? (
             <div className="mt-5 space-y-4">
-              <div className="rounded-2xl bg-slate-950 p-5 text-white">
-                <p className="text-sm uppercase tracking-[0.22em] text-slate-300">{reply.title}</p>
-                <p className="mt-3 text-sm leading-6 text-slate-100">{reply.message}</p>
+              <div className="rounded-2xl border border-white/6 bg-[#080e1a] p-5">
+                <p className="text-xs uppercase tracking-wider text-slate-400">{reply.title}</p>
+                <p className="mt-3 text-sm leading-6 text-slate-200">{reply.message}</p>
               </div>
 
               {reply.nextSteps.map((step) => (
-                <div key={step} className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                <div key={step} className="rounded-2xl border border-white/6 bg-[#080e1a] p-4 text-sm text-slate-300">
                   {step}
                 </div>
               ))}
 
               {reply.campaignDraft && (
-                <div className="rounded-2xl border border-cyan-200 bg-cyan-50 p-5">
-                  <p className="text-xs uppercase tracking-[0.18em] text-cyan-600">Borrador IA listo para guardar</p>
-                  <p className="mt-2 text-base font-semibold text-slate-900">{reply.campaignDraft.name}</p>
-                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-600">
-                    <span className="rounded-full bg-white px-2.5 py-1 border border-slate-200">{reply.campaignDraft.objective}</span>
-                    <span className="rounded-full bg-white px-2.5 py-1 border border-slate-200">{reply.campaignDraft.channel}</span>
-                    <span className="rounded-full bg-white px-2.5 py-1 border border-slate-200">${reply.campaignDraft.budget}/día</span>
-                    <span className="rounded-full bg-white px-2.5 py-1 border border-slate-200">{reply.campaignDraft.launchWindow}</span>
+                <div className="rounded-2xl border border-cyan-400/20 bg-[#080e1a] p-5">
+                  <p className="text-xs uppercase tracking-wider text-cyan-400">Borrador IA listo para guardar</p>
+                  <p className="mt-2 text-base font-semibold text-white">{reply.campaignDraft.name}</p>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                    <span className="rounded-full border border-white/10 px-2.5 py-1 text-slate-300">{reply.campaignDraft.objective}</span>
+                    <span className="rounded-full border border-white/10 px-2.5 py-1 text-slate-300">{reply.campaignDraft.channel}</span>
+                    <span className="rounded-full border border-white/10 px-2.5 py-1 text-slate-300">${reply.campaignDraft.budget}/día</span>
+                    <span className="rounded-full border border-white/10 px-2.5 py-1 text-slate-300">{reply.campaignDraft.launchWindow}</span>
                   </div>
                   {reply.campaignDraft.hook && (
-                    <p className="mt-3 text-xs text-slate-700"><span className="font-semibold">Hook:</span> {reply.campaignDraft.hook}</p>
+                    <p className="mt-3 text-xs text-slate-300"><span className="font-semibold text-white">Hook:</span> {reply.campaignDraft.hook}</p>
                   )}
                   {reply.campaignDraft.cta && (
-                    <p className="mt-1 text-xs text-slate-700"><span className="font-semibold">CTA:</span> {reply.campaignDraft.cta}</p>
+                    <p className="mt-1 text-xs text-slate-300"><span className="font-semibold text-white">CTA:</span> {reply.campaignDraft.cta}</p>
                   )}
                   <button
-                    onClick={handleSaveDraft}
+                    onClick={() => void handleSaveDraft()}
                     disabled={savingDraft || draftSaved}
-                    className={`mt-4 w-full rounded-xl px-4 py-2.5 text-sm font-semibold transition ${draftSaved ? 'bg-emerald-100 text-emerald-700 cursor-default' : 'bg-cyan-600 text-white hover:bg-cyan-700 disabled:opacity-60'}`}
+                    className={`mt-4 w-full rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+                      draftSaved
+                        ? 'border border-emerald-400/20 bg-emerald-500/10 text-emerald-300 cursor-default'
+                        : 'border border-white/10 text-slate-200 hover:border-cyan-400/30 hover:text-white disabled:opacity-50'
+                    }`}
                   >
                     {draftSaved ? '✓ Borrador guardado en Campañas' : savingDraft ? 'Guardando...' : 'Guardar borrador en mis campañas →'}
                   </button>
@@ -280,31 +299,33 @@ export default function SupportPage() {
               )}
             </div>
           ) : (
-            <div className="mt-5 rounded-2xl bg-slate-50 p-5 text-sm leading-6 text-slate-600">
+            <div className="mt-5 rounded-2xl border border-white/6 bg-[#080e1a] p-5 text-sm leading-6 text-slate-400">
               Aún no hay consulta. Cuando escribas una duda, aquí aparecerán diagnóstico, pasos recomendados y borradores ejecutables.
             </div>
           )}
 
-          <div className="mt-6 rounded-2xl border border-slate-200 p-4 text-sm text-slate-700">
-            Si necesitas seguimiento humano, escribe a <span className="font-semibold text-slate-900">{supportEmail}</span>.
+          <div className="mt-6 rounded-2xl border border-white/6 bg-[#080e1a] p-4 text-sm text-slate-400">
+            Si necesitas seguimiento humano, escribe a <span className="font-semibold text-slate-200">{supportEmail}</span>.
           </div>
         </div>
       </section>
 
-      <section className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_16px_55px_rgba(15,23,42,0.06)]">
-        <h2 className="text-lg font-semibold text-slate-900">Proveedores disponibles (sin corte de crédito)</h2>
-        <p className="mt-2 text-sm text-slate-500">El sistema usa una cadena de fallback para que siempre haya respuesta IA, incluso sin claves propias configuradas.</p>
+      {/* Providers */}
+      <section className="rounded-2xl border border-white/6 bg-slate-900 p-6">
+        <p className="text-xs uppercase tracking-wider text-slate-400">Infraestructura</p>
+        <h2 className="mt-2 text-xl font-semibold text-white">Proveedores disponibles</h2>
+        <p className="mt-2 text-sm text-slate-400">El sistema usa una cadena de fallback para que siempre haya respuesta IA, incluso sin claves propias configuradas.</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-4">
           {([
-            { key: 'claude', label: 'Claude 3.5', detail: 'Anthropic · Mejor razonamiento', icon: <Cpu className="h-5 w-5 text-violet-500" /> },
-            { key: 'gemini', label: 'Gemini 1.5', detail: 'Google · Velocidad + contexto', icon: <Layers className="h-5 w-5 text-blue-500" /> },
-            { key: 'openrouter', label: 'Llama / Mistral', detail: 'OpenRouter · Gratis permanente', icon: <Zap className="h-5 w-5 text-emerald-500" /> },
-            { key: 'heuristic', label: 'Motor Nexora', detail: 'Sin API · Siempre disponible', icon: <Bot className="h-5 w-5 text-slate-500" /> },
+            { key: 'claude', label: 'Claude 3.5', detail: 'Anthropic · Mejor razonamiento', icon: <Cpu className="h-5 w-5 text-cyan-400" /> },
+            { key: 'gemini', label: 'Gemini 1.5', detail: 'Google · Velocidad + contexto', icon: <Layers className="h-5 w-5 text-blue-400" /> },
+            { key: 'openrouter', label: 'Llama / Mistral', detail: 'OpenRouter · Gratis permanente', icon: <Zap className="h-5 w-5 text-emerald-400" /> },
+            { key: 'heuristic', label: 'Motor Nexora', detail: 'Sin API · Siempre disponible', icon: <Bot className="h-5 w-5 text-slate-400" /> },
           ] as const).map((item) => (
-            <div key={item.key} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div key={item.key} className="rounded-2xl border border-white/6 bg-[#080e1a] p-4">
               {item.icon}
-              <p className="mt-2 text-sm font-semibold text-slate-800">{item.label}</p>
-              <p className="mt-1 text-xs text-slate-500">{item.detail}</p>
+              <p className="mt-2 text-sm font-semibold text-white">{item.label}</p>
+              <p className="mt-1 text-xs text-slate-400">{item.detail}</p>
             </div>
           ))}
         </div>
@@ -312,4 +333,3 @@ export default function SupportPage() {
     </div>
   );
 }
-

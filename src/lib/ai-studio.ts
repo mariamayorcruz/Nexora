@@ -1,6 +1,6 @@
 import { BillingPlan, getBillingPlan } from '@/lib/billing';
 
-const AI_STUDIO_OPENROUTER_MODEL = 'meta-llama/llama-3.1-8b-instruct:free';
+const AI_STUDIO_GROQ_MODEL = 'llama-3.3-70b-versatile';
 
 export type AiToolKey =
   | 'ad-copy'
@@ -720,6 +720,7 @@ function normalizeLlmAiOutputPayload(
 
 function buildAiStudioOpenRouterSystemPrompt(): string {
   return [
+    'Cuando el usuario provea businessContext, úsalo para personalizar TODO el copy con el nombre real del negocio, industria y objetivos. Cuando provea customContext, incorpóralo como contexto adicional prioritario.',
     'Eres un estratega y copywriter de marketing para Nexora.',
     'Generas contenido en español, claro, persuasivo y orientado a conversión.',
     'Responde SOLO con un JSON válido (sin markdown, sin texto antes ni después).',
@@ -727,6 +728,10 @@ function buildAiStudioOpenRouterSystemPrompt(): string {
     'cta (string, opcional), slides (opcional, array de {title, bullets}),',
     'sections (opcional, array de {title, items}), beats (opcional, array de {id: hook|conflict|resolution|cta, label, timeLabel, startSec, endSec, text, visual}).',
     'headline y angle son obligatorios; bullets debe ser útil y concreto salvo que slides o sections cubran el detalle.',
+    'Si tool es "repurpose": genera sections con 5 canales (Reel, Carrusel, Email, WhatsApp, Landing). Cada section.title es el canal. Cada section.items contiene 3-5 líneas de copy REAL y específico para ese canal, usando la oferta, audiencia y userPrompt del usuario. NO des instrucciones de formato, escribe el copy directamente.',
+    'Si tool es "ugc-script": genera beats con hook, conflict, resolution y cta, cada uno con texto real del guion.',
+    'Si tool es "email-sequence": genera sections con 3 emails (Bienvenida, Seguimiento, Cierre). Cada section.items contiene las líneas reales del email.',
+    'Si tool es "pitch-deck": genera slides con título y bullets reales de cada slide.',
   ].join(' ');
 }
 
@@ -744,8 +749,10 @@ async function tryOpenRouterAiStudio(params: {
   outputFormat?: string;
   captionStyle?: string;
   smartEditOptions?: unknown;
+  businessContext?: Record<string, unknown> | null;
+  customContext?: string;
 }): Promise<AiOutputPayload | null> {
-  const apiKey = String(process.env.OPENROUTER_API_KEY || '').trim();
+  const apiKey = String(process.env.GROQ_API_KEY || '').trim();
   if (!apiKey) {
     console.error('[ai-studio] tryOpenRouterAiStudio: OPENROUTER_API_KEY missing at runtime');
     return null;
@@ -772,6 +779,8 @@ async function tryOpenRouterAiStudio(params: {
     outputFormat: params.outputFormat,
     captionStyle: params.captionStyle,
     smartEditOptions: params.smartEditOptions,
+    businessContext: params.businessContext ?? null,
+    customContext: params.customContext || '',
     constraints: [
       'Adapta el formato al tool (anuncio, brief, guion UGC, repurpose, email, pitch).',
       'No inventes datos legales, métricas o casos que el usuario no haya insinuado.',
@@ -779,16 +788,14 @@ async function tryOpenRouterAiStudio(params: {
   };
 
   try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-        'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'https://www.gotnexora.com',
-        'X-Title': 'Nexora AI Studio',
+        Authorization: `Bearer ${String(process.env.GROQ_API_KEY || '').trim()}`,
       },
       body: JSON.stringify({
-        model: AI_STUDIO_OPENROUTER_MODEL,
+        model: AI_STUDIO_GROQ_MODEL,
         messages: [
           { role: 'system', content: buildAiStudioOpenRouterSystemPrompt() },
           { role: 'user', content: JSON.stringify(userPayload, null, 2) },
@@ -803,7 +810,7 @@ async function tryOpenRouterAiStudio(params: {
       console.error('[ai-studio] tryOpenRouterAiStudio: OpenRouter HTTP error', {
         status: response.status,
         statusText: response.statusText,
-        model: AI_STUDIO_OPENROUTER_MODEL,
+        model: AI_STUDIO_GROQ_MODEL,
         bodyPreview: responseText.slice(0, 2000),
       });
       return null;
@@ -838,7 +845,7 @@ async function tryOpenRouterAiStudio(params: {
       .trim();
     if (!text) {
       console.error('[ai-studio] tryOpenRouterAiStudio: empty assistant content', {
-        model: AI_STUDIO_OPENROUTER_MODEL,
+        model: AI_STUDIO_GROQ_MODEL,
         payloadPreview: responseText.slice(0, 1500),
       });
       return null;
@@ -908,11 +915,17 @@ function buildAiOutputLocal(params: {
   outputFormat?: string;
   captionStyle?: string;
   smartEditOptions?: unknown;
+  businessContext?: Record<string, unknown> | null;
+  customContext?: string;
 }): AiOutputPayload {
   const { tool, prompt, offer, audience, channel } = params;
   const trimmedOffer = normalizeOffer(offer);
   const trimmedAudience = audience || 'tu audiencia ideal';
   const trimmedChannel = channel || 'paid media';
+  const bizName = (params.businessContext as Record<string, unknown>)?.businessName as string || offer;
+  const bizIndustries = ((params.businessContext as Record<string, unknown>)?.industries as string[])?.join(', ') || '';
+  const extraContext = params.customContext || '';
+  const trimmedBizName = normalizeOffer(bizName);
   const basePromise = `Ayuda a ${trimmedAudience} a avanzar con ${trimmedOffer}`;
   const generationConfig = buildGenerationConfig({
     tone: params.tone,
@@ -924,39 +937,83 @@ function buildAiOutputLocal(params: {
   switch (tool) {
     case 'creative-brief':
       return {
-        headline: `Brief listo para vender ${trimmedOffer} con una promesa clara`,
+        headline: `Brief listo para vender ${trimmedBizName}${bizIndustries ? ` · ${bizIndustries}` : ''} con una promesa clara`,
         bullets: [
           `Problema visible: ${trimmedAudience} siente fricción al intentar crecer sin sistema.`,
           `Promesa principal: ${basePromise} con más claridad, control y velocidad.`,
+          ...(bizIndustries ? [`Contexto de sector: ${bizIndustries}.`] : []),
+          ...(extraContext ? [`Prioridad declarada por el cliente: ${extraContext}`] : []),
           'Prueba sugerida: mostrar antes y después, una captura o un caso corto.',
           'Objeción a resolver: “ya probé otras herramientas y no tuve visibilidad real”.',
           'CTA: invita a demo o prueba guiada con un siguiente paso muy concreto.',
         ],
-        angle: `Usa ${trimmedChannel} para mostrar producto primero y beneficios después.`,
+        angle: `Usa ${trimmedChannel} para mostrar ${trimmedBizName} primero y beneficios después.`,
       };
     case 'ugc-script':
       return buildStructuredSocialOutput({
-        offer: trimmedOffer,
+        offer: trimmedBizName,
         audience: trimmedAudience,
-        prompt,
+        prompt: extraContext ? `${prompt}\n\nContexto adicional: ${extraContext}` : prompt,
         config: generationConfig,
       });
-    case 'repurpose':
+    case 'repurpose': {
+      const bizName = (params.businessContext as Record<string, unknown>)?.businessName as string || offer;
+      const bizIndustries = ((params.businessContext as Record<string, unknown>)?.industries as string[])?.join(', ') || '';
+      const extraContext = params.customContext || '';
       return {
-        headline: 'Repurpose multicanal desde una sola idea',
-        bullets: [
-          'Reel: una objeción, una prueba y un CTA.',
-          'Carrusel: dolor, oportunidad, método, resultado y cierre.',
-          'Email: asunto corto, gancho rápido y CTA de respuesta.',
-          'WhatsApp: mensaje breve con valor, contexto y siguiente paso.',
+        headline: `Repurpose multicanal: ${bizName}${bizIndustries ? ` · ${bizIndustries}` : ''}`,
+        bullets: [],
+        angle: `Misma promesa, 5 canales distintos para ${trimmedAudience}.${bizIndustries ? ` Industria: ${bizIndustries}.` : ''}${extraContext ? ` Notas: ${extraContext}` : ''}`,
+        sections: [
+          {
+            title: 'Reel',
+            items: [
+              `Hook: ¿Sabías que ${bizName} puede cambiar tu resultado en menos de 30 días?${extraContext ? ` ${extraContext}` : ''}`,
+              `Conflicto: La mayoría de ${trimmedAudience} sigue usando métodos que no convierten.${bizIndustries ? ` Especialmente en ${bizIndustries}.` : ''}`,
+              `CTA: Guarda este video y escríbenos hoy.`,
+            ],
+          },
+          {
+            title: 'Carrusel',
+            items: [
+              `Slide 1 — El problema: ${trimmedAudience} pierde tiempo sin resultados claros.`,
+              `Slide 2 — La solución: ${bizName} resuelve eso paso a paso.`,
+              `Slide 3 — El método: simple, probado y sin tecnicismos.${bizIndustries ? ` Enfocado en ${bizIndustries}.` : ''}`,
+              `Slide 4 — CTA: Escríbenos y te explicamos cómo empieza.`,
+            ],
+          },
+          {
+            title: 'Email',
+            items: [
+              `Asunto: La razón por la que ${trimmedAudience} no está convirtiendo`,
+              `Cuerpo: Hoy quiero contarte algo que cambia todo sobre ${bizName}.${extraContext ? ` ${extraContext}` : ''}`,
+              `CTA: Responde este email con "quiero saber más" y te contactamos.`,
+            ],
+          },
+          {
+            title: 'WhatsApp',
+            items: [
+              `Hola, te escribo porque tenemos algo puntual para ${trimmedAudience}.`,
+              `${bizName} — sin rodeos, sin contratos largos.`,
+              `¿Tienes 10 minutos esta semana para una llamada rápida?`,
+            ],
+          },
+          {
+            title: 'Landing',
+            items: [
+              `Headline: ${bizName} — para ${trimmedAudience} que quiere resultados reales.`,
+              `Subtítulo: Sin complicaciones. Sin perder tiempo. Solo resultados.${bizIndustries ? ` Especialistas en ${bizIndustries}.` : ''}`,
+              `CTA principal: Empieza hoy →`,
+            ],
+          },
         ],
-        angle: `Mantén la misma promesa en anuncio, landing y seguimiento para ${trimmedAudience}.`,
       };
+    }
     case 'email-sequence':
       return {
-        headline: `Secuencia de seguimiento para ${trimmedOffer}`,
+        headline: `Secuencia de seguimiento para ${trimmedBizName}${bizIndustries ? ` · ${bizIndustries}` : ''}`,
         bullets: [
-          'Email 1: oportunidad y beneficio principal con CTA directo.',
+          `Email 1: oportunidad y beneficio principal con CTA directo.${extraContext ? ` Incluye: ${extraContext}` : ''}`,
           'Email 2: objeción más común y prueba o mini caso.',
           'Email 3: urgencia racional, siguiente paso y recordatorio simple.',
         ],
@@ -964,20 +1021,20 @@ function buildAiOutputLocal(params: {
       };
     case 'pitch-deck':
       return {
-        headline: `Presentación lista para vender ${trimmedOffer}`,
+        headline: `Presentación lista para vender ${trimmedBizName}${bizIndustries ? ` · ${bizIndustries}` : ''}`,
         bullets: [
           'Abre con la oportunidad principal, no con contexto genérico.',
           'Muestra el problema, la solución, la prueba y el siguiente paso con una sola narrativa.',
           'Mantén una idea fuerte por slide para que la propuesta se entienda rápido.',
           'Cierra con una acción concreta: demo, llamada o aprobación.',
         ],
-        angle: `Usa un tono claro, elegante y orientado a resultados para ${trimmedAudience}.`,
+        angle: `Usa un tono claro, elegante y orientado a resultados para ${trimmedAudience}.${extraContext ? ` Contexto clave: ${extraContext}` : ''}`,
         cta: 'Cierra con una propuesta concreta y un siguiente paso fácil de aceptar.',
         slides: [
           {
             title: 'Portada y promesa',
             bullets: [
-              `${trimmedOffer} en una frase clara.`,
+              `${trimmedBizName} en una frase clara.`,
               `Promesa principal para ${trimmedAudience}.`,
               'Resultado o mejora que se puede esperar.',
             ],
@@ -993,7 +1050,7 @@ function buildAiOutputLocal(params: {
           {
             title: 'Solución y enfoque',
             bullets: [
-              `Cómo ${trimmedOffer} resuelve el problema.`,
+              `Cómo ${trimmedBizName} resuelve el problema.`,
               `Qué cambia en ${trimmedChannel} o en la operación comercial.`,
               'Qué hace más simple o más rápido.',
             ],
@@ -1020,29 +1077,31 @@ function buildAiOutputLocal(params: {
     default:
       if (generationConfig.format || generationConfig.tone || generationConfig.platform) {
         return buildStructuredSocialOutput({
-          offer: trimmedOffer,
+          offer: trimmedBizName,
           audience: trimmedAudience,
-          prompt,
+          prompt: extraContext ? `${prompt}\n\nContexto adicional: ${extraContext}` : prompt,
           config: generationConfig,
         });
       }
 
       if (/instagram/i.test(trimmedChannel) || /nexora/i.test(trimmedOffer) || /gotnexora\.com/i.test(prompt)) {
         return buildInstagramAdCopy({
-          offer: trimmedOffer,
+          offer: trimmedBizName,
           audience: trimmedAudience,
           channel: trimmedChannel,
-          prompt,
+          prompt: extraContext ? `${prompt}\n\nContexto adicional: ${extraContext}` : prompt,
         });
       }
 
       return {
-        headline: `Hooks y copies listos para ${trimmedOffer}`,
+        headline: `Hooks y copies listos para ${trimmedBizName}${bizIndustries ? ` · ${bizIndustries}` : ''}`,
         bullets: [
           `Hook 1: “${trimmedAudience} no compra más información; compra una promesa que se siente inevitable.”`,
-          `Hook 2: “${trimmedOffer} vende mejor cuando se entiende qué cambia en la vida o en el negocio del cliente desde el primer impacto.”`,
+          `Hook 2: “${trimmedBizName} vende mejor cuando se entiende qué cambia en la vida o en el negocio del cliente desde el primer impacto.”`,
           'Hook 3: “Si tu anuncio necesita demasiada explicación, está perdiendo a la gente correcta antes de mostrar la prueba.”',
-          `Copy principal: presenta el dolor, nombra el cambio concreto y muestra por qué ${trimmedOffer} se siente diferente a la alternativa actual.`,
+          ...(bizIndustries ? [`Sector: ${bizIndustries}.`] : []),
+          ...(extraContext ? [`Contexto prioritario: ${extraContext}`] : []),
+          `Copy principal: presenta el dolor, nombra el cambio concreto y muestra por qué ${trimmedBizName} se siente diferente a la alternativa actual.`,
           'Prueba sugerida: usa una captura, resultado, comparativa o microdemostración antes del CTA.',
           'CTA: invita a una sola acción con bajo riesgo, alta claridad y una promesa concreta del siguiente paso.',
         ],
@@ -1076,6 +1135,8 @@ export async function buildAiOutput(params: {
   outputFormat?: string;
   captionStyle?: string;
   smartEditOptions?: unknown;
+  businessContext?: Record<string, unknown> | null;
+  customContext?: string;
 }): Promise<AiOutputPayload> {
   const fromLlm = await tryOpenRouterAiStudio(params);
   if (fromLlm) return fromLlm;
