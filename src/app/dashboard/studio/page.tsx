@@ -283,6 +283,54 @@ export default function DashboardStudioPage() {
             </div>
           )}
           <button
+            onClick={async () => {
+              if (submitting) return;
+              if (!offer.trim() || !prompt.trim()) {
+                showMsg('Completa la oferta y el brief para generar variaciones.', true);
+                return;
+              }
+              setSubmitting(true);
+              setMessage('');
+              try {
+                const token = localStorage.getItem('token');
+                const res = await fetch('/api/ai/studio', {
+                  method: 'POST',
+                  headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    tool: activeTool,
+                    offer,
+                    audience,
+                    channel,
+                    prompt,
+                    customContext,
+                    businessContext,
+                    variations: true,
+                    variationCount: 3,
+                  }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error);
+                const newJobs = [data.job, ...jobs].slice(0, 20);
+                setJobs(newJobs);
+                setActiveJob(data.job);
+                if (data.usage) setUsage((u) => u ? { ...u, ...data.usage } : u);
+                showMsg('3 variaciones generadas — revisa el historial para comparar.');
+                setActiveTab('history');
+              } catch (e) {
+                showMsg(e instanceof Error ? e.message : 'Error generando variaciones.', true);
+              } finally {
+                setSubmitting(false);
+              }
+            }}
+            disabled={submitting}
+            className="flex items-center gap-1.5 border border-white/8 hover:border-cyan-400/25 text-slate-400 hover:text-cyan-300 text-xs font-medium px-3 py-2 rounded-lg transition disabled:opacity-50"
+          >
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+              <path d="M2 4h12M2 8h8M2 12h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            3 variaciones
+          </button>
+          <button
             onClick={handleGenerate}
             disabled={submitting}
             className="flex items-center gap-2 bg-cyan-400 hover:bg-cyan-300 text-black text-xs font-bold px-4 py-2 rounded-lg transition disabled:opacity-50"

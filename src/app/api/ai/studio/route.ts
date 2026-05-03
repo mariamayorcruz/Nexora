@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import {
   AI_TOOL_DEFINITIONS,
   buildAiOutput,
+  buildAiOutputVariations,
   type ContentFormat,
   type ContentPlatform,
   type ContentTone,
@@ -120,6 +121,8 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    const wantsVariations = body.variations === true;
+    const variationCount = Math.min(Number(body.variationCount ?? 3), 5);
     const tool = String(body.tool || 'ad-copy') as AiToolKey;
     const prompt = String(body.prompt || '').trim();
     const offer = String(body.offer || '').trim();
@@ -141,6 +144,10 @@ export async function POST(request: NextRequest) {
       createCaptions: Boolean(body.createCaptions),
       generateVariants: Boolean(body.generateVariants),
     };
+    const businessContext =
+      user.onboardingData && typeof user.onboardingData === 'object' && !Array.isArray(user.onboardingData)
+        ? (user.onboardingData as Record<string, unknown>)
+        : null;
 
     if (!prompt || !offer) {
       return NextResponse.json({ error: 'La idea base y la oferta son obligatorias.' }, { status: 400 });
@@ -192,14 +199,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const output = regenerate
-      ? regenerateAiOutputBeat({
+    const outputs = regenerate
+      ? [regenerateAiOutputBeat({
           output: currentOutput as unknown as Parameters<typeof regenerateAiOutputBeat>[0]['output'],
           target: regenerate,
           offer,
           audience,
+        })]
+      : wantsVariations
+      ? await buildAiOutputVariations({
+          tool,
+          prompt,
+          offer,
+          audience,
+          channel,
+          tone,
+          format,
+          platform,
+          duration,
+          businessContext,
+          customContext: String(body.customContext || '').trim(),
+          count: variationCount,
         })
-      : await buildAiOutput({
+      : [await buildAiOutput({
           tool,
           prompt,
           offer,
@@ -213,9 +235,11 @@ export async function POST(request: NextRequest) {
           outputFormat,
           captionStyle,
           smartEditOptions,
-          businessContext: user.onboardingData ?? null,
+          businessContext,
           customContext: String(body.customContext || '').trim(),
-        } as Parameters<typeof buildAiOutput>[0]);
+        })];
+
+    const output = outputs[0];
 
     let imageUrl: string | null = null;
     try {

@@ -719,20 +719,45 @@ function normalizeLlmAiOutputPayload(
 }
 
 function buildAiStudioOpenRouterSystemPrompt(): string {
-  return [
-    'Cuando el usuario provea businessContext, úsalo para personalizar TODO el copy con el nombre real del negocio, industria y objetivos. Cuando provea customContext, incorpóralo como contexto adicional prioritario.',
-    'Eres un estratega y copywriter de marketing para Nexora.',
-    'Generas contenido en español, claro, persuasivo y orientado a conversión.',
-    'Responde SOLO con un JSON válido (sin markdown, sin texto antes ni después).',
-    'Claves permitidas: headline (string), bullets (array de strings, mínimo 3 si aplica), angle (string),',
-    'cta (string, opcional), slides (opcional, array de {title, bullets}),',
-    'sections (opcional, array de {title, items}), beats (opcional, array de {id: hook|conflict|resolution|cta, label, timeLabel, startSec, endSec, text, visual}).',
-    'headline y angle son obligatorios; bullets debe ser útil y concreto salvo que slides o sections cubran el detalle.',
-    'Si tool es "repurpose": genera sections con 5 canales (Reel, Carrusel, Email, WhatsApp, Landing). Cada section.title es el canal. Cada section.items contiene 3-5 líneas de copy REAL y específico para ese canal, usando la oferta, audiencia y userPrompt del usuario. NO des instrucciones de formato, escribe el copy directamente.',
-    'Si tool es "ugc-script": genera beats con hook, conflict, resolution y cta, cada uno con texto real del guion.',
-    'Si tool es "email-sequence": genera sections con 3 emails (Bienvenida, Seguimiento, Cierre). Cada section.items contiene las líneas reales del email.',
-    'Si tool es "pitch-deck": genera slides con título y bullets reales de cada slide.',
-  ].join(' ');
+  return `Eres el mejor copywriter y estratega de marketing digital de habla hispana. Tu especialidad es crear contenido que vende, conecta emocionalmente y genera acción inmediata.
+
+REGLAS ABSOLUTAS:
+- Responde SOLO con JSON válido. Sin markdown, sin texto antes ni después, sin bloques de código.
+- Usa el nombre real del negocio (businessContext.businessName) en TODO el copy. Nunca uses placeholders genéricos.
+- Personaliza con la industria (businessContext.industries) para que el copy suene específico y experto.
+- Si hay customContext, es prioridad máxima — incorpóralo de forma natural en el copy.
+- El copy debe sonar humano, conversacional y específico. Nunca corporativo ni genérico.
+- Usa datos, números y especificidad siempre que el usuario los haya mencionado.
+
+FRAMEWORKS DE COPYWRITING QUE DEBES DOMINAR:
+- AIDA: Atención → Interés → Deseo → Acción
+- PAS: Problema → Agitación → Solución
+- Hook-Story-Offer: Gancho → Historia → Oferta irresistible
+- Before-After-Bridge: Estado actual → Estado deseado → El puente es tu oferta
+- 4Ps: Promise → Picture → Proof → Push
+
+ESTRUCTURA DEL JSON PERMITIDA:
+- headline: string — titular poderoso que para el scroll
+- bullets: array de strings — mínimo 4, máximo 8, cada uno accionable y específico
+- angle: string — el ángulo estratégico explicado en 1-2 oraciones
+- cta: string — llamada a la acción clara, específica y de bajo riesgo
+- slides: array de {title, bullets} — solo para pitch-deck
+- sections: array de {title, items} — para repurpose (un canal por section) y email-sequence
+- beats: array de {id, label, timeLabel, startSec, endSec, text, visual} — solo para ugc-script
+
+INSTRUCCIONES POR HERRAMIENTA:
+
+ad-copy: Genera 3 hooks alternativos poderosos en bullets[0], bullets[1], bullets[2]. Luego en bullets[3] el copy principal completo (150-200 palabras). En bullets[4] la prueba social sugerida. En bullets[5] el CTA con variante A/B. Usa el framework PAS o Hook-Story-Offer según el canal.
+
+creative-brief: En sections genera: (1) "Ángulos estratégicos" con 4 ángulos únicos y específicos para este negocio. (2) "Objeciones a destruir" con las 3 objeciones más comunes de esta industria y cómo demolerlas. (3) "Mensajes que convierten" con 3 mensajes probados para esta audiencia. (4) "Referencias de tono" con 3 ejemplos de cómo debería sonar el copy.
+
+ugc-script: Genera beats con guion palabra por palabra — no instrucciones, el texto real que dice la persona en cámara. Hook en 3 segundos, conflicto visceral, resolución con prueba, CTA específico.
+
+repurpose: En sections genera copy REAL para 5 canales: Reel (hook + conflicto + CTA), Carrusel (5 slides con título y texto), Email (asunto + cuerpo completo de 150 palabras + CTA), WhatsApp (mensaje conversacional de 3 líneas), Landing (headline + subtítulo + 3 bullets de beneficio + CTA). Copy real, no instrucciones.
+
+email-sequence: En sections genera 3 emails completos: Bienvenida (presenta el valor, genera confianza), Seguimiento (destruye la objeción principal), Cierre urgente (crea urgencia real, no falsa). Cada email con asunto, cuerpo completo de 100-150 palabras y CTA específico.
+
+pitch-deck: En slides genera 6 slides: Portada + promesa, El problema (con datos o señales), La solución (mecanismo único), Prueba y resultados, La oferta (qué incluye, precio si aplica), Siguiente paso (CTA específico y de bajo riesgo).`;
 }
 
 async function tryOpenRouterAiStudio(params: {
@@ -800,8 +825,8 @@ async function tryOpenRouterAiStudio(params: {
           { role: 'system', content: buildAiStudioOpenRouterSystemPrompt() },
           { role: 'user', content: JSON.stringify(userPayload, null, 2) },
         ],
-        temperature: 0.45,
-        max_tokens: 2500,
+        temperature: 0.72,
+        max_tokens: 4000,
       }),
     });
 
@@ -1137,8 +1162,45 @@ export async function buildAiOutput(params: {
   smartEditOptions?: unknown;
   businessContext?: Record<string, unknown> | null;
   customContext?: string;
+  variations?: number;
 }): Promise<AiOutputPayload> {
   const fromLlm = await tryOpenRouterAiStudio(params);
   if (fromLlm) return fromLlm;
+  console.warn('[ai-studio] Groq falló — usando fallback local');
   return buildAiOutputLocal(params);
+}
+
+export async function buildAiOutputVariations(params: {
+  tool: AiToolKey;
+  prompt: string;
+  offer: string;
+  audience: string;
+  channel: string;
+  tone?: ContentTone;
+  format?: ContentFormat;
+  platform?: ContentPlatform;
+  duration?: 15 | 30 | 60;
+  businessContext?: Record<string, unknown> | null;
+  customContext?: string;
+  count?: number;
+}): Promise<AiOutputPayload[]> {
+  const count = Math.min(params.count ?? 3, 5);
+  const tones: ContentTone[] = [
+    'viral-aggressive',
+    'pain-pleasure',
+    'curiosity-gap',
+    'ceo-direct',
+    'story-relaxed',
+  ];
+  const requests = Array.from({ length: count }, (_, i) =>
+    tryOpenRouterAiStudio({
+      ...params,
+      tone: tones[i % tones.length],
+      customContext: `${params.customContext || ''} — Variación ${i + 1} de ${count}. Tono: ${tones[i % tones.length]}. Sé completamente diferente a las otras variaciones.`.trim(),
+    }).catch(() => null)
+  );
+  const results = await Promise.all(requests);
+  const valid = results.filter((r): r is AiOutputPayload => r !== null);
+  if (valid.length === 0) return [buildAiOutputLocal(params)];
+  return valid;
 }
