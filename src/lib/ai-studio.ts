@@ -723,7 +723,7 @@ function buildAiStudioOpenRouterSystemPrompt(): string {
 
 REGLAS ABSOLUTAS:
 - Responde SOLO con JSON válido. Sin markdown, sin texto antes ni después, sin bloques de código.
-- Usa el nombre real del negocio (businessContext.businessName) en TODO el copy. Nunca uses placeholders genéricos.
+- CRÍTICO: Usa el nombre real del negocio de businessContext.businessName en TODO el copy. Si businessContext.businessName existe, úsalo SIEMPRE. JAMÁS escribas "[Nombre de la empresa]", "[Tu empresa]" ni ningún placeholder. Si no hay businessContext, usa el valor de "offer" como nombre del negocio.
 - Personaliza con la industria (businessContext.industries) para que el copy suene específico y experto.
 - Si hay customContext, es prioridad máxima — incorpóralo de forma natural en el copy.
 - El copy debe sonar humano, conversacional y específico. Nunca corporativo ni genérico.
@@ -805,6 +805,8 @@ async function tryOpenRouterAiStudio(params: {
     captionStyle: params.captionStyle,
     smartEditOptions: params.smartEditOptions,
     businessContext: params.businessContext ?? null,
+    businessName: (params.businessContext as Record<string, unknown>)?.businessName ?? params.offer ?? 'el negocio',
+    INSTRUCCION_CRITICA: `El nombre del negocio es: "${String((params.businessContext as Record<string, unknown>)?.businessName ?? params.offer ?? 'el negocio')}". Úsalo exactamente así en todo el copy. NUNCA uses placeholders.`,
     customContext: params.customContext || '',
     constraints: [
       'Adapta el formato al tool (anuncio, brief, guion UGC, repurpose, email, pitch).',

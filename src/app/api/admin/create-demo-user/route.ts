@@ -41,7 +41,13 @@ export async function POST(request: NextRequest) {
         name,
         password: hashedPassword,
         onboardingCompletedAt: new Date(),
-        onboardingData: Prisma.JsonNull,
+        onboardingData: {
+          businessName: 'Mayor Excelsior Cleaning',
+          industries: ['Limpieza comercial', 'Servicios para oficinas'],
+          targetAudience: 'Gerentes de oficinas y administradores de edificios en Miami',
+          mainGoal: 'Conseguir contratos mensuales de limpieza sin compromisos largos',
+          location: 'Miami, Florida',
+        },
         subscription: {
           upsert: {
             update: {
@@ -66,7 +72,13 @@ export async function POST(request: NextRequest) {
         name,
         password: hashedPassword,
         onboardingCompletedAt: new Date(),
-        onboardingData: Prisma.JsonNull,
+        onboardingData: {
+          businessName: 'Mayor Excelsior Cleaning',
+          industries: ['Limpieza comercial', 'Servicios para oficinas'],
+          targetAudience: 'Gerentes de oficinas y administradores de edificios en Miami',
+          mainGoal: 'Conseguir contratos mensuales de limpieza sin compromisos largos',
+          location: 'Miami, Florida',
+        },
         subscription: {
           create: {
             plan: 'professional',
