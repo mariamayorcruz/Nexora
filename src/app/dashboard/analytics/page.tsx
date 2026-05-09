@@ -154,13 +154,13 @@ export default function AnalyticsPage() {
 
   if (!user?.entitlements?.capabilities.canUseAdvancedAnalytics) {
     return (
-      <section className="rounded-2xl border border-white/6 bg-slate-900 p-8">
+      <section className="rounded-[28px] bg-[#040810] p-8">
         <p className="text-xs uppercase tracking-[0.28em] text-cyan-300">Analitica avanzada</p>
-        <h1 className="mt-3 text-3xl font-semibold text-white">Desbloquea inteligencia de crecimiento.</h1>
+        <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-white">Desbloquea inteligencia de crecimiento.</h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
           Esta vista une campañas, leads y pipeline en una lectura ejecutiva limpia.
         </p>
-        <div className="mt-5 rounded-2xl border border-white/6 bg-[#080e1a] p-4 text-sm text-slate-300">
+        <div className="mt-5 rounded-[22px] bg-[#030610] p-4 text-sm text-slate-300">
           {user?.entitlements?.capabilities.upgradeCta}
         </div>
         <Link
@@ -186,11 +186,11 @@ export default function AnalyticsPage() {
   ];
 
   return (
-    <div className="space-y-5 bg-[#080e1a]">
-      <section className="rounded-2xl border border-white/6 bg-slate-900 p-6">
+    <div className="space-y-5">
+      <section className="rounded-[28px] bg-[#040810] p-6">
         <p className="text-xs uppercase tracking-[0.26em] text-cyan-300">Control ejecutivo</p>
-        <h1 className="mt-2 text-3xl font-semibold text-white">Analítica</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+        <h1 className="mt-2 text-[34px] font-semibold tracking-[-0.03em] text-white">Reportes</h1>
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
           Gasto, retorno, captación y pipeline en una sola vista.
         </p>
       </section>
@@ -204,17 +204,17 @@ export default function AnalyticsPage() {
         <Kpi label="Cierres" value={metrics.crmWon.toLocaleString()} />
       </section>
 
-      <section className="rounded-2xl border border-white/6 bg-slate-900 p-5">
+      <section className="rounded-[28px] bg-[#040810] p-5">
         <h2 className="text-lg font-semibold text-white">Embudo de capturas</h2>
         <div className="mt-4 grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-white/6 bg-[#080e1a] px-4 py-4">
+          <div className="rounded-[22px] bg-[#030610] px-4 py-4">
             <p className="text-3xl font-bold text-white">{metrics.capturedLeads.toLocaleString()}</p>
             <p className="mt-1 text-xs uppercase tracking-[0.14em] text-slate-400">Capturas totales</p>
             <p className="mt-2 text-sm text-slate-400">
               {metrics.capturedLeads > 0 ? '100' : '0'}% del total
             </p>
           </div>
-          <div className="rounded-2xl border border-white/6 bg-[#080e1a] px-4 py-4">
+          <div className="rounded-[22px] bg-[#030610] px-4 py-4">
             <p className="text-3xl font-bold text-white">{metrics.convertedCaptures.toLocaleString()}</p>
             <p className="mt-1 text-xs uppercase tracking-[0.14em] text-slate-400">Pasaron a CRM</p>
             <p className="mt-2 text-sm text-slate-400">
@@ -224,7 +224,7 @@ export default function AnalyticsPage() {
               % del total
             </p>
           </div>
-          <div className="rounded-2xl border border-white/6 bg-[#080e1a] px-4 py-4">
+          <div className="rounded-[22px] bg-[#030610] px-4 py-4">
             <p className="text-3xl font-bold text-white">{metrics.paidCaptures.toLocaleString()}</p>
             <p className="mt-1 text-xs uppercase tracking-[0.14em] text-slate-400">Pagaron</p>
             <p className="mt-2 text-sm text-slate-400">
@@ -238,7 +238,7 @@ export default function AnalyticsPage() {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-        <div className="rounded-2xl border border-white/6 bg-slate-900 p-5">
+        <div className="rounded-[28px] bg-[#040810] p-5">
           <h2 className="text-lg font-semibold text-white">Rendimiento clave</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <Row label="Impresiones" value={metrics.impressions.toLocaleString()} />
@@ -249,7 +249,7 @@ export default function AnalyticsPage() {
             <Row label="Pipeline abierto" value={`$${Math.round(metrics.pipelineValue).toLocaleString()}`} />
           </div>
 
-          <div className="mt-4 rounded-2xl border border-white/6 bg-[#080e1a] p-3">
+          <div className="mt-4 rounded-[22px] bg-[#030610] p-3">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Top plataformas por gasto</p>
             <div className="mt-2 space-y-2">
               {metrics.topPlatforms.length === 0 ? (
@@ -258,7 +258,7 @@ export default function AnalyticsPage() {
                 metrics.topPlatforms.map(([platform, spend]) => (
                   <div
                     key={platform}
-                    className="flex items-center justify-between rounded-xl border border-white/6 bg-slate-900 px-3 py-2"
+                    className="flex items-center justify-between rounded-xl bg-white/[0.03] px-3 py-2"
                   >
                     <span className="text-sm capitalize text-slate-200">{platform}</span>
                     <span className="text-sm font-semibold text-white">
@@ -271,13 +271,13 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/6 bg-slate-900 p-5">
+        <div className="rounded-[28px] bg-[#040810] p-5">
           <h2 className="text-lg font-semibold text-white">Proximas jugadas</h2>
           <div className="mt-4 space-y-2">
             {actionItems.map((item) => (
               <div
                 key={item}
-                className="rounded-2xl border border-white/6 bg-[#080e1a] px-3 py-3 text-sm text-slate-300"
+                className="rounded-[20px] bg-[#030610] px-4 py-3 text-sm text-slate-300"
               >
                 {item}
               </div>
@@ -306,16 +306,16 @@ export default function AnalyticsPage() {
 
 function Kpi({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-white/6 bg-slate-900 px-4 py-4">
-      <p className="text-xs uppercase tracking-[0.18em] text-slate-400">{label}</p>
-      <p className="mt-2 text-3xl font-bold text-white">{value}</p>
-    </div>
+      <div className="rounded-[24px] bg-[#040810] px-4 py-4">
+        <p className="text-xs uppercase tracking-[0.18em] text-slate-400">{label}</p>
+        <p className="mt-2 text-3xl font-bold text-white">{value}</p>
+      </div>
   );
 }
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-white/6 bg-[#080e1a] px-3 py-3">
+    <div className="rounded-[20px] bg-[#030610] px-3 py-3">
       <p className="text-xs text-slate-400">{label}</p>
       <p className="text-base font-semibold text-white">{value}</p>
     </div>

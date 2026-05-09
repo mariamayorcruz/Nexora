@@ -82,7 +82,7 @@ export default function BillingPage() {
   const fetchSubscription = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/users/me', {
+      const response = await fetch('/api/users/me?allowIncomplete=1', {
         headers: { Authorization: `Bearer ${token}` },
         cache: 'no-store',
       });

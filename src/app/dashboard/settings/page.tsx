@@ -237,21 +237,21 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <section className="rounded-2xl border border-white/6 bg-slate-900 px-8 py-8">
+      <section className="rounded-[28px] bg-[#040810] px-6 py-7 sm:px-8">
         <p className="text-xs uppercase tracking-wider text-cyan-400">Configuración</p>
-        <h1 className="mt-2 text-3xl font-bold text-white">Configuración de Cuenta</h1>
+        <h1 className="mt-2 text-[34px] font-semibold tracking-[-0.03em] text-white">Configuración de Cuenta</h1>
         <p className="mt-2 text-sm text-slate-400">Preferencias personales, notificaciones y seguridad en una sola vista.</p>
       </section>
 
       {/* Status message */}
       {statusMessage && (
-        <div className="rounded-2xl border border-cyan-400/20 bg-slate-900 p-4 text-sm text-cyan-300">
+        <div className="rounded-[22px] bg-cyan-500/10 p-4 text-sm text-cyan-300">
           {statusMessage}
         </div>
       )}
 
       {/* Integrations */}
-      <section className="rounded-2xl border border-white/6 bg-slate-900 p-6">
+      <section className="rounded-[28px] bg-[#040810] p-6">
         <p className="text-xs uppercase tracking-wider text-slate-400">Integraciones</p>
         <h2 className="mt-2 text-xl font-semibold text-white">Conexiones activas</h2>
         {loadingIntegration ? (
@@ -260,7 +260,7 @@ export default function SettingsPage() {
           <p className="mt-4 text-sm text-rose-400">No se pudo obtener el estado de las integraciones.</p>
         ) : (
           <div className="mt-4 space-y-3">
-            <div className="flex items-center justify-between rounded-2xl border border-white/6 bg-[#080e1a] px-5 py-4">
+            <div className="flex items-center justify-between rounded-[22px] bg-[#030610] px-5 py-4">
               <div>
                 <p className="text-sm font-medium text-white">Meta (Facebook / Instagram)</p>
                 {integrationStatus.metaAppId && (
@@ -273,7 +273,7 @@ export default function SettingsPage() {
                 <span className="rounded-full border border-rose-400/20 bg-rose-500/10 px-3 py-1 text-xs font-semibold text-rose-300">No conectado</span>
               )}
             </div>
-            <div className="flex items-center justify-between rounded-2xl border border-white/6 bg-[#080e1a] px-5 py-4">
+            <div className="flex items-center justify-between rounded-[22px] bg-[#030610] px-5 py-4">
               <p className="text-sm font-medium text-white">Proveedor IA</p>
               {integrationStatus.aiConnected ? (
                 <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">{integrationStatus.aiProvider} conectado</span>
@@ -286,7 +286,7 @@ export default function SettingsPage() {
       </section>
 
       {/* Profile */}
-      <section className="rounded-2xl border border-white/6 bg-slate-900 p-6">
+      <section className="rounded-[28px] bg-[#040810] p-6">
         <p className="text-xs uppercase tracking-wider text-slate-400">Perfil</p>
         <h2 className="mt-2 text-xl font-semibold text-white">Información de Perfil</h2>
         <div className="mt-6 space-y-5">
@@ -296,7 +296,7 @@ export default function SettingsPage() {
               type="text"
               value={profileName}
               onChange={(e) => setProfileName(e.target.value)}
-              className="w-full rounded-xl bg-slate-800/50 border border-slate-700 px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
+            className="w-full rounded-2xl bg-[#030610] px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
             />
           </label>
           <label className="block">
@@ -305,14 +305,14 @@ export default function SettingsPage() {
               type="email"
               defaultValue={user?.email}
               disabled
-              className="w-full cursor-not-allowed rounded-xl bg-slate-800/30 border border-slate-700/50 px-4 py-3 text-sm text-slate-500"
+            className="w-full cursor-not-allowed rounded-2xl bg-[#030610] px-4 py-3 text-sm text-slate-500"
             />
             <p className="mt-1 text-xs text-slate-500">El email no puede ser modificado</p>
           </label>
           <button
             onClick={() => void handleSaveProfile()}
             disabled={savingProfile}
-            className="rounded-xl border border-white/10 px-5 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white disabled:opacity-50"
+            className="rounded-2xl bg-white/[0.04] px-5 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.06] hover:text-white disabled:opacity-50"
           >
             {savingProfile ? 'Guardando...' : 'Guardar cambios'}
           </button>
@@ -320,7 +320,7 @@ export default function SettingsPage() {
       </section>
 
       {/* Notifications */}
-      <section className="rounded-2xl border border-white/6 bg-slate-900 p-6">
+      <section className="rounded-[28px] bg-[#040810] p-6">
         <p className="text-xs uppercase tracking-wider text-slate-400">Notificaciones</p>
         <h2 className="mt-2 text-xl font-semibold text-white">Preferencias</h2>
         <div className="mt-6 space-y-3">
@@ -329,7 +329,7 @@ export default function SettingsPage() {
             { label: 'Reportes semanales', checked: weeklyReports, onChange: setWeeklyReports },
             { label: 'Ofertas y promociones', checked: offers, onChange: setOffers },
           ].map(({ label, checked, onChange }) => (
-            <label key={label} className="flex cursor-pointer items-center gap-4 rounded-2xl border border-white/6 bg-[#080e1a] px-5 py-4">
+            <label key={label} className="flex cursor-pointer items-center gap-4 rounded-[22px] bg-[#030610] px-5 py-4">
               <input
                 type="checkbox"
                 checked={checked}
@@ -342,7 +342,7 @@ export default function SettingsPage() {
           <button
             onClick={() => void handleSaveNotifications()}
             disabled={savingNotifications}
-            className="mt-2 rounded-xl border border-white/10 px-5 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white disabled:opacity-50"
+            className="mt-2 rounded-2xl bg-white/[0.04] px-5 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.06] hover:text-white disabled:opacity-50"
           >
             {savingNotifications ? 'Guardando...' : 'Guardar preferencias'}
           </button>
@@ -350,21 +350,21 @@ export default function SettingsPage() {
       </section>
 
       {/* Security */}
-      <section className="rounded-2xl border border-white/6 bg-slate-900 p-6">
+      <section className="rounded-[28px] bg-[#040810] p-6">
         <p className="text-xs uppercase tracking-wider text-slate-400">Seguridad</p>
         <h2 className="mt-2 text-xl font-semibold text-white">Acceso y privacidad</h2>
         <div className="mt-6 space-y-3">
           <button
             onClick={() => void handlePasswordChange()}
             disabled={processingPassword}
-            className="w-full rounded-2xl border border-white/6 bg-[#080e1a] px-5 py-4 text-left transition hover:border-white/10 disabled:opacity-50"
+            className="w-full rounded-[22px] bg-[#030610] px-5 py-4 text-left transition-all duration-150 hover:bg-white/[0.04] disabled:opacity-50"
           >
             <p className="text-sm font-semibold text-white">Cambiar Contraseña</p>
             <p className="mt-0.5 text-xs text-slate-400">Actualiza tu contraseña regularmente</p>
           </button>
           <button
             onClick={handleTwoFactor}
-            className="w-full rounded-2xl border border-white/6 bg-[#080e1a] px-5 py-4 text-left transition hover:border-white/10"
+            className="w-full rounded-[22px] bg-[#030610] px-5 py-4 text-left transition-all duration-150 hover:bg-white/[0.04]"
           >
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-white">Autenticación de Dos Factores</p>
@@ -374,14 +374,14 @@ export default function SettingsPage() {
           </button>
           <button
             onClick={handleSessions}
-            className="w-full rounded-2xl border border-white/6 bg-[#080e1a] px-5 py-4 text-left transition hover:border-white/10"
+            className="w-full rounded-[22px] bg-[#030610] px-5 py-4 text-left transition-all duration-150 hover:bg-white/[0.04]"
           >
             <p className="text-sm font-semibold text-white">Sesiones Activas</p>
             <p className="mt-0.5 text-xs text-slate-400">Gestiona tus sesiones conectadas</p>
           </button>
 
           {sessionsVisible && (
-            <div className="rounded-2xl border border-white/6 bg-[#080e1a] p-5">
+            <div className="rounded-[22px] bg-[#030610] p-5">
               <div className="mb-4 flex items-center justify-between">
                 <p className="text-sm font-semibold text-slate-200">Dispositivos con sesión</p>
                 <button
@@ -432,7 +432,7 @@ export default function SettingsPage() {
       </section>
 
       {/* Cancel subscription */}
-      <section className="rounded-2xl border border-rose-400/20 bg-slate-900 p-6">
+      <section className="rounded-[28px] bg-[#040810] p-6">
         <p className="text-xs uppercase tracking-wider text-rose-400">Zona de peligro</p>
         <h2 className="mt-2 text-xl font-semibold text-white">Cancelar Suscripción</h2>
         <p className="mt-2 text-sm text-slate-400">Tu cuenta y datos se mantienen. La cancelación aplica al cierre del período vigente.</p>

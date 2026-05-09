@@ -2,29 +2,26 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
-import { BarChart2, LayoutDashboard, LifeBuoy, Megaphone, Receipt, Settings2, ShieldCheck, Users, Wand2, Zap } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  CalendarDays,
+  CreditCard,
+  Headphones,
+  Home,
+  MessageSquareText,
+  PanelsTopLeft,
+  Settings2,
+  Sparkles,
+  SquareChartGantt,
+  Workflow,
+} from 'lucide-react';
 import DashboardChatbot from '@/components/DashboardChatbot';
 import { useAppLanguage } from '@/hooks/use-app-language';
 
-const SIDEBAR_ICONS: Record<string, React.ElementType> = {
-  OV: LayoutDashboard,
-  CL: Users,
-  AU: Zap,
-  CN: Megaphone,
-  IA: Wand2,
-  FA: Receipt,
-  SP: LifeBuoy,
-  CO: Settings2,
-  AN: BarChart2,
-  AD: ShieldCheck,
-};
-
-interface DashboardUser {
+type DashboardUser = {
   id?: string;
   email: string;
   name?: string | null;
-  onboardingStartedAt?: string | null;
   onboardingCompletedAt?: string | null;
   onboardingData?: Record<string, unknown> | null;
   isAdmin?: boolean;
@@ -33,7 +30,6 @@ interface DashboardUser {
   entitlements?: {
     marketingLabel?: string;
     capabilities?: {
-      canUseRadar?: boolean;
       canUseAdvancedAnalytics?: boolean;
     } | null;
   } | null;
@@ -41,39 +37,55 @@ interface DashboardUser {
     plan?: string | null;
     status?: string | null;
   } | null;
+};
+
+type MenuItem = {
+  href: string;
+  labelEs: string;
+  labelEn: string;
+  icon: React.ElementType;
+  badge?: number;
+  badgeTone?: 'cyan' | 'red';
+};
+
+const PATH_META: Record<string, { es: string; en: string }> = {
+  dashboard: { es: 'Inicio', en: 'Home' },
+  crm: { es: 'CRM & Leads', en: 'CRM & Leads' },
+  conversaciones: { es: 'Conversaciones', en: 'Conversations' },
+  studio: { es: 'Studio IA', en: 'AI Studio' },
+  calendario: { es: 'Calendario', en: 'Calendar' },
+  reportes: { es: 'Reportes', en: 'Reports' },
+  billing: { es: 'Facturación', en: 'Billing' },
+  integraciones: { es: 'Integraciones', en: 'Integrations' },
+  settings: { es: 'Ajustes', en: 'Settings' },
+  support: { es: 'Soporte', en: 'Support' },
+  admin: { es: 'Admin', en: 'Admin' },
+};
+
+function getInitials(value?: string | null) {
+  return (value || 'NX')
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
 }
 
-type MenuLinkRow = { kind: 'link'; label: string; href: string; icon: string };
-type MenuGroupRow = {
-  kind: 'group';
-  label: string;
-  icon: string;
-  children: { label: string; href: string }[];
-};
-type MenuRow = MenuLinkRow | MenuGroupRow;
+function formatPlanLabel(user: DashboardUser | null) {
+  if (!user) return 'Scale';
+  return user?.entitlements?.marketingLabel || user?.founderPlan || user?.subscription?.plan || 'Scale';
+}
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { language, setLanguage } = useAppLanguage();
   const [user, setUser] = useState<DashboardUser | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [billingCheckoutFocus, setBillingCheckoutFocus] = useState(false);
+  const [crmCount, setCrmCount] = useState(0);
+  const [conversationCount, setConversationCount] = useState(0);
   const hasRedirected = useRef(false);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    const searchParams = new URLSearchParams(window.location.search);
-    setBillingCheckoutFocus(
-      pathname === '/dashboard/billing' &&
-        searchParams.get('autostart') === '1' &&
-        Boolean(searchParams.get('plan'))
-    );
-  }, [pathname]);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -82,7 +94,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       return;
     }
 
-    const fetchUser = async () => {
+    const fetchData = async () => {
       try {
         const meUrl =
           pathname === '/dashboard/billing'
@@ -91,35 +103,53 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         const response = await fetch(meUrl, {
           headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
         });
 
         if (!response.ok) {
           const payload = await response.json().catch(() => null);
-
           if (response.status === 403 && payload?.code === 'SUBSCRIPTION_REQUIRED') {
-            if (hasRedirected.current) return;
-            hasRedirected.current = true;
-            router.push('/#pricing');
+            if (!hasRedirected.current) {
+              hasRedirected.current = true;
+              router.push('/#pricing');
+            }
             return;
           }
-
           throw new Error('Failed to fetch user');
         }
 
         const data = await response.json();
-        const subscriptionStatus = data?.user?.subscription?.status?.toLowerCase?.() || null;
-        const onboardingCompletedAt = data?.user?.onboardingCompletedAt ?? null;
+        const nextUser = data.user as DashboardUser;
+        const subscriptionStatus = nextUser?.subscription?.status?.toLowerCase?.() || null;
 
-        if (subscriptionStatus === 'active' && onboardingCompletedAt === null) {
-          if (hasRedirected.current) return;
-          hasRedirected.current = true;
-          router.push('/onboarding');
+        if (subscriptionStatus === 'active' && nextUser?.onboardingCompletedAt == null) {
+          if (!hasRedirected.current) {
+            hasRedirected.current = true;
+            router.push('/onboarding');
+          }
           return;
         }
 
-        setUser(data.user);
+        setUser(nextUser);
+        setCrmCount(Number(data?.overviewFunnel?.crmLeads || 0));
+
+        try {
+          const leadsResponse = await fetch('/api/crm/leads', {
+            headers: { Authorization: `Bearer ${token}` },
+            cache: 'no-store',
+          });
+          const leadsData = await leadsResponse.json().catch(() => ({ leads: [] }));
+          const leads = Array.isArray(leadsData?.leads) ? leadsData.leads : [];
+          const activeConversations = leads.filter(
+            (lead: Record<string, unknown>) =>
+              String(lead.stage || '') !== 'won' && Boolean(lead.phone || lead.email)
+          ).length;
+          setConversationCount(activeConversations);
+        } catch {
+          setConversationCount(0);
+        }
       } catch (error) {
-        console.error('Error fetching user:', error);
+        console.error('Error fetching dashboard shell:', error);
         localStorage.removeItem('token');
         router.push('/auth/login');
       } finally {
@@ -127,78 +157,78 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       }
     };
 
-    void fetchUser();
-  }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+    void fetchData();
+  }, [pathname, router]);
 
-  const menuRows: MenuRow[] = [
-    { kind: 'link', label: language === 'en' ? 'Overview' : 'Resumen', href: '/dashboard', icon: 'OV' },
-    {
-      kind: 'group',
-      label: language === 'en' ? 'Clients' : 'Clientes',
-      icon: 'CL',
-      children: [
-        { label: language === 'en' ? 'List' : 'Lista', href: '/dashboard/leads' },
-        { label: 'CRM', href: '/dashboard/crm' },
-        { label: 'Pipeline', href: '/dashboard/pipeline' },
-      ],
-    },
-    {
-      kind: 'group',
-      label: language === 'en' ? 'Automations' : 'Automatizaciones',
-      icon: 'AU',
-      children: [
-        {
-          label: language === 'en' ? 'Sequences & calendar' : 'Secuencias y calendario',
-          href: '/dashboard/crm',
-        },
-      ],
-    },
-    {
-      kind: 'link',
-      label: language === 'en' ? 'Campaign Hub' : 'Campañas + Canales',
-      href: '/dashboard/connect',
-      icon: 'CN',
-    },
-    { kind: 'link', label: 'Nexora Studio', href: '/dashboard/studio', icon: 'IA' },
-    { kind: 'link', label: language === 'en' ? 'Billing' : 'Facturación', href: '/dashboard/billing', icon: 'FA' },
-    { kind: 'link', label: language === 'en' ? 'Support' : 'Soporte', href: '/dashboard/support', icon: 'SP' },
-    { kind: 'link', label: language === 'en' ? 'Settings' : 'Configuración', href: '/dashboard/settings', icon: 'CO' },
-  ];
+  const menu = useMemo<MenuItem[]>(() => {
+    return [
+      { href: '/dashboard', labelEs: 'Inicio', labelEn: 'Home', icon: Home },
+      {
+        href: '/dashboard/crm',
+        labelEs: 'CRM & Leads',
+        labelEn: 'CRM & Leads',
+        icon: Workflow,
+        badge: crmCount,
+        badgeTone: 'cyan',
+      },
+      {
+        href: '/dashboard/conversaciones',
+        labelEs: 'Conversaciones',
+        labelEn: 'Conversations',
+        icon: MessageSquareText,
+        badge: conversationCount,
+        badgeTone: 'red',
+      },
+      { href: '/dashboard/studio', labelEs: 'Studio IA', labelEn: 'AI Studio', icon: Sparkles },
+      { href: '/dashboard/calendario', labelEs: 'Calendario', labelEn: 'Calendar', icon: CalendarDays },
+      { href: '/dashboard/reportes', labelEs: 'Reportes', labelEn: 'Reports', icon: SquareChartGantt },
+      { href: '/dashboard/billing', labelEs: 'Facturación', labelEn: 'Billing', icon: CreditCard },
+      { href: '/dashboard/integraciones', labelEs: 'Integraciones', labelEn: 'Integrations', icon: PanelsTopLeft },
+      { href: '/dashboard/settings', labelEs: 'Ajustes', labelEn: 'Settings', icon: Settings2 },
+      { href: '/dashboard/support', labelEs: 'Soporte', labelEn: 'Support', icon: Headphones },
+    ];
+  }, [conversationCount, crmCount]);
 
-  if (user?.entitlements?.capabilities?.canUseAdvancedAnalytics) {
-    menuRows.splice(4, 0, {
-      kind: 'link',
-      label: language === 'en' ? 'Analytics' : 'Analítica',
-      href: '/dashboard/analytics',
-      icon: 'AN',
+  const breadcrumbs = useMemo(() => {
+    const pieces = pathname.split('/').filter(Boolean).slice(1);
+    const root = [{ href: '/dashboard', label: language === 'en' ? 'Dashboard' : 'Dashboard' }];
+    let current = '/dashboard';
+
+    const rest = pieces.map((piece) => {
+      current += `/${piece}`;
+      const meta = PATH_META[piece];
+      return {
+        href: current,
+        label: language === 'en' ? meta?.en || piece : meta?.es || piece,
+      };
     });
-  }
 
-  const isChildActive = (href: string) => {
-    if (href === '/dashboard/connect') {
-      return pathname === '/dashboard/connect' || pathname.startsWith('/dashboard/campaigns');
-    }
-    if (href === '/dashboard/leads') {
-      return pathname === '/dashboard/leads' || pathname.startsWith('/dashboard/leads/');
-    }
-    if (href === '/dashboard/crm') {
-      return pathname === '/dashboard/crm' || pathname.startsWith('/dashboard/crm/');
-    }
-    if (href === '/dashboard/pipeline') {
-      return pathname === '/dashboard/pipeline' || pathname.startsWith('/dashboard/pipeline/');
-    }
-    return pathname === href;
-  };
+    return root.concat(rest);
+  }, [language, pathname]);
 
-  const canAccessAdminPanel = Boolean(user?.isAdmin || user?.founderAccess);
-  if (canAccessAdminPanel) {
-    menuRows.push({
-      kind: 'link',
-      label: language === 'en' ? 'Admin panel' : 'Panel admin',
-      href: '/admin',
-      icon: 'AD',
-    });
-  }
+  const topbarActions = useMemo(() => {
+    if (pathname.startsWith('/dashboard/crm')) {
+      return [
+        { href: '/dashboard/conversaciones', label: language === 'en' ? 'Open inbox' : 'Abrir inbox' },
+        { href: '/dashboard/calendario', label: language === 'en' ? 'Schedule' : 'Agendar' },
+      ];
+    }
+    if (pathname.startsWith('/dashboard/studio')) {
+      return [{ href: '/dashboard/reportes', label: language === 'en' ? 'View reports' : 'Ver reportes' }];
+    }
+    if (pathname.startsWith('/dashboard/conversaciones')) {
+      return [
+        { href: '/dashboard/crm', label: language === 'en' ? 'View lead' : 'Ver lead' },
+        { href: '/dashboard/calendario', label: language === 'en' ? 'Book slot' : 'Agendar cita' },
+      ];
+    }
+    return [
+      { href: '/dashboard/studio', label: language === 'en' ? 'Generate campaign' : 'Generar campaña' },
+      { href: '/dashboard/crm', label: language === 'en' ? 'Review pipeline' : 'Revisar pipeline' },
+    ];
+  }, [language, pathname]);
+
+  const isActive = (href: string) => (href === '/dashboard' ? pathname === href : pathname.startsWith(href));
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -207,179 +237,183 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-[#05080f]">
         <div className="text-center">
-          <div className="inline-block h-12 w-12 animate-spin rounded-full border-b-2 border-b-primary" />
-          <p className="mt-4 text-gray-600">Cargando...</p>
+          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-b-cyan-400" />
+          <p className="mt-4 text-sm text-slate-500">{language === 'en' ? 'Loading dashboard...' : 'Cargando dashboard...'}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-950 font-sans">
-      {!billingCheckoutFocus && (
+    <div className="flex min-h-screen bg-[#05080f] text-slate-100">
       <aside
-        className={`fixed z-40 h-screen w-64 overflow-y-auto border-r border-white/5 bg-[#080e1a] transition-transform lg:relative ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        className={`fixed inset-y-0 left-0 z-40 flex w-[196px] flex-col bg-[#040810] transition-transform duration-150 lg:translate-x-0 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="border-b border-white/6 px-6 py-6">
+        <div className="px-4 pb-4 pt-5">
           <Link href="/dashboard" className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-cyan-400 text-sm font-bold text-slate-950 shadow-[0_10px_30px_rgba(34,211,238,0.25)]">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/[0.04] text-base font-semibold text-white">
               NX
             </div>
-            <div>
-              <p className="text-lg font-bold tracking-tight text-white">Nexora</p>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold tracking-[-0.03em] text-white">Nexora</p>
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+              </div>
+              <span className="mt-2 inline-flex rounded-full bg-cyan-500/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-cyan-300">
+                ✦ Plan {formatPlanLabel(user)}
+              </span>
             </div>
           </Link>
         </div>
 
-        <nav className="space-y-2 px-4 py-5">
-          <p className="px-3 pb-2 text-[10px] uppercase tracking-[0.28em] text-white/25">
-            {language === 'en' ? 'Navigation' : 'Navegación'}
-          </p>
-          {menuRows.map((row) => {
-            if (row.kind === 'link') {
-              const active = isChildActive(row.href);
-              const IconComponent = SIDEBAR_ICONS[row.icon] ?? LayoutDashboard;
+        <nav className="flex-1 px-3 pb-4">
+          <div className="space-y-1">
+            {menu.slice(0, 5).map((item) => {
+              const Icon = item.icon;
+              const active = isActive(item.href);
               return (
                 <Link
-                  key={row.href}
-                  href={row.href}
+                  key={item.href}
+                  href={item.href}
                   onClick={() => setSidebarOpen(false)}
-                  className={`relative flex items-center gap-3 rounded-xl px-4 py-2.5 transition-all duration-150 ${
-                    active
-                      ? 'bg-cyan-500/12 text-white'
-                      : 'text-slate-400/70 hover:bg-white/4 hover:text-white/85'
+                  className={`relative flex items-center gap-3 rounded-2xl px-3 py-2.5 transition-all duration-150 ${
+                    active ? 'bg-[rgba(6,182,212,0.07)] text-white' : 'text-slate-500 hover:bg-white/[0.03] hover:text-white'
                   }`}
                 >
-                  {active && <span className="absolute left-0 top-1/2 h-7 w-[3px] -translate-y-1/2 rounded-r-full bg-cyan-500" />}
-                  <span
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-                      active ? 'text-cyan-300' : 'text-slate-500'
-                    }`}
-                  >
-                    <IconComponent size={16} />
-                  </span>
-                  <span className="text-sm font-medium">{row.label}</span>
+                  {active ? <span className="absolute left-0 top-2 bottom-2 w-[2px] rounded-r-full bg-cyan-400" /> : null}
+                  <Icon className={`h-4 w-4 ${active ? 'text-cyan-300' : 'text-slate-600'}`} />
+                  <span className="min-w-0 flex-1 truncate text-sm">{language === 'en' ? item.labelEn : item.labelEs}</span>
+                  {item.badge ? (
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                        item.badgeTone === 'red' ? 'bg-rose-500/15 text-rose-300' : 'bg-cyan-500/12 text-cyan-300'
+                      }`}
+                    >
+                      {item.badge}
+                    </span>
+                  ) : null}
                 </Link>
               );
-            }
+            })}
+          </div>
 
-            const IconComponent = SIDEBAR_ICONS[row.icon] ?? LayoutDashboard;
-            const groupActive = row.children.some((c) => isChildActive(c.href));
-            return (
-              <div key={row.label} className="space-y-1">
-                <div
-                  className={`flex items-center gap-3 rounded-xl px-4 py-2 ${
-                    groupActive ? 'text-white' : 'text-white/25'
+          <div className="my-4 h-px bg-white/[0.05]" />
+
+          <div className="space-y-1">
+            {menu.slice(5).map((item) => {
+              const Icon = item.icon;
+              const active = isActive(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setSidebarOpen(false)}
+                  className={`relative flex items-center gap-3 rounded-2xl px-3 py-2.5 transition-all duration-150 ${
+                    active ? 'bg-[rgba(6,182,212,0.07)] text-white' : 'text-slate-500 hover:bg-white/[0.03] hover:text-white'
                   }`}
                 >
-                  <span
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-                      groupActive ? 'text-cyan-300' : 'text-slate-600'
-                    }`}
-                  >
-                    <IconComponent size={16} />
-                  </span>
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.28em]">
-                    {row.label}
-                  </span>
-                </div>
-                <div className="ml-7 space-y-0.5 border-l border-white/8 pl-3">
-                  {row.children.map((child) => {
-                    const active = isChildActive(child.href);
-                    return (
-                      <Link
-                        key={`${row.label}-${child.href}-${child.label}`}
-                        href={child.href}
-                        onClick={() => setSidebarOpen(false)}
-                        className={`flex items-center rounded-lg px-3 py-2 text-xs transition-all duration-150 ${
-                          active
-                            ? 'bg-cyan-500/10 font-medium text-white'
-                            : 'text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        {child.label}
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
+                  {active ? <span className="absolute left-0 top-2 bottom-2 w-[2px] rounded-r-full bg-cyan-400" /> : null}
+                  <Icon className={`h-4 w-4 ${active ? 'text-cyan-300' : 'text-slate-600'}`} />
+                  <span className="truncate text-sm">{language === 'en' ? item.labelEn : item.labelEs}</span>
+                </Link>
+              );
+            })}
+          </div>
         </nav>
 
-        <div className="mt-auto border-t border-white/6 px-4 py-4">
-          <div className="mb-4 flex gap-2 px-2">
+        <div className="border-t border-white/[0.05] px-3 py-4">
+          <div className="mb-3 flex items-center gap-1 rounded-full bg-[#030610] p-1">
             {(['es', 'en'] as const).map((option) => (
               <button
                 key={option}
+                type="button"
                 onClick={() => setLanguage(option)}
-                className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] transition-all duration-150 ${
-                  language === option
-                    ? 'bg-white/6 text-cyan-300'
-                    : 'text-slate-500 hover:text-white/80'
+                className={`flex-1 rounded-full px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] transition-all duration-150 ${
+                  language === option ? 'bg-white/[0.05] text-cyan-300' : 'text-slate-500 hover:text-white'
                 }`}
               >
                 {option}
               </button>
             ))}
           </div>
-
-          <div className="flex items-center gap-3 rounded-2xl px-2 py-2">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cyan-500/20 text-sm font-semibold uppercase text-cyan-300">
-              {(user?.email || 'NX').slice(0, 2)}
+          <div className="rounded-[20px] bg-[#030610] p-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-cyan-500/10 text-xs font-semibold text-cyan-300">
+                {getInitials(user?.name || user?.email)}
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm text-white">{user?.name || user?.email}</p>
+                <p className="truncate text-[11px] text-slate-500">✦ Plan {formatPlanLabel(user)}</p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-white">{user?.email}</p>
-              <p className="mt-1 text-[11px] uppercase tracking-[0.2em] text-cyan-400">
-                {user?.founderAccess
-                  ? language === 'en'
-                    ? 'Founder plan'
-                    : 'Plan fundador'
-                  : `${language === 'en' ? 'Plan' : 'Plan'} ${user?.entitlements?.marketingLabel || user?.founderPlan || user?.subscription?.plan || 'starter'}`}
-              </p>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="mt-3 w-full rounded-2xl bg-white/[0.03] px-3 py-2 text-left text-xs text-slate-400 transition-all duration-150 hover:bg-white/[0.05] hover:text-white"
+            >
+              {language === 'en' ? 'Log out' : 'Cerrar sesión'}
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <div className="flex min-h-screen flex-1 flex-col overflow-x-hidden lg:pl-[196px]">
+        <header className="sticky top-0 z-30 flex min-h-[52px] items-center justify-between border-b border-white/[0.05] bg-[#05080f]/95 px-4 py-2 backdrop-blur lg:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setSidebarOpen((current) => !current)}
+              className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.03] text-slate-300 transition-all duration-150 hover:bg-white/[0.05] lg:hidden"
+            >
+              <PanelsTopLeft className="h-4 w-4" />
+            </button>
+            <div className="flex min-w-0 items-center gap-2 text-sm text-slate-500">
+              {breadcrumbs.map((crumb, index) => (
+                <div key={crumb.href} className="flex items-center gap-2">
+                  {index > 0 ? <span className="text-slate-700">/</span> : null}
+                  <span className={index === breadcrumbs.length - 1 ? 'truncate text-white' : 'truncate'}>{crumb.label}</span>
+                </div>
+              ))}
             </div>
           </div>
 
-          <button
-            onClick={handleLogout}
-            className="mt-3 w-full rounded-xl px-3 py-2 text-left text-xs font-medium text-slate-500 transition-all duration-150 hover:text-red-400"
-          >
-            {language === 'en' ? 'Log out' : 'Cerrar sesión'}
-          </button>
-        </div>
-      </aside>
-      )}
+          <div className="flex items-center gap-2">
+            {topbarActions.map((action) => (
+              <Link
+                key={action.href}
+                href={action.href}
+                className="hidden rounded-full bg-white/[0.03] px-3 py-1.5 text-xs text-slate-300 transition-all duration-150 hover:bg-white/[0.05] hover:text-white md:inline-flex"
+              >
+                {action.label}
+              </Link>
+            ))}
+            {user?.isAdmin || user?.founderAccess ? (
+              <Link
+                href="/admin"
+                className="rounded-full bg-rose-500/10 px-3 py-1.5 text-xs text-rose-300 transition-all duration-150 hover:bg-rose-500/15"
+              >
+                ADMIN
+              </Link>
+            ) : null}
+          </div>
+        </header>
 
-      <div className="flex flex-1 flex-col">
-        {!billingCheckoutFocus && (
-        <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950 px-6 py-4 lg:hidden">
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="flex flex-col gap-1">
-            <span className="block h-0.5 w-6 bg-white" />
-            <span className="block h-0.5 w-6 bg-white" />
-            <span className="block h-0.5 w-6 bg-white" />
-          </button>
-          <span className="text-lg font-bold text-white">Nexora</span>
-          <div className="w-6" />
-        </div>
-        )}
-
-        <main
-          className={`flex-1 overflow-y-auto bg-slate-950 text-slate-200 ${
-            billingCheckoutFocus ? 'px-4 py-10 sm:px-6' : 'px-6 py-6'
-          }`}
-        >
-          <div className={`mx-auto w-full ${billingCheckoutFocus ? 'max-w-3xl' : 'max-w-[1440px]'}`}>{children}</div>
-        </main>
+        <main className="flex-1 px-4 py-4 sm:px-5 lg:px-6 lg:py-5">{children}</main>
       </div>
 
-      {!billingCheckoutFocus && sidebarOpen && (
-        <div className="fixed inset-0 z-30 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />
-      )}
-      {!billingCheckoutFocus && <DashboardChatbot />}
+      {sidebarOpen ? (
+        <button
+          type="button"
+          aria-label="Cerrar sidebar"
+          className="fixed inset-0 z-20 bg-black/40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      ) : null}
+      <DashboardChatbot />
     </div>
   );
 }

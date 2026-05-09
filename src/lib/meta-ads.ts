@@ -21,6 +21,14 @@ type MetaAdVideo = {
   length?: number;
 };
 
+type MetaPage = {
+  id: string;
+  name: string;
+  accessToken: string;
+  category?: string;
+  igUserId?: string;
+};
+
 const META_GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v19.0';
 
 function isConfigured(value: string | undefined) {
@@ -53,11 +61,15 @@ function normalizeMetaAccountId(accountId: string) {
   return accountId.startsWith('act_') ? accountId : `act_${accountId}`;
 }
 
-async function graphRequest<T>(path: string, search: URLSearchParams): Promise<T> {
+async function graphRequest<T>(
+  path: string,
+  search: URLSearchParams,
+  method: 'GET' | 'POST' = 'GET'
+): Promise<T> {
   const url = new URL(`https://graph.facebook.com/${META_GRAPH_VERSION}/${path.replace(/^\/+/, '')}`);
   search.forEach((value, key) => url.searchParams.set(key, value));
 
-  const response = await fetch(url, { method: 'GET', cache: 'no-store' });
+  const response = await fetch(url, { method, cache: 'no-store' });
   const payload = (await response.json()) as T & { error?: { message?: string; code?: number } };
 
   if (!response.ok || payload.error) {
@@ -174,4 +186,77 @@ export async function fetchMetaAdVideos(params: {
       };
     })
     .filter((item): item is NonNullable<typeof item> => Boolean(item));
+}
+
+export async function publishToInstagram(params: {
+  accessToken: string;
+  igUserId: string;
+  imageUrl?: string;
+  caption: string;
+}): Promise<{ id: string; permalink?: string }> {
+  const containerParams = new URLSearchParams();
+  containerParams.set('access_token', params.accessToken);
+  containerParams.set('caption', params.caption);
+  if (params.imageUrl) {
+    containerParams.set('image_url', params.imageUrl);
+    containerParams.set('media_type', 'IMAGE');
+  }
+
+  const container = await graphRequest<{ id: string }>(`${params.igUserId}/media`, containerParams, 'POST');
+
+  if (!container.id) throw new Error('No se pudo crear el container de Instagram.');
+
+  const publishParams = new URLSearchParams();
+  publishParams.set('access_token', params.accessToken);
+  publishParams.set('creation_id', container.id);
+
+  const result = await graphRequest<{ id: string }>(`${params.igUserId}/media_publish`, publishParams, 'POST');
+
+  return { id: result.id };
+}
+
+export async function publishToFacebook(params: {
+  accessToken: string;
+  pageId: string;
+  message: string;
+  imageUrl?: string;
+}): Promise<{ id: string; permalink?: string }> {
+  const postParams = new URLSearchParams();
+  postParams.set('access_token', params.accessToken);
+  postParams.set('message', params.message);
+  if (params.imageUrl) {
+    postParams.set('url', params.imageUrl);
+  }
+
+  const endpoint = params.imageUrl ? `${params.pageId}/photos` : `${params.pageId}/feed`;
+  const result = await graphRequest<{ id: string; post_id?: string }>(endpoint, postParams, 'POST');
+
+  return { id: result.post_id || result.id };
+}
+
+export async function fetchMetaPages(accessToken: string): Promise<MetaPage[]> {
+  const search = new URLSearchParams();
+  search.set('access_token', accessToken);
+  search.set('fields', 'id,name,access_token,category,instagram_business_account');
+  search.set('limit', '10');
+
+  const payload = await graphRequest<{
+    data?: Array<{
+      id: string;
+      name?: string;
+      access_token?: string;
+      category?: string;
+      instagram_business_account?: { id: string };
+    }>;
+  }>('me/accounts', search);
+
+  return (payload.data || [])
+    .filter((page) => page.id && page.access_token)
+    .map((page) => ({
+      id: page.id,
+      name: String(page.name || page.id),
+      accessToken: String(page.access_token || ''),
+      category: page.category,
+      igUserId: page.instagram_business_account?.id,
+    }));
 }

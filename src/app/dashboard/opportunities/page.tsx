@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
 export default function OpportunitiesRedirectPage() {
-  redirect('/dashboard/clientes/pipeline');
+  redirect('/dashboard/crm');
 }

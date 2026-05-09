@@ -747,7 +747,17 @@ ESTRUCTURA DEL JSON PERMITIDA:
 
 INSTRUCCIONES POR HERRAMIENTA:
 
-ad-copy: Genera 3 hooks alternativos poderosos en bullets[0], bullets[1], bullets[2]. Luego en bullets[3] el copy principal completo (150-200 palabras). En bullets[4] la prueba social sugerida. En bullets[5] el CTA con variante A/B. Usa el framework PAS o Hook-Story-Offer según el canal.
+ad-copy: Genera EXACTAMENTE esta estructura JSON:
+- headline: el hook más poderoso (máximo 10 palabras, que pare el scroll)
+- bullets[0]: "HOOK A — " + versión provocadora de 1 línea
+- bullets[1]: "HOOK B — " + versión curiosidad de 1 línea
+- bullets[2]: "HOOK C — " + versión dolor de 1 línea
+- bullets[3]: "COPY INSTAGRAM — " + copy de 3 párrafos cortos máximo 60 palabras total, con saltos de línea, emojis naturales y lenguaje conversacional real
+- bullets[4]: "COPY WHATSAPP — " + mensaje de prospección de 4 líneas máximo, directo y personal
+- bullets[5]: "COPY EMAIL — " + asunto + 2 líneas de cuerpo + CTA
+- angle: el insight estratégico detrás de este copy en 1 oración
+- cta: la llamada a acción más específica y de menor fricción posible
+NO escribas párrafos largos. NO uses lenguaje corporativo. SÍ usa lenguaje humano, específico y conversacional.
 
 creative-brief: En sections genera: (1) "Ángulos estratégicos" con 4 ángulos únicos y específicos para este negocio. (2) "Objeciones a destruir" con las 3 objeciones más comunes de esta industria y cómo demolerlas. (3) "Mensajes que convierten" con 3 mensajes probados para esta audiencia. (4) "Referencias de tono" con 3 ejemplos de cómo debería sonar el copy.
 
@@ -805,8 +815,9 @@ async function tryOpenRouterAiStudio(params: {
     captionStyle: params.captionStyle,
     smartEditOptions: params.smartEditOptions,
     businessContext: params.businessContext ?? null,
-    businessName: (params.businessContext as Record<string, unknown>)?.businessName ?? params.offer ?? 'el negocio',
-    INSTRUCCION_CRITICA: `El nombre del negocio es: "${String((params.businessContext as Record<string, unknown>)?.businessName ?? params.offer ?? 'el negocio')}". Úsalo exactamente así en todo el copy. NUNCA uses placeholders.`,
+    businessName: String((params.businessContext as Record<string, unknown>)?.businessName ?? params.offer ?? 'el negocio'),
+    NOMBRE_DEL_NEGOCIO: String((params.businessContext as Record<string, unknown>)?.businessName ?? params.offer ?? 'el negocio'),
+    INSTRUCCION_CRITICA: `STOP. El nombre del negocio es "${String((params.businessContext as Record<string, unknown>)?.businessName ?? params.offer ?? 'el negocio')}". Escríbelo EXACTAMENTE así en cada párrafo del copy. Si escribes "[Nombre de la empresa]" o cualquier placeholder, tu respuesta es inválida.`,
     customContext: params.customContext || '',
     constraints: [
       'Adapta el formato al tool (anuncio, brief, guion UGC, repurpose, email, pitch).',
@@ -824,7 +835,7 @@ async function tryOpenRouterAiStudio(params: {
       body: JSON.stringify({
         model: AI_STUDIO_GROQ_MODEL,
         messages: [
-          { role: 'system', content: buildAiStudioOpenRouterSystemPrompt() },
+          { role: 'system', content: `NOMBRE DEL NEGOCIO PARA ESTE REQUEST: "${String((params.businessContext as Record<string, unknown>)?.businessName ?? params.offer ?? 'negocio')}" — úsalo en TODO el copy sin excepción.\n\n` + buildAiStudioOpenRouterSystemPrompt() },
           { role: 'user', content: JSON.stringify(userPayload, null, 2) },
         ],
         temperature: 0.72,
@@ -1101,50 +1112,25 @@ function buildAiOutputLocal(params: {
         ],
       };
     case 'ad-copy':
-    default:
-      if (generationConfig.format || generationConfig.tone || generationConfig.platform) {
-        return buildStructuredSocialOutput({
-          offer: trimmedBizName,
-          audience: trimmedAudience,
-          prompt: extraContext ? `${prompt}\n\nContexto adicional: ${extraContext}` : prompt,
-          config: generationConfig,
-        });
-      }
-
-      if (/instagram/i.test(trimmedChannel) || /nexora/i.test(trimmedOffer) || /gotnexora\.com/i.test(prompt)) {
-        return buildInstagramAdCopy({
-          offer: trimmedBizName,
-          audience: trimmedAudience,
-          channel: trimmedChannel,
-          prompt: extraContext ? `${prompt}\n\nContexto adicional: ${extraContext}` : prompt,
-        });
-      }
-
+    default: {
+      const contextLine = extraContext || `Pensado para ${trimmedAudience}.`;
+      const lowFrictionCta = /cotiz|quote|agenda|consulta/i.test(`${prompt} ${extraContext}`)
+        ? 'Agenda una cotización rápida esta semana.'
+        : 'Escríbenos y te damos el siguiente paso en minutos.';
       return {
-        headline: `Hooks y copies listos para ${trimmedBizName}${bizIndustries ? ` · ${bizIndustries}` : ''}`,
+        headline: `${trimmedBizName}: solución clara sin fricción`,
         bullets: [
-          `Hook 1: “${trimmedAudience} no compra más información; compra una promesa que se siente inevitable.”`,
-          `Hook 2: “${trimmedBizName} vende mejor cuando se entiende qué cambia en la vida o en el negocio del cliente desde el primer impacto.”`,
-          'Hook 3: “Si tu anuncio necesita demasiada explicación, está perdiendo a la gente correcta antes de mostrar la prueba.”',
-          ...(bizIndustries ? [`Sector: ${bizIndustries}.`] : []),
-          ...(extraContext ? [`Contexto prioritario: ${extraContext}`] : []),
-          `Copy principal: presenta el dolor, nombra el cambio concreto y muestra por qué ${trimmedBizName} se siente diferente a la alternativa actual.`,
-          'Prueba sugerida: usa una captura, resultado, comparativa o microdemostración antes del CTA.',
-          'CTA: invita a una sola acción con bajo riesgo, alta claridad y una promesa concreta del siguiente paso.',
+          `HOOK A — Deja de perder clientes por una primera impresión descuidada.`,
+          `HOOK B — Lo que cambia cuando ${trimmedBizName} se encarga.`,
+          `HOOK C — Si tu espacio no transmite confianza, ya estás perdiendo.`,
+          `COPY INSTAGRAM — ${trimmedBizName} ayuda a ${trimmedAudience} a verse más profesional sin complicarse.\n\n${contextLine} ✨\n\n¿Quieres verlo fácil? Te damos una cotización clara y sin presión.`,
+          `COPY WHATSAPP — Hola, soy de ${trimmedBizName}.\nAyudamos a ${trimmedAudience} con una solución simple y confiable.\n${contextLine}\n¿Te puedo mandar una cotización rápida?`,
+          `COPY EMAIL — Asunto: Una forma más simple de resolver esto\n${trimmedBizName} puede ayudar a ${trimmedAudience} con una propuesta clara y sin fricción.\n${lowFrictionCta}`,
         ],
-        angle: `${prompt || basePromise} enfocado en ${trimmedChannel}, con una narrativa más premium, más creíble y orientada a conversión.`,
-        sections: [
-          {
-            title: 'Estructura recomendada',
-            items: [
-              'Hook de dolor o tensión real.',
-              'Promesa concreta y entendible.',
-              'Prueba o mecanismo.',
-              'CTA con acción única.',
-            ],
-          },
-        ],
+        angle: `El copy posiciona a ${trimmedBizName} como una respuesta simple y confiable para ${trimmedAudience}.`,
+        cta: lowFrictionCta,
       };
+    }
   }
 }
 

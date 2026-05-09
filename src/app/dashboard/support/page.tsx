@@ -142,22 +142,22 @@ export default function SupportPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <section className="rounded-2xl border border-white/6 bg-slate-900 px-8 py-8">
+      <section className="rounded-[28px] bg-[#040810] px-6 py-7 sm:px-8">
         <p className="text-xs uppercase tracking-wider text-cyan-400">Soporte</p>
-        <h1 className="mt-2 text-3xl font-bold text-white">Asistente IA + Media Buyer autónomo</h1>
+        <h1 className="mt-2 text-[34px] font-semibold tracking-[-0.03em] text-white">Soporte IA + operación asistida</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
           Pregunta sobre campañas, métricas, configuración o pide que el asistente cree borradores ejecutables. Los borradores se guardan directamente en tu cuenta con un clic.
         </p>
         <div className="mt-6 grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-white/6 bg-[#080e1a] p-5">
+          <div className="rounded-[22px] bg-[#030610] p-5">
             <p className="text-xs uppercase tracking-wider text-slate-400">Plan actual</p>
             <p className="mt-2 text-3xl font-bold text-white">{user?.entitlements?.marketingLabel || 'Starter'}</p>
           </div>
-          <div className="rounded-2xl border border-white/6 bg-[#080e1a] p-5">
+          <div className="rounded-[22px] bg-[#030610] p-5">
             <p className="text-xs uppercase tracking-wider text-slate-400">Soporte IA</p>
             <p className="mt-2 text-3xl font-bold text-white">Activo · 4 proveedores</p>
           </div>
-          <div className="rounded-2xl border border-white/6 bg-[#080e1a] p-5">
+          <div className="rounded-[22px] bg-[#030610] p-5">
             <p className="text-xs uppercase tracking-wider text-slate-400">Escalado humano</p>
             <p className="mt-2 text-3xl font-bold text-white">
               {user?.entitlements?.capabilities.canUsePrioritySupport ? 'Prioritario' : 'Por email'}
@@ -169,7 +169,7 @@ export default function SupportPage() {
       {/* Main grid */}
       <section className="grid gap-6 lg:grid-cols-2">
         {/* Left — input */}
-        <div className="rounded-2xl border border-white/6 bg-slate-900 p-6">
+        <div className="rounded-[28px] bg-[#040810] p-6">
           <p className="text-xs uppercase tracking-wider text-slate-400">Asistente</p>
           <h2 className="mt-2 text-xl font-semibold text-white">Asistente IA</h2>
           <p className="mt-2 text-sm leading-6 text-slate-400">
@@ -177,13 +177,13 @@ export default function SupportPage() {
           </p>
 
           {/* AI config */}
-          <div className="mt-5 rounded-2xl border border-white/6 bg-[#080e1a] p-4">
+          <div className="mt-5 rounded-[22px] bg-[#030610] p-4">
             <p className="text-xs uppercase tracking-wider text-slate-400">Proveedor IA</p>
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               <select
                 value={aiProvider}
                 onChange={(e) => setAiProvider(e.target.value as typeof aiProvider)}
-                className="w-full rounded-xl bg-slate-800/50 border border-slate-700 px-4 py-3 text-sm text-white focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
+                className="w-full rounded-2xl bg-white/[0.04] px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
               >
                 <option value="auto">Auto — Claude → Gemini → Llama</option>
                 <option value="openrouter">OpenRouter (Llama / Mistral)</option>
@@ -196,14 +196,14 @@ export default function SupportPage() {
                 value={aiApiKey}
                 onChange={(e) => setAiApiKey(e.target.value)}
                 placeholder="API key BYOK (opcional)"
-                className="w-full rounded-xl bg-slate-800/50 border border-slate-700 px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
+                className="w-full rounded-2xl bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
               />
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               <button
                 onClick={handleSaveAiConfig}
                 type="button"
-                className="rounded-xl border border-white/10 px-4 py-2 text-xs font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
+                className="rounded-2xl bg-white/[0.04] px-4 py-2 text-xs font-semibold text-slate-200 transition hover:bg-white/[0.06] hover:text-white"
               >
                 Guardar configuración IA
               </button>
@@ -214,7 +214,7 @@ export default function SupportPage() {
                   setAiStatus('Clave local eliminada de este navegador.');
                 }}
                 type="button"
-                className="rounded-xl border border-white/10 px-4 py-2 text-xs font-semibold text-slate-400 transition hover:text-slate-200"
+                className="rounded-2xl bg-white/[0.03] px-4 py-2 text-xs font-semibold text-slate-400 transition hover:bg-white/[0.05] hover:text-slate-200"
               >
                 Limpiar clave local
               </button>
@@ -226,7 +226,7 @@ export default function SupportPage() {
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void handleAsk(); }}
-            className="mt-5 w-full rounded-xl bg-slate-800/50 border border-slate-700 px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10 min-h-[180px] resize-none"
+            className="mt-5 min-h-[180px] w-full resize-none rounded-[22px] bg-[#030610] px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
             placeholder="Ejemplo: mi campaña tiene gasto pero no convierte, ¿qué debería revisar primero? O: crea una campaña de reconocimiento de marca para Instagram con $50/día"
           />
           <p className="mt-1 text-xs text-slate-500">Ctrl+Enter para enviar</p>
@@ -234,14 +234,14 @@ export default function SupportPage() {
           <button
             onClick={() => void handleAsk()}
             disabled={loading}
-            className="mt-4 w-full rounded-xl border border-white/10 py-3 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white disabled:opacity-50"
+            className="mt-4 w-full rounded-[22px] bg-cyan-500 px-4 py-3 text-sm font-semibold text-[#041018] transition-all duration-150 hover:-translate-y-[1px] hover:bg-cyan-400 disabled:opacity-50"
           >
             {loading ? 'Analizando...' : 'Preguntar al asistente IA'}
           </button>
         </div>
 
         {/* Right — response */}
-        <div className="rounded-2xl border border-white/6 bg-slate-900 p-6">
+        <div className="rounded-[28px] bg-[#040810] p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs uppercase tracking-wider text-slate-400">Respuesta</p>
@@ -257,19 +257,19 @@ export default function SupportPage() {
 
           {reply ? (
             <div className="mt-5 space-y-4">
-              <div className="rounded-2xl border border-white/6 bg-[#080e1a] p-5">
+              <div className="rounded-[22px] bg-[#030610] p-5">
                 <p className="text-xs uppercase tracking-wider text-slate-400">{reply.title}</p>
                 <p className="mt-3 text-sm leading-6 text-slate-200">{reply.message}</p>
               </div>
 
               {reply.nextSteps.map((step) => (
-                <div key={step} className="rounded-2xl border border-white/6 bg-[#080e1a] p-4 text-sm text-slate-300">
+                <div key={step} className="rounded-[20px] bg-[#030610] p-4 text-sm text-slate-300">
                   {step}
                 </div>
               ))}
 
               {reply.campaignDraft && (
-                <div className="rounded-2xl border border-cyan-400/20 bg-[#080e1a] p-5">
+                <div className="rounded-[22px] bg-[rgba(6,182,212,0.06)] p-5">
                   <p className="text-xs uppercase tracking-wider text-cyan-400">Borrador IA listo para guardar</p>
                   <p className="mt-2 text-base font-semibold text-white">{reply.campaignDraft.name}</p>
                   <div className="mt-2 flex flex-wrap gap-2 text-xs">
@@ -287,7 +287,7 @@ export default function SupportPage() {
                   <button
                     onClick={() => void handleSaveDraft()}
                     disabled={savingDraft || draftSaved}
-                    className={`mt-4 w-full rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+                    className={`mt-4 w-full rounded-2xl px-4 py-2.5 text-sm font-semibold transition ${
                       draftSaved
                         ? 'border border-emerald-400/20 bg-emerald-500/10 text-emerald-300 cursor-default'
                         : 'border border-white/10 text-slate-200 hover:border-cyan-400/30 hover:text-white disabled:opacity-50'
@@ -299,19 +299,19 @@ export default function SupportPage() {
               )}
             </div>
           ) : (
-            <div className="mt-5 rounded-2xl border border-white/6 bg-[#080e1a] p-5 text-sm leading-6 text-slate-400">
+            <div className="mt-5 rounded-[22px] bg-[#030610] p-5 text-sm leading-6 text-slate-400">
               Aún no hay consulta. Cuando escribas una duda, aquí aparecerán diagnóstico, pasos recomendados y borradores ejecutables.
             </div>
           )}
 
-          <div className="mt-6 rounded-2xl border border-white/6 bg-[#080e1a] p-4 text-sm text-slate-400">
+          <div className="mt-6 rounded-[22px] bg-[#030610] p-4 text-sm text-slate-400">
             Si necesitas seguimiento humano, escribe a <span className="font-semibold text-slate-200">{supportEmail}</span>.
           </div>
         </div>
       </section>
 
       {/* Providers */}
-      <section className="rounded-2xl border border-white/6 bg-slate-900 p-6">
+      <section className="rounded-[28px] bg-[#040810] p-6">
         <p className="text-xs uppercase tracking-wider text-slate-400">Infraestructura</p>
         <h2 className="mt-2 text-xl font-semibold text-white">Proveedores disponibles</h2>
         <p className="mt-2 text-sm text-slate-400">El sistema usa una cadena de fallback para que siempre haya respuesta IA, incluso sin claves propias configuradas.</p>
@@ -322,7 +322,7 @@ export default function SupportPage() {
             { key: 'openrouter', label: 'Llama / Mistral', detail: 'OpenRouter · Gratis permanente', icon: <Zap className="h-5 w-5 text-emerald-400" /> },
             { key: 'heuristic', label: 'Motor Nexora', detail: 'Sin API · Siempre disponible', icon: <Bot className="h-5 w-5 text-slate-400" /> },
           ] as const).map((item) => (
-            <div key={item.key} className="rounded-2xl border border-white/6 bg-[#080e1a] p-4">
+            <div key={item.key} className="rounded-[22px] bg-[#030610] p-4">
               {item.icon}
               <p className="mt-2 text-sm font-semibold text-white">{item.label}</p>
               <p className="mt-1 text-xs text-slate-400">{item.detail}</p>

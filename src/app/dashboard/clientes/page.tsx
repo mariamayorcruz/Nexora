@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
-export default function ClientesIndexPage() {
-  redirect('/dashboard/clientes/lista');
+export default function ClientesRedirectPage() {
+  redirect('/dashboard/crm');
 }
