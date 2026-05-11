@@ -24,13 +24,33 @@ export async function generateImageWithGemini(prompt: string): Promise<string | 
       }
     );
 
+    if (!imageResponse.ok) {
+      const errorData = await imageResponse.json().catch(() => ({}));
+      console.error('[image-gen] Gemini image error:', imageResponse.status, JSON.stringify(errorData));
+    }
+
     if (imageResponse.ok) {
       const data = await imageResponse.json();
       const parts = data?.candidates?.[0]?.content?.parts || [];
+      console.log(
+        '[image-gen] Gemini response parts:',
+        JSON.stringify(
+          parts.map((p: Record<string, unknown>) => ({
+            hasInlineData: !!p.inlineData,
+            mimeType: (p.inlineData as Record<string, unknown>)?.mimeType,
+            hasText: !!p.text,
+          }))
+        )
+      );
 
       for (const part of parts) {
-        if (part.inlineData?.mimeType?.startsWith('image/')) {
-          return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+        if (
+          (part as Record<string, unknown>).inlineData &&
+          ((part as Record<string, unknown>).inlineData as Record<string, unknown>)?.mimeType
+            ?.toString()
+            .startsWith('image/')
+        ) {
+          return `data:${((part as Record<string, unknown>).inlineData as Record<string, unknown>).mimeType};base64,${((part as Record<string, unknown>).inlineData as Record<string, unknown>).data}`;
         }
       }
     }
