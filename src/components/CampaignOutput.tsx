@@ -20,6 +20,7 @@ export default function CampaignOutput({
   hooks,
   channels,
   onPublish,
+  onRegenerate,
 }: {
   title: string;
   status: string;
@@ -29,6 +30,7 @@ export default function CampaignOutput({
   hooks: string[];
   channels: ChannelCard[];
   onPublish?: () => void;
+  onRegenerate?: () => void;
 }) {
   return (
     <div className="flex min-h-[720px] flex-1 flex-col rounded-[24px] bg-[#040810] p-4 sm:p-5">
@@ -49,16 +51,18 @@ export default function CampaignOutput({
             <p className="text-sm font-medium text-white">Visual principal</p>
             <div className="flex flex-wrap items-center gap-2">
               {[
-                { label: 'Regenerar', icon: RefreshCcw },
-                { label: 'Editar', icon: Sparkles },
-                { label: 'Descargar', icon: Download },
+                { label: 'Regenerar', icon: RefreshCcw, onClick: onRegenerate },
+                { label: 'Editar', icon: Sparkles, onClick: undefined },
+                { label: 'Descargar', icon: Download, onClick: undefined },
               ].map((item) => {
                 const Icon = item.icon;
                 return (
                   <button
                     key={item.label}
                     type="button"
-                    className="flex items-center gap-1.5 rounded-full bg-white/[0.04] px-3 py-1.5 text-[11px] text-slate-300 transition-all duration-150 hover:bg-white/[0.06] hover:text-white"
+                    onClick={item.onClick}
+                    disabled={item.label === 'Regenerar' && !onRegenerate}
+                    className="flex items-center gap-1.5 rounded-full bg-white/[0.04] px-3 py-1.5 text-[11px] text-slate-300 transition-all duration-150 hover:bg-white/[0.06] hover:text-white disabled:opacity-50"
                   >
                     <Icon className="h-3.5 w-3.5" />
                     {item.label}
@@ -68,7 +72,32 @@ export default function CampaignOutput({
             </div>
           </div>
           <div className="mt-4 overflow-hidden rounded-[22px] bg-white/[0.03]">
-            {imageUrl ? (
+            {imageUrl?.startsWith('__gemini_description__') ? (
+              (() => {
+                try {
+                  const desc = JSON.parse(imageUrl.replace('__gemini_description__', '')) as {
+                    description?: string;
+                    style?: string;
+                    colors?: string;
+                    mood?: string;
+                  };
+                  return (
+                    <div className="flex aspect-[4/5] min-h-[280px] flex-col items-center justify-center bg-gradient-to-br from-[#040810] to-[#061220] p-6 text-center">
+                      <p className="mb-3 text-[11px] uppercase tracking-[0.2em] text-cyan-300">✦ Visión de campaña</p>
+                      <p className="text-sm leading-6 text-slate-300">{desc.description}</p>
+                      <div className="mt-4 flex flex-wrap justify-center gap-3">
+                        {desc.style ? <span className="rounded-full bg-white/[0.04] px-3 py-1 text-[10px] text-slate-400">{desc.style}</span> : null}
+                        {desc.colors ? <span className="rounded-full bg-white/[0.04] px-3 py-1 text-[10px] text-slate-400">{desc.colors}</span> : null}
+                        {desc.mood ? <span className="rounded-full bg-white/[0.04] px-3 py-1 text-[10px] text-slate-400">{desc.mood}</span> : null}
+                      </div>
+                      <p className="mt-4 text-[11px] text-slate-600">Activa fal.ai para generar imagen real -&gt;</p>
+                    </div>
+                  );
+                } catch {
+                  return null;
+                }
+              })()
+            ) : imageUrl ? (
               <div className="relative">
                 <Image
                   src={imageUrl}
@@ -86,7 +115,7 @@ export default function CampaignOutput({
                 ) : null}
               </div>
             ) : (
-              <div className="flex aspect-[4/5] flex-col items-center justify-center gap-3">
+              <div className="flex aspect-[4/5] min-h-[280px] flex-col items-center justify-center gap-3">
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-cyan-500/10 text-cyan-400">
                   <ImageIcon className="h-6 w-6" />
                 </div>

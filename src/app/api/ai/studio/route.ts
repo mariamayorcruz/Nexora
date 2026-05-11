@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fal } from '@fal-ai/client';
 import { prisma } from '@/lib/prisma';
+import { buildImagePrompt, generateImageWithGemini } from '@/lib/image-gen';
 import {
   AI_TOOL_DEFINITIONS,
   buildAiOutput,
@@ -243,22 +243,24 @@ export async function POST(request: NextRequest) {
 
     let imageUrl: string | null = null;
     try {
-      fal.config({ credentials: process.env.FAL_KEY || '' });
-      const imagePrompt = `Professional marketing ad image for: ${offer}. Target audience: ${audience}. Channel: ${channel}. Clean, modern, high quality advertising photo.`;
-      const imageResult = await fal.subscribe('fal-ai/flux/schnell', {
-        input: {
-          prompt: imagePrompt,
-          image_size: 'landscape_4_3',
-          num_images: 1,
-          num_inference_steps: 4,
-        },
+      const imagePrompt = buildImagePrompt({
+        goal: prompt,
+        offer,
+        audience,
+        style: String(body.customContext || '').includes('Premium')
+          ? 'Premium'
+          : String(body.customContext || '').includes('Corporativo')
+            ? 'Corporativo'
+            : String(body.customContext || '').includes('Cercano')
+              ? 'Cercano'
+              : String(body.customContext || '').includes('Urgente')
+                ? 'Urgente'
+                : 'Premium',
+        businessName: String((user.onboardingData as Record<string, unknown>)?.businessName ?? offer),
       });
-      const images = (imageResult as any)?.data?.images;
-      if (images && images.length > 0) {
-        imageUrl = images[0].url;
-      }
-    } catch (error) {
-      console.error('[studio] Image generation failed:', error);
+      imageUrl = await generateImageWithGemini(imagePrompt);
+    } catch (err) {
+      console.warn('[ai-studio] Image generation failed:', err);
     }
 
     if (!output?.headline || (!output?.bullets?.length && !output?.slides?.length && !output?.sections?.length)) {

@@ -148,6 +148,11 @@ export default function DashboardStudioPage() {
     }
   };
 
+  const regenerateCampaign = async () => {
+    if (!goal.trim() || !audience.trim() || !offer.trim()) return;
+    await generateCampaign();
+  };
+
   const publishAll = async () => {
     if (!activeJob) return;
     const token = localStorage.getItem('token');
@@ -293,6 +298,7 @@ export default function DashboardStudioPage() {
             hooks={hooks.length ? hooks : activeJob.output?.bullets?.slice(0, 3) || ['Hook A pendiente', 'Hook B pendiente', 'Hook C pendiente']}
             channels={channelCards}
             onPublish={() => void publishAll()}
+            onRegenerate={() => void regenerateCampaign()}
           />
         ) : (
           <div className="flex min-h-[520px] flex-1 items-center justify-center rounded-[24px] bg-[#040810] p-6">
