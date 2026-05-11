@@ -891,7 +891,14 @@ async function tryOpenRouterAiStudio(params: {
 
     let raw: unknown;
     try {
-      raw = JSON.parse(extractLlmJsonObject(text));
+      const extracted = extractLlmJsonObject(text);
+      // Limpiar caracteres de control que rompen JSON.parse
+      const cleaned = extracted
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+        .replace(/(?<!\\)\n/g, '\\n')
+        .replace(/(?<!\\)\r/g, '\\r')
+        .replace(/(?<!\\)\t/g, '\\t');
+      raw = JSON.parse(cleaned);
     } catch (parseErr) {
       console.error('[ai-studio] tryOpenRouterAiStudio: LLM output JSON parse failed', {
         err: String(parseErr),
