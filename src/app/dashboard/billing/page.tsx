@@ -261,7 +261,7 @@ export default function BillingPage() {
   }
 
   const renderCheckoutError = () => (
-    <div className="rounded-2xl border border-white/6 bg-slate-900 p-8 text-center sm:p-10">
+    <div className="rounded-2xl border border-white/[0.05] bg-[#040810] p-8 text-center sm:p-10">
       <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-500">Pago</p>
       <h1 className="mt-4 text-3xl font-bold text-white">No pudimos iniciar el pago</h1>
       <p className="mt-4 text-base leading-7 text-slate-400">Intenta nuevamente.</p>
@@ -283,7 +283,7 @@ export default function BillingPage() {
     const price = requestedBilling === 'yearly' ? requestedPlanConfig.yearlyPrice : requestedPlanConfig.monthlyPrice;
 
     return (
-      <div className="space-y-6 bg-[#080e1a]">
+      <div className="space-y-6 bg-[#05080f]">
         <div className="text-center">
           <p className="text-sm font-semibold uppercase tracking-[0.24em] text-cyan-300">Activación</p>
           <h1 className="mt-4 text-3xl font-bold text-white sm:text-4xl">Estás a un paso de activar tu acceso</h1>
@@ -296,20 +296,20 @@ export default function BillingPage() {
           <div
             className={`rounded-2xl border p-5 text-sm ${
               checkoutState.type === 'success'
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                : 'border-amber-200 bg-amber-50 text-amber-800'
+                ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
+                : 'border-amber-500/20 bg-amber-500/10 text-amber-300'
             }`}
           >
             {checkoutState.message}
           </div>
         )}
 
-        <div className="rounded-2xl border border-white/6 bg-slate-900 p-8">
+        <div className="rounded-2xl border border-white/[0.05] bg-[#040810] p-8">
           <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Plan seleccionado</p>
           <h2 className="mt-3 text-3xl font-semibold text-white">{requestedPlanConfig.marketingLabel}</h2>
           <p className="mt-3 text-sm leading-7 text-slate-300">{requestedPlanConfig.description}</p>
 
-          <div className="mt-8 rounded-2xl border border-white/6 bg-slate-900 p-5">
+          <div className="mt-8 rounded-2xl border border-white/[0.05] bg-[#05080f] p-5">
             <div className="flex items-end gap-2">
               <span className="text-5xl font-bold text-white">${price}</span>
               <span className="pb-2 text-sm text-slate-400">/ mes</span>
@@ -343,14 +343,19 @@ export default function BillingPage() {
   }
 
   return (
-    <div className="space-y-6 bg-[#080e1a]">
+    <div className="space-y-6 bg-[#05080f]">
       <div>
-        <h2 className="mb-2 text-3xl font-bold text-white">Facturación y suscripción</h2>
-        <p className="text-slate-400">Gestiona tu plan, lanza upgrades y valida el estado real de Stripe.</p>
+        <p className="text-[11px] uppercase tracking-[0.2em] text-cyan-300">✦ Facturación</p>
+        <h1 className="mt-2 text-[28px] font-semibold tracking-[-0.03em] text-white sm:text-[32px]">
+          Facturación y suscripción
+        </h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Gestiona tu plan, lanza upgrades y valida el estado real de Stripe.
+        </p>
       </div>
 
       {shouldAutostart && requestedPlan && !checkoutState && (
-        <div className="rounded-2xl border border-white/6 bg-slate-900 p-5 text-sm text-slate-300">
+        <div className="rounded-2xl border border-white/[0.05] bg-[#040810] p-5 text-sm text-slate-300">
           Estamos preparando tu checkout para el plan {BILLING_PLANS[requestedPlan]?.marketingLabel || requestedPlan}.
         </div>
       )}
@@ -359,41 +364,37 @@ export default function BillingPage() {
         <div
           className={`rounded-2xl border p-5 text-sm ${
             checkoutState.type === 'success'
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+              ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
               : checkoutState.type === 'cancelled'
-                ? 'border-amber-200 bg-amber-50 text-amber-800'
-                : 'border-red-200 bg-red-50 text-red-700'
+                ? 'border-amber-500/20 bg-amber-500/10 text-amber-300'
+                : 'border-rose-500/20 bg-rose-500/10 text-rose-300'
           }`}
         >
           {checkoutState.message}
         </div>
       )}
 
-      <div className="rounded-2xl border border-white/6 bg-slate-900 p-8">
+      <div className="rounded-2xl border border-white/[0.05] bg-[#040810] p-8">
         <h3 className="text-xl font-semibold text-white">Tu plan actual</h3>
         {subscription ? (
           <div className="mt-6 grid gap-4 md:grid-cols-3">
-            <div className="rounded-2xl border border-white/6 bg-slate-900 p-5">
-              <p className="text-xs uppercase tracking-wider text-slate-400">Plan</p>
-              <p className="mt-2 text-2xl font-semibold text-white">{currentPlanLabel}</p>
-            </div>
-            <div className="rounded-2xl border border-white/6 bg-slate-900 p-5">
-              <p className="text-xs uppercase tracking-wider text-slate-400">Estado</p>
-              <p className="mt-2 text-2xl font-semibold capitalize text-white">{subscription.status}</p>
-            </div>
-            <div className="rounded-2xl border border-white/6 bg-slate-900 p-5">
-              <p className="text-xs uppercase tracking-wider text-slate-400">Próximo corte</p>
-              <p className="mt-2 text-2xl font-semibold text-white">
-                {new Date(subscription.currentPeriodEnd).toLocaleDateString('es-ES')}
-              </p>
-            </div>
+            {[
+              { label: 'Plan', value: currentPlanLabel },
+              { label: 'Estado', value: subscription.status },
+              { label: 'Próximo corte', value: new Date(subscription.currentPeriodEnd).toLocaleDateString('es-ES') },
+            ].map((item) => (
+              <div key={item.label} className="rounded-[20px] bg-[#05080f] p-5">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{item.label}</p>
+                <p className="mt-3 text-2xl font-semibold tracking-[-0.02em] text-white capitalize">{item.value}</p>
+              </div>
+            ))}
           </div>
         ) : (
           <p className="mt-4 text-slate-400">Todavía no encontramos una suscripción asociada.</p>
         )}
       </div>
 
-      <div className="rounded-2xl border border-white/6 bg-slate-900 p-8">
+      <div className="rounded-2xl border border-white/[0.05] bg-[#040810] p-8">
         <h3 className="text-xl font-semibold text-white">Historial de facturas</h3>
         {invoices.length === 0 ? (
           <p className="mt-4 text-sm text-slate-400">Aún no hay facturas registradas para tu cuenta.</p>
@@ -401,7 +402,7 @@ export default function BillingPage() {
           <div className="mt-6 overflow-x-auto">
             <table className="w-full min-w-[520px] text-left text-sm">
               <thead>
-                <tr className="border-b border-white/6 text-slate-400">
+                <tr className="border-b border-white/[0.05] text-slate-400">
                   <th className="pb-3 pr-4 font-medium">Fecha</th>
                   <th className="pb-3 pr-4 font-medium">Monto</th>
                   <th className="pb-3 pr-4 font-medium">Estado</th>
@@ -417,7 +418,7 @@ export default function BillingPage() {
                     currency: inv.currency || 'USD',
                   }).format(inv.amount);
                   return (
-                    <tr key={inv.id} className="border-b border-white/6 last:border-0">
+                    <tr key={inv.id} className="border-b border-white/[0.05] last:border-0">
                       <td className="py-3 pr-4 text-white">{dateLabel}</td>
                       <td className="py-3 pr-4 font-medium text-white">{amountLabel}</td>
                       <td className="py-3 pr-4 capitalize text-slate-300">{inv.status}</td>
@@ -456,7 +457,7 @@ export default function BillingPage() {
             <article
               key={plan.key}
               className={`rounded-[28px] border p-8 shadow-sm ${
-                isCurrentPlan ? 'rounded-2xl border border-cyan-400/40 bg-slate-900' : 'rounded-2xl border border-white/6 bg-slate-900'
+                isCurrentPlan ? 'rounded-2xl border border-cyan-500/25 bg-[#040810]' : 'rounded-2xl border border-white/[0.05] bg-[#040810]'
               }`}
             >
               <p className="text-xs uppercase tracking-wider text-slate-400">{plan.label}</p>
@@ -475,7 +476,7 @@ export default function BillingPage() {
                 ))}
               </ul>
 
-              <div className="mt-6 rounded-2xl border border-white/6 bg-slate-900 p-4 text-xs text-slate-500">
+              <div className="mt-6 rounded-2xl border border-white/[0.05] bg-[#05080f] p-4 text-xs text-slate-500">
                 {plan.key === 'starter' && 'Incluye 1 cuenta publicitaria, hasta 3 campañas activas y una bolsa inicial de IA.'}
                 {plan.key === 'professional' && 'Incluye radar creativo, analítica avanzada, video, 3 cuentas y una bolsa robusta de IA.'}
                 {plan.key === 'enterprise' && 'Incluye máxima capacidad, automatización sugerida, soporte prioritario y créditos amplios para operar todo el mes.'}
@@ -484,13 +485,13 @@ export default function BillingPage() {
               <button
                 onClick={() => handlePlanChange(plan.key, 'monthly', true)}
                 disabled={isCurrentPlan || !!processingPlan}
-                className={`mt-8 w-full rounded-2xl px-4 py-3 text-sm font-semibold transition disabled:opacity-60 ${
+                className={`mt-8 w-full rounded-[18px] px-4 py-3 text-sm font-semibold transition-all duration-150 disabled:opacity-50 ${
                   isCurrentPlan
-                    ? 'cursor-default border border-cyan-400/30 text-cyan-300'
-                    : 'border border-white/10 text-slate-200 hover:border-cyan-400/30 hover:text-white'
-                } disabled:opacity-60`}
+                    ? 'cursor-default border border-cyan-500/25 text-cyan-300'
+                    : 'bg-cyan-500 text-[#041018] hover:-translate-y-[1px] hover:bg-cyan-400'
+                }`}
               >
-                {isCurrentPlan ? 'Plan actual' : isProcessing ? 'Abriendo Stripe...' : `Cambiar a ${plan.marketingLabel}`}
+                {isCurrentPlan ? 'Plan actual' : isProcessing ? 'Abriendo Stripe...' : `Activar ${plan.marketingLabel}`}
               </button>
             </article>
           );
