@@ -249,7 +249,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen bg-[#05080f] text-slate-100">
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-[196px] flex-col bg-[#040810] transition-transform duration-150 lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-[196px] flex-col overflow-visible bg-[#040810] transition-transform duration-150 lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -286,7 +286,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 >
                   {active ? <span className="absolute left-0 top-2 bottom-2 w-[2px] rounded-r-full bg-cyan-400" /> : null}
                   <Icon className={`h-4 w-4 ${active ? 'text-cyan-300' : 'text-slate-600'}`} />
-                  <span className="min-w-0 flex-1 truncate text-sm">{language === 'en' ? item.labelEn : item.labelEs}</span>
+                  <span className="min-w-0 flex-1 text-[11px]">{language === 'en' ? item.labelEn : item.labelEs}</span>
                   {item.badge ? (
                     <span
                       className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
@@ -318,7 +318,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 >
                   {active ? <span className="absolute left-0 top-2 bottom-2 w-[2px] rounded-r-full bg-cyan-400" /> : null}
                   <Icon className={`h-4 w-4 ${active ? 'text-cyan-300' : 'text-slate-600'}`} />
-                  <span className="truncate text-sm">{language === 'en' ? item.labelEn : item.labelEs}</span>
+                  <span className="text-[11px]">{language === 'en' ? item.labelEn : item.labelEs}</span>
                 </Link>
               );
             })}
