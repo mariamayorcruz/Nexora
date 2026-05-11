@@ -1,59 +1,7 @@
 export async function generateImageWithGemini(prompt: string): Promise<string | null> {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      console.warn('[image-gen] GEMINI_API_KEY no configurada');
-      return null;
-    }
-
-    const imageResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [{ text: prompt }],
-            },
-          ],
-          generationConfig: {
-            responseModalities: ['TEXT', 'IMAGE'],
-          },
-        }),
-      }
-    );
-
-    if (!imageResponse.ok) {
-      const errorData = await imageResponse.json().catch(() => ({}));
-      console.error('[image-gen] Gemini image error:', imageResponse.status, JSON.stringify(errorData));
-    }
-
-    if (imageResponse.ok) {
-      const data = await imageResponse.json();
-      const parts = data?.candidates?.[0]?.content?.parts || [];
-      console.log(
-        '[image-gen] Gemini response parts:',
-        JSON.stringify(
-          parts.map((p: Record<string, unknown>) => ({
-            hasInlineData: !!p.inlineData,
-            mimeType: (p.inlineData as Record<string, unknown>)?.mimeType,
-            hasText: !!p.text,
-          }))
-        )
-      );
-
-      for (const part of parts) {
-        if (
-          (part as Record<string, unknown>).inlineData &&
-          ((part as Record<string, unknown>).inlineData as Record<string, unknown>)?.mimeType
-            ?.toString()
-            .startsWith('image/')
-        ) {
-          return `data:${((part as Record<string, unknown>).inlineData as Record<string, unknown>).mimeType};base64,${((part as Record<string, unknown>).inlineData as Record<string, unknown>).data}`;
-        }
-      }
-    }
+    if (!apiKey) return null;
 
     const descResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
@@ -65,23 +13,33 @@ export async function generateImageWithGemini(prompt: string): Promise<string | 
             {
               parts: [
                 {
-                  text: `You are a visual director. Describe the perfect marketing image for this campaign in JSON format only, no markdown.
-              Campaign: ${prompt}
-              Return exactly this JSON structure:
-              {"description": "detailed visual description in Spanish", "style": "photography style", "colors": "main colors palette", "mood": "emotional tone"}`,
+                  text: `Eres un director de arte para campañas de marketing. 
+Describe en español la imagen perfecta para esta campaña publicitaria.
+Campaña: ${prompt}
+Responde SOLO con este JSON exacto, sin markdown ni texto adicional:
+{"description":"descripción visual detallada de la imagen en 2-3 oraciones","style":"estilo fotográfico","colors":"paleta de colores principal","mood":"tono emocional","elements":"elementos visuales clave separados por coma"}`,
                 },
               ],
             },
           ],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 300 },
+          generationConfig: {
+            temperature: 0.8,
+            maxOutputTokens: 400,
+            responseMimeType: 'application/json',
+          },
         }),
       }
     );
 
-    if (!descResponse.ok) return null;
+    if (!descResponse.ok) {
+      const err = await descResponse.json().catch(() => ({}));
+      console.error('[image-gen] Gemini error:', descResponse.status, JSON.stringify(err));
+      return null;
+    }
 
     const descData = await descResponse.json();
     const text = descData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    if (!text) return null;
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
