@@ -19,9 +19,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const { plan, billingCycle } = (await request.json()) as {
+    const { plan, billingCycle, withTrial } = (await request.json()) as {
       plan?: BillingPlan;
       billingCycle?: BillingCycle;
+      withTrial?: boolean;
     };
 
     if (!plan || !billingCycle || !['monthly', 'yearly'].includes(billingCycle)) {
@@ -108,6 +109,14 @@ export async function POST(request: NextRequest) {
           plan,
           billingCycle,
         },
+        trial_period_days: withTrial ? 7 : undefined,
+        trial_settings: withTrial
+          ? {
+              end_behavior: {
+                missing_payment_method: 'cancel',
+              },
+            }
+          : undefined,
       },
     };
 

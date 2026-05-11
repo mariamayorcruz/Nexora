@@ -195,7 +195,7 @@ export default function BillingPage() {
     void verifyCheckout();
   }, [checkoutStatus, sessionId]);
 
-  const handlePlanChange = async (plan: BillingPlan, cycle: BillingCycle) => {
+  const handlePlanChange = async (plan: BillingPlan, cycle: BillingCycle, withTrial = false) => {
     setProcessingPlan(`${plan}-${cycle}`);
     setCheckoutState(null);
 
@@ -207,7 +207,7 @@ export default function BillingPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ plan, billingCycle: cycle }),
+        body: JSON.stringify({ plan, billingCycle: cycle, withTrial }),
       });
 
       const data = await response.json();
@@ -266,7 +266,7 @@ export default function BillingPage() {
       <h1 className="mt-4 text-3xl font-bold text-white">No pudimos iniciar el pago</h1>
       <p className="mt-4 text-base leading-7 text-slate-400">Intenta nuevamente.</p>
       <button
-        onClick={() => requestedPlanConfig && handlePlanChange(requestedPlanConfig.key, requestedBilling)}
+        onClick={() => requestedPlanConfig && handlePlanChange(requestedPlanConfig.key, requestedBilling, true)}
         disabled={!!processingPlan || !requestedPlanConfig}
         className="mt-8 w-full rounded-2xl border border-white/10 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white disabled:opacity-60 sm:w-auto"
       >
@@ -326,7 +326,7 @@ export default function BillingPage() {
           </ul>
 
           <button
-            onClick={() => handlePlanChange(requestedPlanConfig.key, requestedBilling)}
+            onClick={() => handlePlanChange(requestedPlanConfig.key, requestedBilling, true)}
             disabled={!!processingPlan}
             className="mt-10 w-full rounded-2xl border border-white/10 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white disabled:opacity-60"
           >
@@ -466,6 +466,7 @@ export default function BillingPage() {
               <div className="mt-6">
                 <p className="text-4xl font-bold text-white">${plan.monthlyPrice}</p>
                 <p className="text-sm text-slate-400">por mes</p>
+                <p className="mt-1 text-xs text-cyan-300">✦ 7 días gratis para nuevos usuarios</p>
               </div>
 
               <ul className="mt-6 space-y-3 text-sm text-slate-300">
@@ -481,7 +482,7 @@ export default function BillingPage() {
               </div>
 
               <button
-                onClick={() => handlePlanChange(plan.key, 'monthly')}
+                onClick={() => handlePlanChange(plan.key, 'monthly', true)}
                 disabled={isCurrentPlan || !!processingPlan}
                 className={`mt-8 w-full rounded-2xl px-4 py-3 text-sm font-semibold transition disabled:opacity-60 ${
                   isCurrentPlan
