@@ -236,24 +236,25 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <section className="rounded-[28px] bg-[#040810] px-6 py-7 sm:px-8">
-        <p className="text-xs uppercase tracking-wider text-cyan-400">Configuración</p>
-        <h1 className="mt-2 text-[34px] font-semibold tracking-[-0.03em] text-white">Configuración de Cuenta</h1>
-        <p className="mt-2 text-sm text-slate-400">Preferencias personales, notificaciones y seguridad en una sola vista.</p>
+        <p className="text-[11px] uppercase tracking-[0.2em] text-cyan-300">✦ Configuración</p>
+        <h1 className="mt-2 text-[28px] font-semibold tracking-[-0.03em] text-white sm:text-[32px]">
+          Configuración de Cuenta
+        </h1>
+        <p className="mt-2 text-sm text-slate-500">
+          Preferencias personales, notificaciones y seguridad en una sola vista.
+        </p>
       </section>
 
-      {/* Status message */}
       {statusMessage && (
         <div className="rounded-[22px] bg-cyan-500/10 p-4 text-sm text-cyan-300">
           {statusMessage}
         </div>
       )}
 
-      {/* Integrations */}
       <section className="rounded-[28px] bg-[#040810] p-6">
-        <p className="text-xs uppercase tracking-wider text-slate-400">Integraciones</p>
-        <h2 className="mt-2 text-xl font-semibold text-white">Conexiones activas</h2>
+        <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Integraciones</p>
+        <h2 className="mt-2 text-[18px] font-semibold tracking-[-0.02em] text-white">Conexiones activas</h2>
         {loadingIntegration ? (
           <p className="mt-4 text-sm text-slate-400">Cargando estado de integraciones...</p>
         ) : !integrationStatus ? (
@@ -285,10 +286,9 @@ export default function SettingsPage() {
         )}
       </section>
 
-      {/* Profile */}
       <section className="rounded-[28px] bg-[#040810] p-6">
-        <p className="text-xs uppercase tracking-wider text-slate-400">Perfil</p>
-        <h2 className="mt-2 text-xl font-semibold text-white">Información de Perfil</h2>
+        <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Perfil</p>
+        <h2 className="mt-2 text-[18px] font-semibold tracking-[-0.02em] text-white">Información de Perfil</h2>
         <div className="mt-6 space-y-5">
           <label className="block">
             <span className="mb-2 block text-xs uppercase tracking-wider text-slate-400">Nombre completo</span>
@@ -296,7 +296,7 @@ export default function SettingsPage() {
               type="text"
               value={profileName}
               onChange={(e) => setProfileName(e.target.value)}
-            className="w-full rounded-2xl bg-[#030610] px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
+              className="w-full rounded-2xl bg-[#030610] px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/10"
             />
           </label>
           <label className="block">
@@ -305,24 +305,23 @@ export default function SettingsPage() {
               type="email"
               defaultValue={user?.email}
               disabled
-            className="w-full cursor-not-allowed rounded-2xl bg-[#030610] px-4 py-3 text-sm text-slate-500"
+              className="w-full cursor-not-allowed rounded-2xl bg-[#030610] px-4 py-3 text-sm text-slate-500"
             />
             <p className="mt-1 text-xs text-slate-500">El email no puede ser modificado</p>
           </label>
           <button
             onClick={() => void handleSaveProfile()}
             disabled={savingProfile}
-            className="rounded-2xl bg-white/[0.04] px-5 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.06] hover:text-white disabled:opacity-50"
+            className="rounded-[18px] bg-cyan-500 px-5 py-2.5 text-sm font-semibold text-[#041018] transition-all duration-150 hover:-translate-y-[1px] hover:bg-cyan-400 disabled:opacity-50"
           >
             {savingProfile ? 'Guardando...' : 'Guardar cambios'}
           </button>
         </div>
       </section>
 
-      {/* Notifications */}
       <section className="rounded-[28px] bg-[#040810] p-6">
-        <p className="text-xs uppercase tracking-wider text-slate-400">Notificaciones</p>
-        <h2 className="mt-2 text-xl font-semibold text-white">Preferencias</h2>
+        <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Notificaciones</p>
+        <h2 className="mt-2 text-[18px] font-semibold tracking-[-0.02em] text-white">Preferencias</h2>
         <div className="mt-6 space-y-3">
           {[
             { label: 'Alertas de campañas con bajo rendimiento', checked: campaignAlerts, onChange: setCampaignAlerts },
@@ -342,17 +341,16 @@ export default function SettingsPage() {
           <button
             onClick={() => void handleSaveNotifications()}
             disabled={savingNotifications}
-            className="mt-2 rounded-2xl bg-white/[0.04] px-5 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.06] hover:text-white disabled:opacity-50"
+            className="rounded-[18px] bg-cyan-500 px-5 py-2.5 text-sm font-semibold text-[#041018] transition-all duration-150 hover:-translate-y-[1px] hover:bg-cyan-400 disabled:opacity-50"
           >
             {savingNotifications ? 'Guardando...' : 'Guardar preferencias'}
           </button>
         </div>
       </section>
 
-      {/* Security */}
       <section className="rounded-[28px] bg-[#040810] p-6">
-        <p className="text-xs uppercase tracking-wider text-slate-400">Seguridad</p>
-        <h2 className="mt-2 text-xl font-semibold text-white">Acceso y privacidad</h2>
+        <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Seguridad</p>
+        <h2 className="mt-2 text-[18px] font-semibold tracking-[-0.02em] text-white">Acceso y privacidad</h2>
         <div className="mt-6 space-y-3">
           <button
             onClick={() => void handlePasswordChange()}
@@ -431,10 +429,9 @@ export default function SettingsPage() {
         </div>
       </section>
 
-      {/* Cancel subscription */}
       <section className="rounded-[28px] bg-[#040810] p-6">
-        <p className="text-xs uppercase tracking-wider text-rose-400">Zona de peligro</p>
-        <h2 className="mt-2 text-xl font-semibold text-white">Cancelar Suscripción</h2>
+        <p className="text-[11px] uppercase tracking-[0.2em] text-rose-400">Zona de peligro</p>
+        <h2 className="mt-2 text-[18px] font-semibold tracking-[-0.02em] text-white">Cancelar Suscripción</h2>
         <p className="mt-2 text-sm text-slate-400">Tu cuenta y datos se mantienen. La cancelación aplica al cierre del período vigente.</p>
         <button
           onClick={() => void handleCancelSubscription()}
