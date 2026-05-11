@@ -59,7 +59,7 @@ export default function AdminLayout({
   const menuItems = [
     { label: 'Overview', href: '/admin', icon: Command, badge: 'live' },
     { label: 'Clientes', href: '/admin/clientes', icon: Users },
-    { label: 'Revenue', href: '/admin/payments', icon: CreditCard },
+    { label: 'Revenue', href: '/admin/revenue', icon: CreditCard },
     { label: 'Uso IA', href: '/admin/studio', icon: Wand2 },
     { label: 'Usuarios', href: '/admin/users', icon: Users },
     { label: 'Perfil Admin', href: '/admin/perfil', icon: ShieldCheck },
