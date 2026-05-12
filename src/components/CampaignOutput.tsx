@@ -53,7 +53,6 @@ export default function CampaignOutput({
               {[
                 { label: 'Regenerar', icon: RefreshCcw, onClick: onRegenerate },
                 { label: 'Editar', icon: Sparkles, onClick: undefined },
-                { label: 'Descargar', icon: Download, onClick: undefined },
               ].map((item) => {
                 const Icon = item.icon;
                 return (
@@ -69,6 +68,24 @@ export default function CampaignOutput({
                   </button>
                 );
               })}
+              <button
+                key="Descargar"
+                type="button"
+                onClick={() => {
+                  if (!imageUrl || imageUrl.startsWith('__gemini_description__')) return;
+                  const link = document.createElement('a');
+                  link.href = imageUrl;
+                  link.download = 'nexora-campaign-image.jpg';
+                  link.target = '_blank';
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
+                className="flex items-center gap-1.5 rounded-full bg-white/[0.04] px-3 py-1.5 text-[11px] text-slate-300 transition-all duration-150 hover:bg-white/[0.06] hover:text-white"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Descargar
+              </button>
             </div>
           </div>
           {imageUrl ? (
@@ -167,7 +184,12 @@ export default function CampaignOutput({
                       Publicar
                     </button>
                   </div>
-                  <p className="mt-3 whitespace-pre-line text-sm leading-6 text-white">{channel.copy}</p>
+                  <p className="mt-3 whitespace-pre-line text-sm leading-6 text-white">
+                    {channel.copy
+                      .replace(/Campaign Assembly Engine\s*[·\-]\s*Premium\s*✨?/gi, '')
+                      .replace(/Campaign Assembly Engine/gi, '')
+                      .trim()}
+                  </p>
                   <p className="mt-4 text-xs text-slate-500">{channel.cta}</p>
                 </div>
               ))}
