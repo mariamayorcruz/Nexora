@@ -188,9 +188,11 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-5">
       <section className="rounded-[28px] bg-[#040810] p-6">
-        <p className="text-xs uppercase tracking-[0.26em] text-cyan-300">Control ejecutivo</p>
-        <h1 className="mt-2 text-[34px] font-semibold tracking-[-0.03em] text-white">Reportes</h1>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
+        <p className="text-[11px] uppercase tracking-[0.2em] text-cyan-300">✦ Control ejecutivo</p>
+        <h1 className="mt-2 text-[28px] font-semibold tracking-[-0.03em] text-white sm:text-[32px]">
+          Reportes
+        </h1>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
           Gasto, retorno, captación y pipeline en una sola vista.
         </p>
       </section>
@@ -253,7 +255,7 @@ export default function AnalyticsPage() {
             <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Top plataformas por gasto</p>
             <div className="mt-2 space-y-2">
               {metrics.topPlatforms.length === 0 ? (
-                <p className="text-sm text-slate-500">Sin gasto registrado todavia.</p>
+                <p className="text-sm text-slate-500">Sin gasto registrado todavía.</p>
               ) : (
                 metrics.topPlatforms.map(([platform, spend]) => (
                   <div
@@ -286,16 +288,16 @@ export default function AnalyticsPage() {
 
           <div className="mt-4 grid gap-2">
             <Link
-              href="/dashboard/connect"
-              className="rounded-xl border border-white/10 px-3 py-2 text-center text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
+              href="/dashboard/integraciones"
+              className="rounded-xl border border-white/[0.08] px-3 py-2 text-center text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
             >
-              Ir a Campanas + Canales
+              Ir a Integraciones
             </Link>
             <Link
-              href="/dashboard/clientes/pipeline"
-              className="rounded-xl border border-white/10 px-3 py-2 text-center text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
+              href="/dashboard/crm"
+              className="rounded-xl border border-white/[0.08] px-3 py-2 text-center text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
             >
-              Abrir Motor de Ventas
+              Abrir CRM & Leads
             </Link>
           </div>
         </div>
@@ -306,10 +308,10 @@ export default function AnalyticsPage() {
 
 function Kpi({ label, value }: { label: string; value: string }) {
   return (
-      <div className="rounded-[24px] bg-[#040810] px-4 py-4">
-        <p className="text-xs uppercase tracking-[0.18em] text-slate-400">{label}</p>
-        <p className="mt-2 text-3xl font-bold text-white">{value}</p>
-      </div>
+    <div className="rounded-[24px] bg-[#040810] px-4 py-4">
+      <p className="text-xs uppercase tracking-[0.18em] text-slate-400">{label}</p>
+      <p className="mt-2 text-3xl font-bold text-white">{value}</p>
+    </div>
   );
 }
 
