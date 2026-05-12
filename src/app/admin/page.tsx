@@ -60,7 +60,7 @@ export default function AdminRootPage() {
           {[
             { href: '/admin', label: 'Overview' },
             { href: '/admin/clientes', label: 'Clientes' },
-            { href: '/admin/payments', label: 'Revenue' },
+            { href: '/admin/revenue', label: 'Revenue' },
             { href: '/admin/studio', label: 'Uso IA' },
             { href: '/admin/users', label: 'Usuarios' },
           ].map((tab) => (
@@ -149,16 +149,17 @@ export default function AdminRootPage() {
               {[...(stats?.alerts || []), ...(stats?.automationPlays || [])].slice(0, 6).map((item, index) => {
                 const description = 'detail' in item ? item.detail : 'summary' in item ? item.summary : undefined;
                 return (
-                <div key={`${item.title}-${index}`} className="rounded-[20px] bg-[#030610] px-4 py-3">
-                  <div className="flex gap-3">
-                  <span className={`mt-1.5 h-2 w-2 rounded-full ${index % 2 === 0 ? 'bg-cyan-400' : 'bg-amber-400'}`} />
-                  <div>
-                    <p className="text-sm text-slate-200">{item.title || 'Evento del sistema'}</p>
-                    <p className="text-[11px] text-slate-500">{description || 'Sin detalle adicional.'}</p>
+                  <div key={`${item.title}-${index}`} className="rounded-[20px] bg-[#030610] px-4 py-3">
+                    <div className="flex gap-3">
+                      <span className={`mt-1.5 h-2 w-2 rounded-full ${index % 2 === 0 ? 'bg-cyan-400' : 'bg-amber-400'}`} />
+                      <div>
+                        <p className="text-sm text-slate-200">{item.title || 'Evento del sistema'}</p>
+                        <p className="text-[11px] text-slate-500">{description || 'Sin detalle adicional.'}</p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                </div>
-              )})}
+                );
+              })}
             </div>
           </div>
         </div>

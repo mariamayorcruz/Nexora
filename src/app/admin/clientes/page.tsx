@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { CreditCard, LifeBuoy, Receipt, Users } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { isSubscriptionMrrEligible } from '@/lib/admin-ops';
 
@@ -69,7 +68,6 @@ export default function AdminClientesPage() {
     void fetchData();
   }, []);
 
-  /** Misma elegibilidad que MRR / embudo admin (`active` o `trialing`). */
   const activeSubscriptions = useMemo(
     () => subscriptions.filter((item) => isSubscriptionMrrEligible(item.status)).length,
     [subscriptions]
@@ -83,107 +81,90 @@ export default function AdminClientesPage() {
 
   return (
     <div className="space-y-6 text-slate-200">
-      <header>
-        <h1 className="text-2xl font-bold text-white">Clientes & Ingresos</h1>
-        <p className="mt-1 text-sm text-slate-400">Usuarios, planes, pagos y soporte en una sola vista.</p>
-      </header>
+      <div>
+        <p className="text-[11px] uppercase tracking-[0.2em] text-rose-300">✦ Admin · Clientes</p>
+        <h1 className="mt-2 text-[28px] font-semibold tracking-[-0.03em] text-white sm:text-[32px]">
+          Clientes & Ingresos
+        </h1>
+        <p className="mt-1 text-sm text-slate-500">Usuarios, planes, pagos y soporte en una sola vista.</p>
+      </div>
 
-      <section className="grid gap-5 md:grid-cols-4">
-        <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-          <Users className="h-5 w-5 text-cyan-400" />
-          <p className="mt-3 text-3xl font-bold text-white">{users.length}</p>
-          <p className="text-sm text-slate-500">Clientes totales</p>
-        </div>
-        <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-          <CreditCard className="h-5 w-5 text-emerald-400" />
-          <p className="mt-3 text-3xl font-bold text-white">{activeSubscriptions}</p>
-          <p className="text-sm text-slate-500">Suscripciones activas</p>
-        </div>
-        <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-          <LifeBuoy className="h-5 w-5 text-amber-400" />
-          <p className="mt-3 text-3xl font-bold text-white">{openTickets}</p>
-          <p className="text-sm text-slate-500">Tickets abiertos</p>
-        </div>
-        <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-          <Receipt className="h-5 w-5 text-violet-400" />
-          <p className="mt-3 text-3xl font-bold text-white">{payments?.paypalEmail ? 'Ready' : 'Draft'}</p>
-          <p className="text-sm text-slate-500">Stack de pagos</p>
-        </div>
+      <section className="grid gap-4 md:grid-cols-4">
+        {[
+          { icon: '👥', label: 'Clientes totales', value: users.length, color: 'text-white' },
+          { icon: '💳', label: 'Suscripciones activas', value: activeSubscriptions, color: 'text-emerald-400' },
+          { icon: '🎧', label: 'Tickets abiertos', value: openTickets, color: 'text-amber-400' },
+          { icon: '💰', label: 'Stack de pagos', value: payments?.paypalEmail ? 'Ready' : 'Draft', color: 'text-violet-400' },
+        ].map((item) => (
+          <div key={item.label} className="rounded-[20px] bg-[#040810] p-5">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{item.label}</p>
+            <p className={`mt-3 text-3xl font-bold tracking-[-0.03em] ${item.color}`}>{item.value}</p>
+          </div>
+        ))}
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+        <div className="rounded-[24px] bg-[#040810] p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-semibold text-white">Clientes recientes</h2>
-            <Link href="/admin/users" className="text-xs text-cyan-400 hover:text-cyan-300">Ver histórico</Link>
+            <h2 className="text-[16px] font-semibold tracking-[-0.02em] text-white">Clientes recientes</h2>
+            <Link href="/admin/users" className="text-xs text-cyan-300 transition hover:text-white">Ver histórico →</Link>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-slate-800 text-slate-500">
-                  <th className="py-3 font-medium">Cliente</th>
-                  <th className="py-3 font-medium">Plan</th>
-                  <th className="py-3 font-medium">Estado</th>
-                  <th className="py-3 font-medium">Campañas</th>
-                </tr>
-              </thead>
-              <tbody>
+          <div className="overflow-x-auto rounded-[20px] bg-[#030610]">
+            <div className="min-w-[560px]">
+              <div className="grid grid-cols-[1.5fr_0.8fr_0.8fr_0.6fr] gap-3 px-4 py-3 text-[10px] uppercase tracking-[0.16em] text-slate-600">
+                <span>Cliente</span>
+                <span>Plan</span>
+                <span>Estado</span>
+                <span>Campañas</span>
+              </div>
+              <div className="divide-y divide-white/[0.04]">
                 {recentUsers.map((user) => (
-                  <tr key={user.id} className="border-b border-slate-800/50 text-slate-300">
-                    <td className="py-3">
-                      <div>
-                        <p className="font-medium text-white">{user.name || 'Sin nombre'}</p>
-                        <p className="text-xs text-slate-500">{user.email}</p>
-                      </div>
-                    </td>
-                    <td className="py-3">{user.subscription?.plan || 'Sin plan'}</td>
-                    <td className="py-3">{user.subscription?.status || 'Pendiente'}</td>
-                    <td className="py-3">{user.campaigns.length}</td>
-                  </tr>
+                  <div key={user.id} className="grid grid-cols-[1.5fr_0.8fr_0.8fr_0.6fr] gap-3 px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium text-white">{user.name || 'Sin nombre'}</p>
+                      <p className="text-xs text-slate-500">{user.email}</p>
+                    </div>
+                    <p className="self-center text-sm text-slate-300">{user.subscription?.plan || 'Sin plan'}</p>
+                    <p className="self-center text-sm text-slate-300">{user.subscription?.status || 'Pendiente'}</p>
+                    <p className="self-center text-sm text-slate-300">{user.campaigns.length}</p>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </div>
           </div>
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-            <h2 className="font-semibold text-white">Ingresos & pagos</h2>
-            <div className="mt-4 space-y-3 text-sm text-slate-300">
-              <div className="flex items-center justify-between rounded-lg bg-slate-800/60 px-3 py-3">
-                <span>PayPal</span>
-                <span>{payments?.paypalEmail || 'No configurado'}</span>
-              </div>
-              <div className="flex items-center justify-between rounded-lg bg-slate-800/60 px-3 py-3">
-                <span>Webhook Stripe</span>
-                <span>{payments?.stripeWebhookSecret ? 'Guardado' : 'Pendiente'}</span>
-              </div>
-              <div className="flex items-center justify-between rounded-lg bg-slate-800/60 px-3 py-3">
-                <span>Comisión</span>
-                <span>{payments?.commissionRate ?? 0}%</span>
-              </div>
-              <div className="flex items-center justify-between rounded-lg bg-slate-800/60 px-3 py-3">
-                <span>Payout mínimo</span>
-                <span>${payments?.minimumPayout ?? 0}</span>
-              </div>
+          <div className="rounded-[24px] bg-[#040810] p-5">
+            <h2 className="mb-4 text-[16px] font-semibold tracking-[-0.02em] text-white">Ingresos & pagos</h2>
+            <div className="space-y-2">
+              {[
+                { label: 'PayPal', value: payments?.paypalEmail || 'No configurado' },
+                { label: 'Webhook Stripe', value: payments?.stripeWebhookSecret ? 'Guardado' : 'Pendiente' },
+                { label: 'Comisión', value: `${payments?.commissionRate ?? 0}%` },
+                { label: 'Payout mínimo', value: `$${payments?.minimumPayout ?? 0}` },
+              ].map((item) => (
+                <div key={item.label} className="flex items-center justify-between rounded-[16px] bg-[#030610] px-4 py-3">
+                  <span className="text-sm text-slate-400">{item.label}</span>
+                  <span className="text-sm font-medium text-white">{item.value}</span>
+                </div>
+              ))}
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-            <h2 className="font-semibold text-white">Soporte</h2>
-            <div className="mt-4 space-y-3 text-sm text-slate-300">
-              <div className="flex items-center justify-between rounded-lg bg-slate-800/60 px-3 py-3">
-                <span>Tickets abiertos</span>
-                <span>{support?.queueSummary.openTickets || 0}</span>
-              </div>
-              <div className="flex items-center justify-between rounded-lg bg-slate-800/60 px-3 py-3">
-                <span>Resolución IA</span>
-                <span>{support?.queueSummary.aiResolvedRate || 0}%</span>
-              </div>
-              <div className="flex items-center justify-between rounded-lg bg-slate-800/60 px-3 py-3">
-                <span>Primera respuesta</span>
-                <span>{support?.queueSummary.averageFirstResponse || 'N/D'}</span>
-              </div>
+          <div className="rounded-[24px] bg-[#040810] p-5">
+            <h2 className="mb-4 text-[16px] font-semibold tracking-[-0.02em] text-white">Soporte</h2>
+            <div className="space-y-2">
+              {[
+                { label: 'Tickets abiertos', value: support?.queueSummary.openTickets || 0 },
+                { label: 'Resolución IA', value: `${support?.queueSummary.aiResolvedRate || 0}%` },
+                { label: 'Primera respuesta', value: support?.queueSummary.averageFirstResponse || 'N/D' },
+              ].map((item) => (
+                <div key={item.label} className="flex items-center justify-between rounded-[16px] bg-[#030610] px-4 py-3">
+                  <span className="text-sm text-slate-400">{item.label}</span>
+                  <span className="text-sm font-medium text-white">{item.value}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
