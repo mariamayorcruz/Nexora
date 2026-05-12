@@ -241,6 +241,16 @@ export async function POST(request: NextRequest) {
 
     const output = outputs[0];
 
+    if (output.bullets) {
+      output.bullets = output.bullets.map((bullet: string) =>
+        bullet
+          .replace(/Campaign Assembly Engine\s*[·\-]\s*Premium\s*✨?/gi, '')
+          .replace(/Campaign Assembly Engine\s*[·\-]\s*\w+\s*✨?/gi, '')
+          .replace(/Campaign Assembly Engine/gi, '')
+          .trim()
+      );
+    }
+
     let imageUrl: string | null = null;
     try {
       const imagePrompt = buildImagePrompt({

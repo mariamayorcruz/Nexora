@@ -33,6 +33,14 @@ type StudioUsage = {
 const CHANNELS = ['Instagram', 'WhatsApp', 'Facebook', 'SMS', 'Email', 'TikTok'];
 const VISUAL_STYLES = ['Corporativo', 'Premium', 'Cercano', 'Urgente'];
 
+function stripCampaignAssemblyText(value: string) {
+  return value
+    .replace(/Campaign Assembly Engine\s*[Â·\-]\s*Premium\s*âœ¨?/gi, '')
+    .replace(/Campaign Assembly Engine\s*[Â·\-]\s*\w+\s*âœ¨?/gi, '')
+    .replace(/Campaign Assembly Engine/gi, '')
+    .trim();
+}
+
 export default function DashboardStudioPage() {
   const { language } = useAppLanguage();
   const [usage, setUsage] = useState<StudioUsage | null>(null);
@@ -71,7 +79,7 @@ export default function DashboardStudioPage() {
     const bullets = activeJob?.output?.bullets || [];
     return bullets
       .filter((item) => /^HOOK [ABC]/i.test(item))
-      .map((item) => item.replace(/^HOOK [ABC]\s*—\s*/i, '').replace(/^HOOK [ABC]\s*-\s*/i, ''))
+      .map((item) => item.replace(/^HOOK [ABC]\s*â€”\s*/i, '').replace(/^HOOK [ABC]\s*-\s*/i, ''))
       .slice(0, 3);
   }, [activeJob]);
 
@@ -83,28 +91,40 @@ export default function DashboardStudioPage() {
         key: 'instagram',
         label: 'Instagram',
         color: '#E1306C',
-        copy: (findBullet('COPY INSTAGRAM') || activeJob?.output?.headline || 'Copy pendiente').replace(/^COPY INSTAGRAM\s*—\s*/i, '').replace(/^COPY INSTAGRAM\s*-\s*/i, ''),
+        copy: stripCampaignAssemblyText(
+          (findBullet('COPY INSTAGRAM') || activeJob?.output?.headline || 'Copy pendiente')
+            .replace(/^COPY INSTAGRAM\s*â€”\s*/i, '')
+            .replace(/^COPY INSTAGRAM\s*-\s*/i, '')
+        ),
         cta: activeJob?.output?.cta || 'CTA pendiente',
       },
       {
         key: 'whatsapp',
         label: 'WhatsApp',
         color: '#25D366',
-        copy: (findBullet('COPY WHATSAPP') || activeJob?.output?.angle || 'Mensaje pendiente').replace(/^COPY WHATSAPP\s*—\s*/i, '').replace(/^COPY WHATSAPP\s*-\s*/i, ''),
+        copy: stripCampaignAssemblyText(
+          (findBullet('COPY WHATSAPP') || activeJob?.output?.angle || 'Mensaje pendiente')
+            .replace(/^COPY WHATSAPP\s*â€”\s*/i, '')
+            .replace(/^COPY WHATSAPP\s*-\s*/i, '')
+        ),
         cta: activeJob?.output?.cta || 'CTA pendiente',
       },
       {
         key: 'facebook',
         label: 'Facebook',
         color: '#1877F2',
-        copy: activeJob?.output?.headline || 'Copy pendiente',
+        copy: stripCampaignAssemblyText(activeJob?.output?.headline || 'Copy pendiente'),
         cta: activeJob?.output?.cta || 'CTA pendiente',
       },
       {
         key: 'email',
         label: 'Email',
         color: '#818cf8',
-        copy: (findBullet('COPY EMAIL') || activeJob?.output?.angle || 'Email pendiente').replace(/^COPY EMAIL\s*—\s*/i, '').replace(/^COPY EMAIL\s*-\s*/i, ''),
+        copy: stripCampaignAssemblyText(
+          (findBullet('COPY EMAIL') || activeJob?.output?.angle || 'Email pendiente')
+            .replace(/^COPY EMAIL\s*â€”\s*/i, '')
+            .replace(/^COPY EMAIL\s*-\s*/i, '')
+        ),
         cta: activeJob?.output?.cta || 'CTA pendiente',
       },
     ];
@@ -131,7 +151,7 @@ export default function DashboardStudioPage() {
           audience,
           channel: channels[0] || 'Instagram',
           prompt: `${goal}\nCanales: ${channels.join(', ')}\nEstilo visual: ${style}`,
-          customContext: `Campaign Assembly Engine · ${style}`,
+          customContext: `Campaign Assembly Engine Â· ${style}`,
         }),
       });
       const data = await response.json();

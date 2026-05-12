@@ -186,7 +186,7 @@ export default function CampaignOutput({
                   </div>
                   <p className="mt-3 whitespace-pre-line text-sm leading-6 text-white">
                     {channel.copy
-                      .replace(/Campaign Assembly Engine\s*[·\-]\s*Premium\s*✨?/gi, '')
+                      .replace(/Campaign Assembly Engine\s*[Â·\-]\s*Premium\s*âœ¨?/gi, '')
                       .replace(/Campaign Assembly Engine/gi, '')
                       .trim()}
                   </p>
