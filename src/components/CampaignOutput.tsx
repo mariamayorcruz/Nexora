@@ -71,8 +71,8 @@ export default function CampaignOutput({
               })}
             </div>
           </div>
-          <div className="mt-4 overflow-hidden rounded-[22px] bg-white/[0.03]">
-            {imageUrl?.startsWith('__gemini_description__') ? (
+          {imageUrl ? (
+            imageUrl.startsWith('__gemini_description__') ? (
               (() => {
                 try {
                   const desc = JSON.parse(imageUrl.replace('__gemini_description__', '')) as {
@@ -82,7 +82,7 @@ export default function CampaignOutput({
                     mood?: string;
                   };
                   return (
-                    <div className="flex aspect-[4/5] min-h-[280px] flex-col items-center justify-center bg-gradient-to-br from-[#040810] to-[#061220] p-6 text-center">
+                    <div className="mt-4 flex aspect-[4/5] min-h-[280px] flex-col items-center justify-center overflow-hidden rounded-[22px] bg-gradient-to-br from-[#040810] to-[#061220] p-6 text-center">
                       <p className="mb-3 text-[11px] uppercase tracking-[0.2em] text-cyan-300">✦ Visión de campaña</p>
                       <p className="text-sm leading-6 text-slate-300">{desc.description}</p>
                       <div className="mt-4 flex flex-wrap justify-center gap-3">
@@ -97,24 +97,24 @@ export default function CampaignOutput({
                   return null;
                 }
               })()
-            ) : imageUrl ? (
+            ) : (
               <Image
                 src={imageUrl}
                 alt=""
                 width={1200}
                 height={1500}
                 unoptimized
-                className="aspect-[4/5] w-full object-cover"
+                className="mt-4 aspect-[4/5] w-full overflow-hidden rounded-[22px] object-cover"
               />
-            ) : (
-              <div className="flex aspect-[4/5] min-h-[280px] flex-col items-center justify-center gap-3">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-cyan-500/10 text-cyan-400">
-                  <ImageIcon className="h-6 w-6" />
-                </div>
-                <p className="text-sm text-slate-400">Tu visual aparecerá aquí cuando generes la campaña.</p>
+            )
+          ) : (
+            <div className="mt-4 flex aspect-[4/5] min-h-[280px] flex-col items-center justify-center gap-3 overflow-hidden rounded-[22px] bg-white/[0.03]">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-cyan-500/10 text-cyan-400">
+                <ImageIcon className="h-6 w-6" />
               </div>
-            )}
-          </div>
+              <p className="text-sm text-slate-400">Tu visual aparecerá aquí cuando generes la campaña.</p>
+            </div>
+          )}
         </div>
 
         <div className="space-y-5">
