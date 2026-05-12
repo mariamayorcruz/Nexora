@@ -19,9 +19,10 @@ async function generateImageWithFal(prompt: string): Promise<string | null> {
       body: JSON.stringify({
         prompt,
         image_size: 'square_hd',
-        num_inference_steps: 4,
+        num_inference_steps: 8,
         num_images: 1,
         enable_safety_checker: true,
+        negative_prompt: 'text, words, letters, typography, watermark, logo, banner, sign, label, caption, title, heading, writing, font, alphabet, numbers, digits, characters, blurry, low quality, distorted',
       }),
     });
 
@@ -101,14 +102,27 @@ export function buildImagePrompt(params: {
   businessName?: string;
 }): string {
   const styleMap: Record<string, string> = {
-    Corporativo: 'professional, clean, corporate, minimalist, business environment, modern office',
-    Premium: 'luxury, premium, elegant, high-end, sophisticated, aspirational lifestyle',
-    Cercano: 'warm, friendly, approachable, human, authentic, real people smiling',
-    Urgente: 'bold, high contrast, dynamic, energetic, striking, attention-grabbing',
+    Corporativo: 'professional corporate photography, clean modern office, business professionals',
+    Premium: 'luxury premium photography, elegant upscale environment, sophisticated',
+    Cercano: 'warm friendly photography, real people, authentic human moments, approachable',
+    Urgente: 'bold dramatic photography, high contrast, dynamic action shot, energetic',
   };
 
-  const styleDesc = styleMap[params.style] || 'professional, modern';
-  const business = params.businessName || 'the business';
+  const styleDesc = styleMap[params.style] || 'professional modern photography';
 
-  return `Professional marketing advertisement image for ${business}. ${params.goal}. Target: ${params.audience}. Service: ${params.offer}. Style: ${styleDesc}. High quality commercial photography, no text overlays, no logos, clean composition, square format, suitable for Instagram advertising.`;
+  return `${styleDesc}. Scene directly related to: ${params.offer}. 
+For business: ${params.businessName || 'professional service company'}. 
+Serving: ${params.audience}. 
+Campaign goal: ${params.goal}. 
+STRICT REQUIREMENTS: 
+- NO text of any kind
+- NO words, letters, numbers or typography anywhere
+- NO logos or watermarks
+- NO overlaid graphics
+- Photorealistic commercial photography
+- Clean professional composition
+- Square 1:1 format
+- Bright well-lit scene
+- Show the actual service or result being delivered
+- Real people or real environments related to the service`;
 }
