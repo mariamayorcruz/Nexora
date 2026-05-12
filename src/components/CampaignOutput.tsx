@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { Download, ImageIcon, RefreshCcw, Rocket, Sparkles } from 'lucide-react';
+import AdComposer from '@/components/AdComposer';
 
 type ChannelCard = {
   key: string;
@@ -186,7 +187,8 @@ export default function CampaignOutput({
                   </div>
                   <p className="mt-3 whitespace-pre-line text-sm leading-6 text-white">
                     {channel.copy
-                      .replace(/Campaign Assembly Engine\s*[Â·\-]\s*Premium\s*âœ¨?/gi, '')
+                      .replace(/Campaign Assembly Engine\s*[·-]\s*Premium\s*✨?/gi, '')
+                      .replace(/Campaign Assembly Engine\s*[·-]\s*\w+\s*✨?/gi, '')
                       .replace(/Campaign Assembly Engine/gi, '')
                       .trim()}
                   </p>
@@ -195,6 +197,42 @@ export default function CampaignOutput({
               ))}
             </div>
           </div>
+
+          {imageUrl && !imageUrl.startsWith('__gemini_description__') && (
+            <div className="rounded-[22px] bg-[#030610] p-4">
+              <p className="mb-4 text-sm font-medium text-white">✦ Ads con branding aplicado</p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <AdComposer
+                  imageUrl={imageUrl}
+                  headline={headline || title}
+                  subline="Sin contratos · After hours · 15% descuento"
+                  cta="Cotización gratis →"
+                  brand={{
+                    primaryColor: '#2AAFB0',
+                    secondaryColor: '#3D4F5E',
+                    accentColor: '#8B7D35',
+                    terracottaColor: '#B85C38',
+                    businessName: 'Mayor Excelsior',
+                  }}
+                  format="square"
+                />
+                <AdComposer
+                  imageUrl={imageUrl}
+                  headline={headline || title}
+                  subline="Sin contratos · After hours · 15% descuento"
+                  cta="Cotización gratis →"
+                  brand={{
+                    primaryColor: '#2AAFB0',
+                    secondaryColor: '#3D4F5E',
+                    accentColor: '#8B7D35',
+                    terracottaColor: '#B85C38',
+                    businessName: 'Mayor Excelsior',
+                  }}
+                  format="story"
+                />
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
