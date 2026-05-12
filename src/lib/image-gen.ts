@@ -102,27 +102,51 @@ export function buildImagePrompt(params: {
   businessName?: string;
 }): string {
   const styleMap: Record<string, string> = {
-    Corporativo: 'professional corporate photography, clean modern office, business professionals',
-    Premium: 'luxury premium photography, elegant upscale environment, sophisticated',
-    Cercano: 'warm friendly photography, real people, authentic human moments, approachable',
-    Urgente: 'bold dramatic photography, high contrast, dynamic action shot, energetic',
+    Corporativo: 'professional corporate photography, clean modern environment, business professionals at work',
+    Premium: 'luxury premium photography, elegant upscale setting, sophisticated and aspirational',
+    Cercano: 'warm friendly photography, real people, authentic human moments, approachable and genuine',
+    Urgente: 'bold dramatic photography, high contrast, dynamic action, energetic and striking',
   };
 
-  const styleDesc = styleMap[params.style] || 'professional modern photography';
+  const styleDesc = styleMap[params.style] || 'professional modern commercial photography';
+  const combined = `${params.offer} ${params.goal} ${params.audience}`.toLowerCase();
 
-  return `${styleDesc}. Scene directly related to: ${params.offer}. 
-For business: ${params.businessName || 'professional service company'}. 
-Serving: ${params.audience}. 
-Campaign goal: ${params.goal}. 
-STRICT REQUIREMENTS: 
-- NO text of any kind
-- NO words, letters, numbers or typography anywhere
-- NO logos or watermarks
-- NO overlaid graphics
-- Photorealistic commercial photography
-- Clean professional composition
-- Square 1:1 format
-- Bright well-lit scene
-- Show the actual service or result being delivered
-- Real people or real environments related to the service`;
+  let serviceScene = '';
+
+  if (combined.match(/limpi|clean|aseo|janitorial|maid|housekeep/)) {
+    serviceScene = 'spotless clean professional space, cleaning professionals in uniform, gleaming surfaces, organized pristine environment';
+  } else if (combined.match(/dental|dent|odontolog|clinic|salud|health|medical|médic/)) {
+    serviceScene = 'modern medical clinic, healthcare professionals, clean sterile environment, patients being cared for';
+  } else if (combined.match(/gym|fitness|entrena|workout|sport|deport/)) {
+    serviceScene = 'modern gym facility, people exercising, fitness equipment, active healthy lifestyle';
+  } else if (combined.match(/restaur|food|comida|café|coffee|bakery|panadería/)) {
+    serviceScene = 'beautiful restaurant or cafe, delicious food presentation, warm inviting atmosphere, happy customers dining';
+  } else if (combined.match(/real estate|inmueble|propiedad|casa|home|apartment|depart/)) {
+    serviceScene = 'beautiful modern home or apartment, real estate photography, bright spacious rooms, inviting living space';
+  } else if (combined.match(/tech|software|app|digital|web|desarrollo/)) {
+    serviceScene = 'modern tech office, people working on computers, innovative workspace, collaborative team environment';
+  } else if (combined.match(/marketing|agencia|agency|publicidad|advertising|brand/)) {
+    serviceScene = 'creative agency office, marketing professionals, creative work environment, team collaboration';
+  } else if (combined.match(/legal|law|abogad|attorney|notari/)) {
+    serviceScene = 'professional law office, legal professionals, formal business environment, trust and expertise';
+  } else if (combined.match(/construc|architect|renovar|remodel|build/)) {
+    serviceScene = 'construction or renovation project, skilled workers, modern building, quality craftsmanship';
+  } else if (combined.match(/beauty|salon|spa|estética|hair|nail|barbería/)) {
+    serviceScene = 'modern beauty salon or spa, professional beauty treatment, relaxing elegant atmosphere';
+  } else {
+    serviceScene = `professional service environment related to: ${params.offer}, satisfied clients, professional team, quality results`;
+  }
+
+  return `${styleDesc}. ${serviceScene}. 
+Business context: ${params.businessName || 'professional service company'} serving ${params.audience}. 
+Campaign objective: ${params.goal}.
+ABSOLUTE REQUIREMENTS - NO EXCEPTIONS:
+- NO text of any kind anywhere in the image
+- NO words, letters, numbers, typography, fonts
+- NO logos, watermarks, signs, banners, labels
+- NO overlaid graphics or UI elements
+- Photorealistic commercial photography quality
+- Bright, clean, professional lighting
+- Perfect square 1:1 composition
+- Show the actual service environment, result or happy clients`;
 }

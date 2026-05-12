@@ -90,7 +90,7 @@ export default function CampaignOutput({
                         {desc.colors ? <span className="rounded-full bg-white/[0.04] px-3 py-1 text-[10px] text-slate-400">{desc.colors}</span> : null}
                         {desc.mood ? <span className="rounded-full bg-white/[0.04] px-3 py-1 text-[10px] text-slate-400">{desc.mood}</span> : null}
                       </div>
-                      <p className="mt-4 text-[11px] text-slate-600">Activa fal.ai para generar imagen real -&gt;</p>
+                      <p className="mt-4 text-[11px] text-slate-600">Activa fal.ai para generar imagen real →</p>
                     </div>
                   );
                 } catch {
@@ -98,22 +98,14 @@ export default function CampaignOutput({
                 }
               })()
             ) : imageUrl ? (
-              <div className="relative">
-                <Image
-                  src={imageUrl}
-                  alt=""
-                  width={1200}
-                  height={1500}
-                  unoptimized
-                  className="aspect-[4/5] w-full object-cover"
-                />
-                {headline ? (
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent p-5">
-                    <p className="max-w-md text-2xl font-semibold tracking-[-0.02em] text-white">{headline}</p>
-                    <p className="mt-2 text-xs uppercase tracking-[0.18em] text-cyan-300">✦ Nexora</p>
-                  </div>
-                ) : null}
-              </div>
+              <Image
+                src={imageUrl}
+                alt=""
+                width={1200}
+                height={1500}
+                unoptimized
+                className="aspect-[4/5] w-full object-cover"
+              />
             ) : (
               <div className="flex aspect-[4/5] min-h-[280px] flex-col items-center justify-center gap-3">
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-cyan-500/10 text-cyan-400">
@@ -175,7 +167,7 @@ export default function CampaignOutput({
                       Publicar
                     </button>
                   </div>
-                  <p className="mt-3 text-sm leading-6 text-white whitespace-pre-line">{channel.copy}</p>
+                  <p className="mt-3 whitespace-pre-line text-sm leading-6 text-white">{channel.copy}</p>
                   <p className="mt-4 text-xs text-slate-500">{channel.cta}</p>
                 </div>
               ))}
