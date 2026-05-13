@@ -58,6 +58,7 @@ export default function DashboardStudioPage() {
   const [channels, setChannels] = useState<string[]>(['Instagram', 'WhatsApp']);
   const [style, setStyle] = useState('Premium');
   const [activeJob, setActiveJob] = useState<AiJob | null>(null);
+  const [selectedHook, setSelectedHook] = useState<string | null>(null);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
@@ -167,6 +168,7 @@ export default function DashboardStudioPage() {
       const nextJobs = [data.job, ...jobs].slice(0, 20);
       setJobs(nextJobs);
       setActiveJob(data.job);
+      setSelectedHook(null);
       if (data.usage) setUsage((current) => (current ? { ...current, ...data.usage } : data.usage));
       setMessage(language === 'en' ? 'Campaign generated.' : 'Campaña generada.');
     } catch (error) {
@@ -324,9 +326,11 @@ export default function DashboardStudioPage() {
             status={language === 'en' ? 'Ready to publish' : 'Lista para publicar'}
             creditsUsed={activeJob.creditsUsed}
             imageUrl={activeJob.output?.imageUrl}
-            headline={activeJob.output?.headline}
+            headline={selectedHook || activeJob.output?.headline}
             hooks={hooks.length ? hooks : activeJob.output?.bullets?.slice(0, 3) || ['Hook A pendiente', 'Hook B pendiente', 'Hook C pendiente']}
             channels={channelCards}
+            selectedHook={selectedHook}
+            onSelectHook={setSelectedHook}
             onPublish={() => void publishAll()}
             onRegenerate={() => void regenerateCampaign()}
           />

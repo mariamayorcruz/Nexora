@@ -20,6 +20,8 @@ export default function CampaignOutput({
   headline,
   hooks,
   channels,
+  selectedHook,
+  onSelectHook,
   onPublish,
   onRegenerate,
 }: {
@@ -30,6 +32,8 @@ export default function CampaignOutput({
   headline?: string;
   hooks: string[];
   channels: ChannelCard[];
+  selectedHook?: string | null;
+  onSelectHook?: (hook: string) => void;
   onPublish?: () => void;
   onRegenerate?: () => void;
 }) {
@@ -146,8 +150,16 @@ export default function CampaignOutput({
                       <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{String.fromCharCode(65 + index)}</p>
                       <p className="mt-2 text-sm leading-6 text-white">{hook}</p>
                     </div>
-                    <button type="button" className="rounded-full bg-cyan-500/10 px-3 py-1.5 text-[11px] text-cyan-300 transition-all duration-150 hover:bg-cyan-500/20">
-                      Usar
+                    <button
+                      type="button"
+                      onClick={() => onSelectHook?.(hook)}
+                      className={`rounded-full px-3 py-1.5 text-[11px] transition-all duration-150 ${
+                        selectedHook === hook
+                          ? 'bg-cyan-500 text-white'
+                          : 'bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20'
+                      }`}
+                    >
+                      {selectedHook === hook ? '✓ Usando' : 'Usar'}
                     </button>
                   </div>
                 </div>
