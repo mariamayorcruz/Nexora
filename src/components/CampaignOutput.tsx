@@ -186,10 +186,12 @@ export default function CampaignOutput({
                     </button>
                   </div>
                   <p className="mt-3 whitespace-pre-line text-sm leading-6 text-white">
-                    {channel.copy
-                      .replace(/Campaign Assembly Engine\s*[·-]\s*Premium\s*✨?/gi, '')
-                      .replace(/Campaign Assembly Engine\s*[·-]\s*\w+\s*✨?/gi, '')
-                      .replace(/Campaign Assembly Engine/gi, '')
+                    {(channel.copy || '')
+                      .replace(/Â·/g, '·')
+                      .replace(/â€"/g, '—')
+                      .replace(/✨/g, '')
+                      .replace(/Campaign Assembly Engine[^.]*[\.\s]*/gi, '')
+                      .replace(/·\s*(Corporativo|Premium|Cercano|Urgente)\s*/gi, '')
                       .trim()}
                   </p>
                   <p className="mt-4 text-xs text-slate-500">{channel.cta}</p>

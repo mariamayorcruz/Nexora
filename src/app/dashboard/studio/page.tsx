@@ -35,8 +35,12 @@ const VISUAL_STYLES = ['Corporativo', 'Premium', 'Cercano', 'Urgente'];
 
 function stripCampaignAssemblyText(value: string) {
   return value
-    .replace(/Campaign Assembly Engine\s*[Â·\-]\s*Premium\s*âœ¨?/gi, '')
-    .replace(/Campaign Assembly Engine\s*[Â·\-]\s*\w+\s*âœ¨?/gi, '')
+    .replace(/Â·/g, '·')
+    .replace(/â€"/g, '—')
+    .replace(/✨/g, '')
+    .replace(/Campaign Assembly Engine\s*[·-]\s*Premium\s*✨?/gi, '')
+    .replace(/Campaign Assembly Engine\s*[·-]\s*\w+\s*✨?/gi, '')
+    .replace(/Campaign Assembly Engine[^.]*\./gi, '')
     .replace(/Campaign Assembly Engine/gi, '')
     .trim();
 }
@@ -79,52 +83,56 @@ export default function DashboardStudioPage() {
     const bullets = activeJob?.output?.bullets || [];
     return bullets
       .filter((item) => /^HOOK [ABC]/i.test(item))
-      .map((item) => item.replace(/^HOOK [ABC]\s*â€”\s*/i, '').replace(/^HOOK [ABC]\s*-\s*/i, ''))
+      .map((item) =>
+        item
+          .replace(/^HOOK [ABC]\s*[—\-]+\s*/i, '')
+          .replace(/^HOOK [ABC]\s*/i, '')
+          .trim()
+      )
       .slice(0, 3);
   }, [activeJob]);
 
   const channelCards = useMemo(() => {
     const bullets = activeJob?.output?.bullets || [];
-    const findBullet = (prefix: string) => bullets.find((item) => item.toUpperCase().startsWith(prefix));
+    const findBullet = (prefix: string) => {
+      const found = bullets.find((item) => item.toUpperCase().startsWith(prefix.toUpperCase()));
+      if (!found) return null;
+      return found
+        .replace(new RegExp(`^${prefix}\\s*[—\\-]+\\s*`, 'i'), '')
+        .replace(new RegExp(`^${prefix}\\s*`, 'i'), '')
+        .replace(/Â·/g, '·')
+        .replace(/✨/g, '')
+        .replace(/Campaign Assembly Engine[^.]*\./gi, '')
+        .trim();
+    };
+
     return [
       {
         key: 'instagram',
         label: 'Instagram',
         color: '#E1306C',
-        copy: stripCampaignAssemblyText(
-          (findBullet('COPY INSTAGRAM') || activeJob?.output?.headline || 'Copy pendiente')
-            .replace(/^COPY INSTAGRAM\s*â€”\s*/i, '')
-            .replace(/^COPY INSTAGRAM\s*-\s*/i, '')
-        ),
+        copy: findBullet('COPY INSTAGRAM') || stripCampaignAssemblyText(activeJob?.output?.headline || ''),
         cta: activeJob?.output?.cta || 'CTA pendiente',
       },
       {
         key: 'whatsapp',
         label: 'WhatsApp',
         color: '#25D366',
-        copy: stripCampaignAssemblyText(
-          (findBullet('COPY WHATSAPP') || activeJob?.output?.angle || 'Mensaje pendiente')
-            .replace(/^COPY WHATSAPP\s*â€”\s*/i, '')
-            .replace(/^COPY WHATSAPP\s*-\s*/i, '')
-        ),
+        copy: findBullet('COPY WHATSAPP') || stripCampaignAssemblyText(activeJob?.output?.angle || ''),
         cta: activeJob?.output?.cta || 'CTA pendiente',
       },
       {
         key: 'facebook',
         label: 'Facebook',
         color: '#1877F2',
-        copy: stripCampaignAssemblyText(activeJob?.output?.headline || 'Copy pendiente'),
+        copy: findBullet('COPY FACEBOOK') || stripCampaignAssemblyText(activeJob?.output?.headline || ''),
         cta: activeJob?.output?.cta || 'CTA pendiente',
       },
       {
         key: 'email',
         label: 'Email',
         color: '#818cf8',
-        copy: stripCampaignAssemblyText(
-          (findBullet('COPY EMAIL') || activeJob?.output?.angle || 'Email pendiente')
-            .replace(/^COPY EMAIL\s*â€”\s*/i, '')
-            .replace(/^COPY EMAIL\s*-\s*/i, '')
-        ),
+        copy: findBullet('COPY EMAIL') || stripCampaignAssemblyText(activeJob?.output?.angle || ''),
         cta: activeJob?.output?.cta || 'CTA pendiente',
       },
     ];
@@ -151,7 +159,7 @@ export default function DashboardStudioPage() {
           audience,
           channel: channels[0] || 'Instagram',
           prompt: `${goal}\nCanales: ${channels.join(', ')}\nEstilo visual: ${style}`,
-          customContext: `Campaign Assembly Engine Â· ${style}`,
+          customContext: `Campaign Assembly Engine · ${style}`,
         }),
       });
       const data = await response.json();
@@ -208,7 +216,9 @@ export default function DashboardStudioPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-[11px] uppercase tracking-[0.2em] text-cyan-300">✦ Campaign Assembly Engine</p>
-            <h1 className="mt-2 text-[28px] font-semibold tracking-[-0.03em] text-white sm:text-[32px] xl:text-[34px]">Studio IA para campañas listas para lanzar</h1>
+            <h1 className="mt-2 text-[28px] font-semibold tracking-[-0.03em] text-white sm:text-[32px] xl:text-[34px]">
+              Studio IA para campañas listas para lanzar
+            </h1>
           </div>
           <div className="min-w-[220px]">
             <div className="mb-2 flex items-center justify-between text-xs text-slate-500">
