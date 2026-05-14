@@ -159,11 +159,11 @@ export default function DashboardPage() {
       cards.push({
         label: en ? 'Needs attention' : 'Requieren atención',
         title: en
-          ? `${staleLeads.length} ${staleLeads.length === 1 ? 'lead has' : 'leads have'} gone quiet`
-          : `${staleLeads.length} ${staleLeads.length === 1 ? 'lead sin' : 'leads sin'} actividad reciente`,
+          ? `${staleLeads.length} potential ${staleLeads.length === 1 ? "customer hasn't" : "customers haven't"} heard back yet`
+          : `${staleLeads.length} ${staleLeads.length === 1 ? 'cliente potencial sin' : 'clientes potenciales sin'} respuesta reciente`,
         detail: en
-          ? 'Quiet for over a day — a good moment for a fresh follow-up.'
-          : 'Sin movimiento por más de un día — buen momento para un seguimiento fresco.',
+          ? 'They may think you forgot about them. A quick message changes that.'
+          : 'Puede que crean que los olvidaste. Un mensaje rápido cambia eso.',
         tone: 'text-amber-300',
         href: '/dashboard/crm',
         cta: en ? 'Open CRM' : 'Abrir CRM',
@@ -172,11 +172,11 @@ export default function DashboardPage() {
       cards.push({
         label: en ? 'Needs attention' : 'Requieren atención',
         title: en
-          ? `${leadStageLeads.length} new ${leadStageLeads.length === 1 ? 'lead awaits' : 'leads await'} follow-up`
-          : `${leadStageLeads.length} ${leadStageLeads.length === 1 ? 'lead nuevo espera' : 'leads nuevos esperan'} seguimiento`,
+          ? `${leadStageLeads.length} new ${leadStageLeads.length === 1 ? 'customer is' : 'customers are'} waiting to hear from you`
+          : `${leadStageLeads.length} ${leadStageLeads.length === 1 ? 'cliente nuevo está esperando' : 'clientes nuevos están esperando'} tu respuesta`,
         detail: en
-          ? 'A quick first reply often turns interest into booked conversations.'
-          : 'Una primera respuesta rápida suele convertir interés en citas.',
+          ? 'Most customers decide in the first response. Make yours count.'
+          : 'La mayoría decide con la primera respuesta. Haz que cuente.',
         tone: 'text-cyan-300',
         href: '/dashboard/crm',
         cta: en ? 'View pipeline' : 'Ver pipeline',
@@ -186,10 +186,10 @@ export default function DashboardPage() {
     if (urgentLead) {
       cards.push({
         label: en ? 'Opportunity' : 'Oportunidad',
-        title: en ? `${urgentLead.name} is ready for a next step` : `${urgentLead.name}: siguiente paso`,
+        title: en ? `${urgentLead.name} is waiting for you to take the next step` : `${urgentLead.name}: espera tu siguiente paso`,
         detail:
           urgentLead.nextAction ||
-          (en ? 'Strong intent — worth handling today.' : 'Alta intención — vale atenderlo hoy.'),
+          (en ? "High interest — don't let this one cool off." : 'Alta intención — no dejes que se enfríe.'),
         tone: 'text-emerald-300',
         href: '/dashboard/crm',
         cta: en ? 'Open in CRM' : 'Abrir en CRM',
@@ -216,7 +216,7 @@ export default function DashboardPage() {
             : 'Revisa tu lead demo'
           : firstWinReady
             ? en
-              ? 'Scan today’s opportunities'
+              ? "Scan today's opportunities"
               : 'Repasa las oportunidades de hoy'
             : en
               ? 'Build your first growth system'
@@ -264,17 +264,17 @@ export default function DashboardPage() {
     return [
       { label: en ? 'Total leads' : 'Leads totales', value: leads.length, tone: 'text-white' },
       {
-        label: en ? 'Active opportunities' : 'Oportunidades activas',
+        label: en ? 'Customers in conversation' : 'Clientes en conversación',
         value: activeLeads.length,
         tone: 'text-cyan-300',
       },
       {
-        label: en ? 'Follow-up pending' : 'Seguimiento pendiente',
+        label: en ? 'Waiting for your reply' : 'Esperando tu respuesta',
         value: followUpsPending,
         tone: 'text-amber-300',
       },
       {
-        label: en ? 'Won deals' : 'Ganados',
+        label: en ? 'Customers closed' : 'Clientes cerrados',
         value: payload?.overviewFunnel?.crmWon || 0,
         tone: 'text-emerald-300',
       },
@@ -341,11 +341,11 @@ export default function DashboardPage() {
           <p className="text-[11px] uppercase tracking-[0.22em] text-cyan-300">✦ Nexora · {businessName}</p>
           <h1 className="mt-3 text-[30px] font-semibold leading-tight tracking-[-0.03em] text-white sm:text-[34px] xl:text-[38px]">
             {language === 'en'
-              ? `Hi, ${greetingName}. ${activeLeads.length} new leads are waiting today.`
-              : `Hola, ${greetingName}. ${activeLeads.length} leads nuevos esperan hoy.`}
+              ? `Hi, ${greetingName}. ${activeLeads.length} customers are waiting to hear from you today.`
+              : `Hola, ${greetingName}. ${activeLeads.length} clientes esperan tu respuesta hoy.`}
           </h1>
           <p className="mt-3 text-sm text-slate-400">
-            {todayDate} · {language === 'en' ? 'AI Agent online and monitoring responses.' : 'AI Agent online y monitoreando respuestas.'}
+            {todayDate} · {language === 'en' ? 'AI Agent is protecting your opportunities right now.' : 'AI Agent cuidando tus oportunidades ahora mismo.'}
           </p>
 
           <div className="mt-5 flex flex-wrap gap-2">
@@ -382,8 +382,8 @@ export default function DashboardPage() {
                 <p className="mt-4 text-sm leading-6 text-slate-300">
                 {urgentLead.nextAction ||
                   (language === 'en'
-                    ? 'Follow up today — intent is high while attention lasts.'
-                    : 'Retómalo hoy. Tiene intención alta y todavía está caliente.')}
+                    ? "Don't let this opportunity cool off — they're still interested."
+                    : 'No dejes que esta oportunidad se enfríe — todavía está interesado.')}
                 </p>
               </div>
               <Link
@@ -411,13 +411,13 @@ export default function DashboardPage() {
               </p>
               <h2 className="mt-2 text-[24px] font-semibold tracking-[-0.03em] text-white">
                 {language === 'en'
-                  ? 'Your Nexora growth system is ready'
-                  : 'Tu sistema de crecimiento Nexora está listo'}
+                  ? 'Nexora is ready to protect your opportunities'
+                  : 'Nexora está listo para proteger tus oportunidades'}
               </h2>
               <p className="mt-3 text-sm leading-7 text-slate-300">
                 {language === 'en'
-                  ? 'Your first lead, follow-up templates, and pipeline setup are in place — Nexora is ready to help protect new opportunities.'
-                  : 'Tu primer lead, plantillas de seguimiento y pipeline están activos: Nexora está listo para ayudarte a no perder oportunidades.'}
+                  ? 'Your follow-up system is live. Nexora will help make sure no opportunity slips through.'
+                  : 'Tu sistema de seguimiento está activo. Nexora se asegurará de que ninguna oportunidad se pierda.'}
               </p>
             </div>
 
@@ -451,25 +451,25 @@ export default function DashboardPage() {
             label: language === 'en' ? 'Active leads' : 'Leads activos',
             value: activeLeads.length,
             tone: 'text-cyan-300',
-            sub: language === 'en' ? 'Open opportunities' : 'Oportunidades abiertas',
+            sub: language === 'en' ? 'Customers you can still win' : 'Clientes que aún puedes cerrar',
           },
           {
             label: language === 'en' ? 'Conversations today' : 'Conversaciones hoy',
             value: conversations.length,
             tone: 'text-white',
-            sub: language === 'en' ? 'Inbox needing replies' : 'Inbox con movimiento',
+            sub: language === 'en' ? 'Customers needing a reply' : 'Clientes esperando respuesta',
           },
           {
             label: language === 'en' ? 'Closed this month' : 'Cierres este mes',
             value: `${payload?.overviewFunnel?.crmWon || 0} · $${revenueClosed.toLocaleString()}`,
             tone: 'text-emerald-300',
-            sub: language === 'en' ? 'Revenue captured' : 'Ingresos capturados',
+            sub: language === 'en' ? 'Revenue protected' : 'Ingresos protegidos',
           },
           {
             label: language === 'en' ? 'Studio assets' : 'Assets Studio',
             value: `${studio?.jobs?.length || 0} · ${studio?.usage?.creditsRemaining || 0}`,
             tone: 'text-violet-300',
-            sub: language === 'en' ? 'Generated + remaining credits' : 'Generados + créditos restantes',
+            sub: language === 'en' ? 'Campaigns created + credits left' : 'Campañas creadas + créditos restantes',
           },
         ].map((item) => (
           <div key={item.label} className="rounded-[24px] bg-[#040810] p-5">
@@ -549,8 +549,8 @@ export default function DashboardPage() {
                 <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-300">
                   {lead.nextAction ||
                     (language === 'en'
-                      ? 'Awaiting reply — follow up with a clear next step.'
-                      : 'Pendiente de respuesta. Retoma con un siguiente paso claro y un CTA suave.')}
+                      ? 'This customer may think you forgot about them.'
+                      : 'Este cliente puede pensar que lo olvidaste.')}
                 </p>
               </div>
             ))}
@@ -599,11 +599,11 @@ export default function DashboardPage() {
           <div className="mt-4 space-y-3">
             {[
               language === 'en'
-                ? `${activeLeads.length} open leads in active follow-up.`
-                : `${activeLeads.length} leads abiertos en seguimiento activo.`,
+                ? `${activeLeads.length} customers waiting to hear from you.`
+                : `${activeLeads.length} clientes esperando tu respuesta.`,
               language === 'en'
-                ? `${conversations.length} conversations need a reply today.`
-                : `${conversations.length} conversaciones piden respuesta hoy.`,
+                ? `${conversations.length} customers need a reply today.`
+                : `${conversations.length} clientes esperan tu respuesta hoy.`,
               language === 'en'
                 ? `${studio?.jobs?.length || 0} assets generated in Nexora Studio.`
                 : `${studio?.jobs?.length || 0} assets generados en Nexora Studio.`,
