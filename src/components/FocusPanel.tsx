@@ -1,7 +1,7 @@
 'use client';
 
 import { PlusCircle, Star } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import AISuggestionBar from '@/components/AISuggestionBar';
 import { useAppLanguage } from '@/hooks/use-app-language';
 
@@ -47,6 +47,9 @@ export default function FocusPanel({
   const [sending, setSending] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
   const [sendError, setSendError] = useState('');
+  const [addingTask, setAddingTask] = useState(false);
+  const [newTask, setNewTask] = useState('');
+  const [tasks, setTasks] = useState<Array<{ label: string; done: boolean; due: string }>>([]);
 
   const computed = useMemo(() => {
     if (!lead) return null;
@@ -57,6 +60,24 @@ export default function FocusPanel({
     if (!tags.length) tags.push(en ? 'Active follow-up' : 'Seguimiento activo');
     return tags.slice(0, 2);
   }, [en, lead]);
+
+  useEffect(() => {
+    if (!lead) return;
+    setTasks([
+      {
+        done: false,
+        label: en ? 'Reply to first message' : 'Responder mensaje inicial',
+        due: en ? 'Today' : 'Hoy',
+      },
+      {
+        done: lead.stage === 'won',
+        label: en ? 'Update stage' : 'Actualizar etapa',
+        due: en ? 'Before close' : 'Antes de cierre',
+      },
+    ]);
+    setAddingTask(false);
+    setNewTask('');
+  }, [en, lead?.id, lead?.stage]);
 
   const handleSubmit = async () => {
     if (!lead || !draft.trim()) return;
@@ -215,26 +236,75 @@ export default function FocusPanel({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{en ? 'Tasks' : 'Tareas'}</p>
-            <button type="button" className="text-slate-500 transition hover:text-white">
+            <button
+              type="button"
+              onClick={() => setAddingTask(true)}
+              className="text-slate-500 transition hover:text-white"
+            >
               <PlusCircle className="h-4 w-4" />
             </button>
           </div>
-          {[
-            {
-              done: false,
-              label: en ? 'Reply to first message' : 'Responder mensaje inicial',
-              due: en ? 'Today' : 'Hoy',
-            },
-            {
-              done: lead.stage === 'won',
-              label: en ? 'Update stage' : 'Actualizar etapa',
-              due: en ? 'Before close' : 'Antes de cierre',
-            },
-          ].map((task) => (
-            <label key={task.label} className="flex items-center gap-3 rounded-2xl bg-[#040810] px-3 py-2.5">
-              <input type="checkbox" checked={task.done} readOnly className="h-4 w-4 rounded accent-cyan-400" />
+          {addingTask && (
+            <div className="mt-2 flex gap-2">
+              <input
+                value={newTask}
+                onChange={(e) => setNewTask(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newTask.trim()) {
+                    setTasks((prev) => [
+                      ...prev,
+                      {
+                        label: newTask.trim(),
+                        done: false,
+                        due: en ? 'Today' : 'Hoy',
+                      },
+                    ]);
+                    setNewTask('');
+                    setAddingTask(false);
+                  }
+                  if (e.key === 'Escape') {
+                    setNewTask('');
+                    setAddingTask(false);
+                  }
+                }}
+                placeholder={en ? 'New task...' : 'Nueva tarea...'}
+                className="flex-1 rounded-xl bg-[#030610] border border-cyan-500/20 px-3 py-1.5 text-xs text-white outline-none placeholder:text-slate-600"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (newTask.trim()) {
+                    setTasks((prev) => [
+                      ...prev,
+                      {
+                        label: newTask.trim(),
+                        done: false,
+                        due: en ? 'Today' : 'Hoy',
+                      },
+                    ]);
+                  }
+                  setNewTask('');
+                  setAddingTask(false);
+                }}
+                className="rounded-xl bg-cyan-500 px-2 py-1.5 text-xs text-white hover:bg-cyan-400"
+              >
+                ✓
+              </button>
+            </div>
+          )}
+          {tasks.map((task, index) => (
+            <label key={`${task.label}-${index}`} className="flex items-center gap-3 rounded-2xl bg-[#040810] px-3 py-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={task.done}
+                onChange={() => setTasks((prev) => prev.map((t, i) => i === index ? { ...t, done: !t.done } : t))}
+                className="h-4 w-4 rounded accent-cyan-400"
+              />
               <div className="min-w-0 flex-1">
-                <p className="text-xs text-slate-200">{task.label}</p>
+                <p className={`text-xs ${task.done ? 'line-through text-slate-500' : 'text-slate-200'}`}>
+                  {task.label}
+                </p>
                 <p className="text-[11px] text-slate-500">{task.due}</p>
               </div>
             </label>
