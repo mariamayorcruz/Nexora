@@ -3,7 +3,9 @@
 import Link from 'next/link';
 import { ArrowRight, Bot, CalendarPlus2, MessageCircleMore, Rocket, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import NextBestActionPanel from '@/components/NextBestActionPanel';
 import { useAppLanguage } from '@/hooks/use-app-language';
+import { computeNextBestActions } from '@/lib/next-best-action';
 
 type DashboardPayload = {
   user?: {
@@ -280,6 +282,10 @@ export default function DashboardPage() {
       },
     ];
   }, [activeLeads.length, followUpsPending, language, leads.length, payload?.overviewFunnel?.crmWon]);
+  const nextBestActions = useMemo(
+    () => computeNextBestActions(leads, language),
+    [leads, language]
+  );
 
   if (loading) {
     return (
@@ -444,6 +450,13 @@ export default function DashboardPage() {
           </div>
         </section>
       ) : null}
+
+      {nextBestActions.length > 0 && (
+        <NextBestActionPanel
+          actions={nextBestActions}
+          language={language}
+        />
+      )}
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {[
