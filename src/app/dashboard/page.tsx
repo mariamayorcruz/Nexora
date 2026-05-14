@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Bot, CalendarPlus2, MessageCircleMore, Rocket, Sparkles } from 'lucide-react';
+import { ArrowRight, CalendarPlus2, MessageCircleMore, Rocket, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import DailyBriefing from '@/components/DailyBriefing';
 import NextBestActionPanel from '@/components/NextBestActionPanel';
@@ -105,11 +105,6 @@ export default function DashboardPage() {
     'Nexora';
   const firstWinReady = Boolean(payload?.user?.onboardingData?.firstWinReady);
   const greetingName = payload?.user?.name || businessName;
-  const todayDate = new Date().toLocaleDateString(language === 'en' ? 'en-US' : 'es-ES', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  });
 
   const activeLeads = leads.filter((lead) => lead.stage !== 'won');
   const waitingForReply = activeLeads.filter(
