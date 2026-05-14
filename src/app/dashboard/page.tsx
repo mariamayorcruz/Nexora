@@ -98,6 +98,7 @@ export default function DashboardPage() {
     payload?.user?.name ||
     payload?.user?.email ||
     'Nexora';
+  const firstWinReady = Boolean(payload?.user?.onboardingData?.firstWinReady);
   const greetingName = payload?.user?.name || businessName;
   const todayDate = new Date().toLocaleDateString(language === 'en' ? 'en-US' : 'es-ES', {
     weekday: 'long',
@@ -106,6 +107,10 @@ export default function DashboardPage() {
   });
 
   const activeLeads = leads.filter((lead) => lead.stage !== 'won');
+  const leadStageLeads = activeLeads.filter((lead) => lead.stage === 'lead');
+  const staleLeads = activeLeads.filter((lead) => Date.now() - new Date(lead.updatedAt).getTime() > 1000 * 60 * 60 * 24);
+  const followUpsPending = activeLeads.filter((lead) => Boolean(lead.nextAction)).length;
+  const sampleLeadExists = leads.some((lead) => String(lead.source || '').toLowerCase() === 'launch_assistant');
   const urgentLead = [...activeLeads].sort((a, b) => {
     const scoreA = (a.value || 0) + (a.confidence || 0) * 30;
     const scoreB = (b.value || 0) + (b.confidence || 0) * 30;
@@ -128,6 +133,153 @@ export default function DashboardPage() {
       facebook: platforms.some((item) => String(item.platform || '').includes('facebook')),
     };
   }, [activeLeads, payload?.adAccounts]);
+  const todayCards = useMemo(() => {
+    const en = language === 'en';
+    const cards: Array<{
+      label: string;
+      title: string;
+      detail: string;
+      tone: string;
+      href: string;
+      cta: string;
+    }> = [];
+
+    if (activeLeads.length === 0) {
+      cards.push({
+        label: en ? 'Lead protection' : 'Protección de leads',
+        title: en ? 'Ready for your first opportunity' : 'Listo para tu primera oportunidad',
+        detail: en
+          ? 'Start from your sample lead or connect a source so Nexora can protect new inquiries.'
+          : 'Empieza con tu lead demo o conecta una fuente para que Nexora cuide nuevas consultas.',
+        tone: 'text-cyan-300',
+        href: '/dashboard/crm',
+        cta: en ? 'Open CRM' : 'Abrir CRM',
+      });
+    } else if (staleLeads.length > 0) {
+      cards.push({
+        label: en ? 'Needs attention' : 'Requieren atención',
+        title: en
+          ? `${staleLeads.length} ${staleLeads.length === 1 ? 'lead has' : 'leads have'} gone quiet`
+          : `${staleLeads.length} ${staleLeads.length === 1 ? 'lead sin' : 'leads sin'} actividad reciente`,
+        detail: en
+          ? 'Quiet for over a day — a good moment for a fresh follow-up.'
+          : 'Sin movimiento por más de un día — buen momento para un seguimiento fresco.',
+        tone: 'text-amber-300',
+        href: '/dashboard/crm',
+        cta: en ? 'Open CRM' : 'Abrir CRM',
+      });
+    } else if (leadStageLeads.length > 0) {
+      cards.push({
+        label: en ? 'Needs attention' : 'Requieren atención',
+        title: en
+          ? `${leadStageLeads.length} new ${leadStageLeads.length === 1 ? 'lead awaits' : 'leads await'} follow-up`
+          : `${leadStageLeads.length} ${leadStageLeads.length === 1 ? 'lead nuevo espera' : 'leads nuevos esperan'} seguimiento`,
+        detail: en
+          ? 'A quick first reply often turns interest into booked conversations.'
+          : 'Una primera respuesta rápida suele convertir interés en citas.',
+        tone: 'text-cyan-300',
+        href: '/dashboard/crm',
+        cta: en ? 'View pipeline' : 'Ver pipeline',
+      });
+    }
+
+    if (urgentLead) {
+      cards.push({
+        label: en ? 'Opportunity' : 'Oportunidad',
+        title: en ? `${urgentLead.name} is ready for a next step` : `${urgentLead.name}: siguiente paso`,
+        detail:
+          urgentLead.nextAction ||
+          (en ? 'Strong intent — worth handling today.' : 'Alta intención — vale atenderlo hoy.'),
+        tone: 'text-emerald-300',
+        href: '/dashboard/crm',
+        cta: en ? 'Open in CRM' : 'Abrir en CRM',
+      });
+    }
+
+    if (urgentLead) {
+      cards.push({
+        label: en ? 'Next step' : 'Siguiente paso',
+        title: en ? `Message ${urgentLead.name}` : `Escribir a ${urgentLead.name}`,
+        detail: en
+          ? 'Continue in the inbox with full context in one place.'
+          : 'Continúa en el inbox con el contexto en un solo lugar.',
+        tone: 'text-white',
+        href: '/dashboard/conversaciones',
+        cta: en ? 'Open inbox' : 'Abrir inbox',
+      });
+    } else {
+      cards.push({
+        label: en ? 'Next action' : 'Próxima acción',
+        title: sampleLeadExists
+          ? en
+            ? 'Review your sample lead'
+            : 'Revisa tu lead demo'
+          : firstWinReady
+            ? en
+              ? 'Scan today’s opportunities'
+              : 'Repasa las oportunidades de hoy'
+            : en
+              ? 'Build your first growth system'
+              : 'Construye tu primer sistema',
+        detail: sampleLeadExists
+          ? en
+            ? 'See how Nexora runs a full follow-up flow.'
+            : 'Mira cómo Nexora gestiona un flujo de seguimiento completo.'
+          : firstWinReady
+            ? en
+              ? 'A quick CRM pass turns setup into momentum.'
+              : 'Un repaso al CRM convierte la configuración en momentum.'
+            : en
+              ? 'Finish activation so Nexora can support you daily.'
+              : 'Termina la activación para que Nexora te ayude cada día.',
+        tone: 'text-white',
+        href: sampleLeadExists || firstWinReady ? '/dashboard/crm' : '/dashboard/studio',
+        cta: sampleLeadExists
+          ? en
+            ? 'Review lead'
+            : 'Revisar lead'
+          : firstWinReady
+            ? en
+              ? 'Open CRM'
+              : 'Abrir CRM'
+            : en
+              ? 'Open Studio'
+              : 'Abrir Studio',
+      });
+    }
+
+    return cards.slice(0, 4);
+  }, [
+    activeLeads.length,
+    firstWinReady,
+    language,
+    leadStageLeads.length,
+    sampleLeadExists,
+    staleLeads.length,
+    urgentLead,
+  ]);
+
+  const todaySnapshot = useMemo(() => {
+    const en = language === 'en';
+    return [
+      { label: en ? 'Total leads' : 'Leads totales', value: leads.length, tone: 'text-white' },
+      {
+        label: en ? 'Active opportunities' : 'Oportunidades activas',
+        value: activeLeads.length,
+        tone: 'text-cyan-300',
+      },
+      {
+        label: en ? 'Follow-up pending' : 'Seguimiento pendiente',
+        value: followUpsPending,
+        tone: 'text-amber-300',
+      },
+      {
+        label: en ? 'Won deals' : 'Ganados',
+        value: payload?.overviewFunnel?.crmWon || 0,
+        tone: 'text-emerald-300',
+      },
+    ];
+  }, [activeLeads.length, followUpsPending, language, leads.length, payload?.overviewFunnel?.crmWon]);
 
   if (loading) {
     return (
@@ -139,6 +291,51 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-5">
+      <section className="rounded-[28px] bg-[#040810] p-5 sm:p-6">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+          <div className="max-w-3xl">
+            <p className="text-[11px] uppercase tracking-[0.22em] text-cyan-300">{language === 'en' ? 'Today' : 'Hoy'}</p>
+            <h2 className="mt-2 text-[26px] font-semibold tracking-[-0.03em] text-white sm:text-[30px]">
+              {language === 'en'
+                ? 'A calm view of what matters right now'
+                : 'Una vista clara de lo que importa ahora'}
+            </h2>
+            <p className="mt-3 text-sm leading-7 text-slate-400">
+              {language === 'en'
+                ? 'Follow-ups, opportunities, and the next move that protects revenue.'
+                : 'Seguimientos, oportunidades y el siguiente paso que protege ingresos.'}
+            </p>
+          </div>
+
+          <div className="grid w-full gap-3 sm:grid-cols-2 xl:max-w-[440px]">
+            {todaySnapshot.map((item) => (
+              <div key={item.label} className="rounded-[20px] bg-white/[0.03] px-4 py-4">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-slate-500">{item.label}</p>
+                <p className={`mt-2 text-2xl font-semibold tracking-[-0.03em] ${item.tone}`}>{item.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+          {todayCards.map((card) => (
+            <Link
+              key={`${card.label}-${card.title}`}
+              href={card.href}
+              className="group rounded-[22px] bg-[#030610] p-4 transition-all duration-150 hover:-translate-y-[1px] hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#040810]"
+            >
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{card.label}</p>
+              <p className={`mt-3 text-[18px] font-semibold tracking-[-0.02em] ${card.tone}`}>{card.title}</p>
+              <p className="mt-3 text-sm leading-6 text-slate-400">{card.detail}</p>
+              <div className="mt-4 inline-flex items-center gap-2 text-xs font-medium text-cyan-300 transition-colors duration-150 group-hover:text-white">
+                <span>{card.cta}</span>
+                <ArrowRight className="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-0.5" />
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
+
       <section className="grid gap-5 xl:grid-cols-[1.45fr_0.85fr]">
         <div className="rounded-[28px] bg-[#040810] px-5 py-5 sm:px-6 sm:py-6">
           <p className="text-[11px] uppercase tracking-[0.22em] text-cyan-300">✦ Nexora · {businessName}</p>
@@ -154,9 +351,15 @@ export default function DashboardPage() {
           <div className="mt-5 flex flex-wrap gap-2">
             {[
               `✦ Plan ${payload?.user?.entitlements?.marketingLabel || 'Scale'}`,
-              connectedMap.whatsapp ? 'WhatsApp activo' : 'WhatsApp pendiente',
-              'AI Agent activo',
-              `${studio?.usage?.creditsRemaining || 0} créditos`,
+              connectedMap.whatsapp
+                ? language === 'en'
+                  ? 'WhatsApp active'
+                  : 'WhatsApp activo'
+                : language === 'en'
+                  ? 'WhatsApp pending'
+                  : 'WhatsApp pendiente',
+              language === 'en' ? 'AI Agent active' : 'AI Agent activo',
+              `${studio?.usage?.creditsRemaining || 0} ${language === 'en' ? 'credits' : 'créditos'}`,
             ].map((pill) => (
               <span key={pill} className="rounded-full bg-white/[0.04] px-3 py-1.5 text-xs text-slate-300">
                 {pill}
@@ -177,7 +380,10 @@ export default function DashboardPage() {
                   {leadChannel(urgentLead)} · {urgentLead.company || urgentLead.source}
                 </p>
                 <p className="mt-4 text-sm leading-6 text-slate-300">
-                  {urgentLead.nextAction || 'Retómalo hoy. Tiene intención alta y todavía está caliente.'}
+                {urgentLead.nextAction ||
+                  (language === 'en'
+                    ? 'Follow up today — intent is high while attention lasts.'
+                    : 'Retómalo hoy. Tiene intención alta y todavía está caliente.')}
                 </p>
               </div>
               <Link
@@ -195,6 +401,49 @@ export default function DashboardPage() {
           )}
         </div>
       </section>
+
+      {firstWinReady ? (
+        <section className="rounded-[28px] border border-cyan-500/15 bg-[rgba(6,182,212,0.07)] p-5">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-3xl">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-cyan-300">
+                {language === 'en' ? '✦ First win ready' : '✦ Primera victoria lista'}
+              </p>
+              <h2 className="mt-2 text-[24px] font-semibold tracking-[-0.03em] text-white">
+                {language === 'en'
+                  ? 'Your Nexora growth system is ready'
+                  : 'Tu sistema de crecimiento Nexora está listo'}
+              </h2>
+              <p className="mt-3 text-sm leading-7 text-slate-300">
+                {language === 'en'
+                  ? 'Your first lead, follow-up templates, and pipeline setup are in place — Nexora is ready to help protect new opportunities.'
+                  : 'Tu primer lead, plantillas de seguimiento y pipeline están activos: Nexora está listo para ayudarte a no perder oportunidades.'}
+              </p>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[420px]">
+              <Link
+                href="/dashboard/crm"
+                className="rounded-full bg-cyan-500 px-4 py-2 text-center text-sm font-semibold text-[#041018] transition-all duration-150 hover:-translate-y-[1px] hover:bg-cyan-400"
+              >
+                {language === 'en' ? 'Open CRM' : 'Abrir CRM'}
+              </Link>
+              <Link
+                href="/dashboard/conversaciones"
+                className="rounded-full border border-white/[0.08] px-4 py-2 text-center text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
+              >
+                {language === 'en' ? 'Review follow-up' : 'Revisar seguimiento'}
+              </Link>
+              <Link
+                href="/dashboard/studio"
+                className="rounded-full border border-white/[0.08] px-4 py-2 text-center text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white"
+              >
+                {language === 'en' ? 'Open AI Studio' : 'Abrir Studio IA'}
+              </Link>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {[
@@ -214,7 +463,7 @@ export default function DashboardPage() {
             label: language === 'en' ? 'Closed this month' : 'Cierres este mes',
             value: `${payload?.overviewFunnel?.crmWon || 0} · $${revenueClosed.toLocaleString()}`,
             tone: 'text-emerald-300',
-            sub: language === 'en' ? 'Revenue captured' : 'Revenue capturado',
+            sub: language === 'en' ? 'Revenue captured' : 'Ingresos capturados',
           },
           {
             label: language === 'en' ? 'Studio assets' : 'Assets Studio',
@@ -238,7 +487,9 @@ export default function DashboardPage() {
               <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
                 {language === 'en' ? 'Recent leads' : 'Leads recientes'}
               </p>
-              <h2 className="mt-2 text-xl font-semibold tracking-[-0.02em] text-white">Pipeline feed</h2>
+              <h2 className="mt-2 text-xl font-semibold tracking-[-0.02em] text-white">
+                {language === 'en' ? 'Pipeline feed' : 'Feed del pipeline'}
+              </h2>
             </div>
             <Link href="/dashboard/crm" className="text-xs text-cyan-300 transition hover:text-white">
               {language === 'en' ? 'View all' : 'Ver todo'}
@@ -275,7 +526,9 @@ export default function DashboardPage() {
               <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
                 {language === 'en' ? 'Active conversations' : 'Conversaciones activas'}
               </p>
-              <h2 className="mt-2 text-xl font-semibold tracking-[-0.02em] text-white">Live inbox</h2>
+              <h2 className="mt-2 text-xl font-semibold tracking-[-0.02em] text-white">
+                {language === 'en' ? 'Live inbox' : 'Inbox activo'}
+              </h2>
             </div>
             <Link href="/dashboard/conversaciones" className="text-xs text-cyan-300 transition hover:text-white">
               {language === 'en' ? 'Open inbox' : 'Abrir inbox'}
@@ -289,10 +542,15 @@ export default function DashboardPage() {
                     <p className="truncate text-sm text-white">{lead.name}</p>
                     <p className="truncate text-xs text-slate-500">{leadChannel(lead)} · {timeAgo(lead.updatedAt)}</p>
                   </div>
-                  <span className="rounded-full bg-rose-500/10 px-2.5 py-1 text-[10px] text-rose-300">Hot</span>
+                  <span className="rounded-full bg-rose-500/10 px-2.5 py-1 text-[10px] text-rose-300">
+                    {language === 'en' ? 'Hot' : 'Caliente'}
+                  </span>
                 </div>
                 <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-300">
-                  {lead.nextAction || 'Pendiente de respuesta. El AI Agent recomienda retomar con una propuesta concreta y CTA suave.'}
+                  {lead.nextAction ||
+                    (language === 'en'
+                      ? 'Awaiting reply — follow up with a clear next step.'
+                      : 'Pendiente de respuesta. Retoma con un siguiente paso claro y un CTA suave.')}
                 </p>
               </div>
             ))}
@@ -340,15 +598,33 @@ export default function DashboardPage() {
           </p>
           <div className="mt-4 space-y-3">
             {[
-              `${activeLeads.length} leads abiertos en seguimiento activo.`,
-              `${conversations.length} conversaciones piden respuesta hoy.`,
-              `${studio?.jobs?.length || 0} assets generados en Nexora Studio.`,
+              language === 'en'
+                ? `${activeLeads.length} open leads in active follow-up.`
+                : `${activeLeads.length} leads abiertos en seguimiento activo.`,
+              language === 'en'
+                ? `${conversations.length} conversations need a reply today.`
+                : `${conversations.length} conversaciones piden respuesta hoy.`,
+              language === 'en'
+                ? `${studio?.jobs?.length || 0} assets generated in Nexora Studio.`
+                : `${studio?.jobs?.length || 0} assets generados en Nexora Studio.`,
             ].map((event, index) => (
               <div key={event} className="flex gap-3">
                 <span className={`mt-1.5 h-2 w-2 rounded-full ${index === 0 ? 'bg-cyan-400' : index === 1 ? 'bg-amber-400' : 'bg-violet-400'}`} />
                 <div>
                   <p className="text-sm text-slate-200">{event}</p>
-                  <p className="text-[11px] text-slate-500">{index === 0 ? 'Ahora' : index === 1 ? 'Hace 18 min' : 'Hace 1 h'}</p>
+                  <p className="text-[11px] text-slate-500">
+                    {index === 0
+                      ? language === 'en'
+                        ? 'Now'
+                        : 'Ahora'
+                      : index === 1
+                        ? language === 'en'
+                          ? '18 min ago'
+                          : 'Hace 18 min'
+                        : language === 'en'
+                          ? '1 h ago'
+                          : 'Hace 1 h'}
+                  </p>
                 </div>
               </div>
             ))}

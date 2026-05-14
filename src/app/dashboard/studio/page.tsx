@@ -1,7 +1,7 @@
 'use client';
 
 import { ImageIcon } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import CampaignOutput from '@/components/CampaignOutput';
 import { useAppLanguage } from '@/hooks/use-app-language';
 
@@ -47,6 +47,8 @@ function stripCampaignAssemblyText(value: string) {
 
 export default function DashboardStudioPage() {
   const { language } = useAppLanguage();
+  const createPanelRef = useRef<HTMLDivElement | null>(null);
+  const outputPanelRef = useRef<HTMLDivElement | null>(null);
   const [usage, setUsage] = useState<StudioUsage | null>(null);
   const [tools, setTools] = useState<AiTool[]>([]);
   const [jobs, setJobs] = useState<AiJob[]>([]);
@@ -94,6 +96,7 @@ export default function DashboardStudioPage() {
   }, [activeJob]);
 
   const channelCards = useMemo(() => {
+    const pendingCta = language === 'en' ? 'CTA pending' : 'CTA pendiente';
     const bullets = activeJob?.output?.bullets || [];
     const findBullet = (prefix: string) => {
       const found = bullets.find((item) => item.toUpperCase().startsWith(prefix.toUpperCase()));
@@ -113,31 +116,69 @@ export default function DashboardStudioPage() {
         label: 'Instagram',
         color: '#E1306C',
         copy: findBullet('COPY INSTAGRAM') || stripCampaignAssemblyText(activeJob?.output?.headline || ''),
-        cta: activeJob?.output?.cta || 'CTA pendiente',
+        cta: activeJob?.output?.cta || pendingCta,
       },
       {
         key: 'whatsapp',
         label: 'WhatsApp',
         color: '#25D366',
         copy: findBullet('COPY WHATSAPP') || stripCampaignAssemblyText(activeJob?.output?.angle || ''),
-        cta: activeJob?.output?.cta || 'CTA pendiente',
+        cta: activeJob?.output?.cta || pendingCta,
       },
       {
         key: 'facebook',
         label: 'Facebook',
         color: '#1877F2',
         copy: findBullet('COPY FACEBOOK') || stripCampaignAssemblyText(activeJob?.output?.headline || ''),
-        cta: activeJob?.output?.cta || 'CTA pendiente',
+        cta: activeJob?.output?.cta || pendingCta,
       },
       {
         key: 'email',
         label: 'Email',
         color: '#818cf8',
         copy: findBullet('COPY EMAIL') || stripCampaignAssemblyText(activeJob?.output?.angle || ''),
-        cta: activeJob?.output?.cta || 'CTA pendiente',
+        cta: activeJob?.output?.cta || pendingCta,
       },
     ];
-  }, [activeJob]);
+  }, [activeJob, language]);
+  const studioCommandCenter = useMemo(() => {
+    const en = language === 'en';
+
+    if (activeJob) {
+      return {
+        eyebrow: en ? 'Studio Command Center' : 'Centro de comando Studio',
+        title: en ? 'Your Studio run is live' : 'Tu ejecución en Studio está activa',
+        detail: en
+          ? 'Refine hooks and channel copy before you publish.'
+          : 'Ajusta hooks y copy por canal antes de publicar.',
+        bullets: en
+          ? ['Check the generated visual and headline', 'Tune hooks for each channel']
+          : ['Revisa el visual y el titular generados', 'Ajusta los hooks por canal'],
+        accent: 'text-cyan-300',
+        helper: en ? 'Output continues in the panel below.' : 'El resultado continúa en el panel inferior.',
+      };
+    }
+
+    if ((jobs?.length || 0) > 0) {
+      return {
+        eyebrow: en ? 'Studio Command Center' : 'Centro de comando Studio',
+        title: en ? 'Recent assets are ready' : 'Hay assets recientes listos',
+        detail: en ? 'Revisit a run when you want sharper messaging.' : 'Vuelve a una ejecución cuando quieras afilar el mensaje.',
+        bullets: en ? ['Open your latest campaign below', 'Refresh copy where it matters'] : ['Abre tu última campaña abajo', 'Renueva el copy donde importe'],
+        accent: 'text-violet-300',
+        helper: en ? 'Scroll to review or regenerate below.' : 'Desplázate para revisar o regenerar abajo.',
+      };
+    }
+
+    return {
+      eyebrow: en ? 'Growth Studio' : 'Studio de crecimiento',
+      title: en ? 'Studio is ready' : 'Studio listo',
+      detail: en ? 'Shape assets your pipeline can reuse.' : 'Crea assets que tu pipeline pueda reutilizar.',
+      bullets: en ? ['Define objective and audience', 'Generate once, refine channel by channel'] : ['Define objetivo y audiencia', 'Genera una vez y refina por canal'],
+      accent: 'text-cyan-300',
+      helper: en ? 'Start from the brief on the left.' : 'Empieza por el brief del panel izquierdo.',
+    };
+  }, [activeJob, jobs, language]);
 
   const generateCampaign = async () => {
     if (!goal.trim() || !audience.trim() || !offer.trim()) {
@@ -214,17 +255,41 @@ export default function DashboardStudioPage() {
 
   return (
     <div className="space-y-5">
+      <section className="rounded-[28px] bg-[#040810] p-5 sm:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-3xl">
+            <p className={`text-[11px] uppercase tracking-[0.2em] ${studioCommandCenter.accent}`}>
+              {studioCommandCenter.eyebrow}
+            </p>
+            <h2 className="mt-3 text-[24px] font-semibold tracking-[-0.03em] text-white sm:text-[28px]">
+              {studioCommandCenter.title}
+            </h2>
+            <p className="mt-3 text-sm leading-7 text-slate-400">{studioCommandCenter.detail}</p>
+            <p className="mt-4 text-xs text-slate-500">{studioCommandCenter.helper}</p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:max-w-[460px]">
+            {studioCommandCenter.bullets.map((item) => (
+              <div key={item} className="rounded-[20px] bg-[#030610] px-4 py-3 text-sm text-slate-300">
+                {item}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="rounded-[28px] bg-[#040810] px-5 py-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-[11px] uppercase tracking-[0.2em] text-cyan-300">✦ Campaign Assembly Engine</p>
             <h1 className="mt-2 text-[28px] font-semibold tracking-[-0.03em] text-white sm:text-[32px] xl:text-[34px]">
-              Studio IA para campañas listas para lanzar
+              {language === 'en'
+                ? 'AI Studio for campaigns ready to launch'
+                : 'Studio IA para campañas listas para lanzar'}
             </h1>
           </div>
           <div className="min-w-[220px]">
             <div className="mb-2 flex items-center justify-between text-xs text-slate-500">
-              <span>Créditos</span>
+              <span>{language === 'en' ? 'Credits' : 'Créditos'}</span>
               <span>
                 {usage?.creditsRemaining || 0}/{usage?.creditsTotal || 0}
               </span>
@@ -244,31 +309,35 @@ export default function DashboardStudioPage() {
       {message ? <div className="rounded-2xl bg-cyan-500/10 px-4 py-3 text-sm text-cyan-300">{message}</div> : null}
 
       <div className="flex flex-col gap-5 xl:flex-row">
-        <div className="w-full shrink-0 rounded-[24px] bg-[#040810] p-4 xl:w-[260px]">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">✦ Objetivo de campaña</p>
+        <div ref={createPanelRef} className="w-full shrink-0 rounded-[24px] bg-[#040810] p-4 xl:w-[260px]">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+            ✦ {language === 'en' ? 'Campaign objective' : 'Objetivo de campaña'}
+          </p>
           <div className="mt-4 space-y-3">
             <input
               value={goal}
               onChange={(event) => setGoal(event.target.value)}
-              placeholder="¿Qué quieres lograr?"
+              placeholder={language === 'en' ? 'What do you want to achieve?' : '¿Qué quieres lograr?'}
               className="w-full rounded-2xl bg-[#030610] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600"
             />
             <input
               value={audience}
               onChange={(event) => setAudience(event.target.value)}
-              placeholder="Audiencia objetivo"
+              placeholder={language === 'en' ? 'Target audience' : 'Audiencia objetivo'}
               className="w-full rounded-2xl bg-[#030610] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600"
             />
             <textarea
               value={offer}
               onChange={(event) => setOffer(event.target.value)}
-              placeholder="Oferta o diferenciador"
+              placeholder={language === 'en' ? 'Offer or differentiator' : 'Oferta o diferenciador'}
               className="min-h-[110px] w-full resize-none rounded-2xl bg-[#030610] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600"
             />
           </div>
 
           <div className="mt-5">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Canales de publicación</p>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+              {language === 'en' ? 'Publishing channels' : 'Canales de publicación'}
+            </p>
             <div className="mt-3 flex flex-wrap gap-2">
               {CHANNELS.map((channel) => (
                 <button
@@ -290,7 +359,9 @@ export default function DashboardStudioPage() {
           </div>
 
           <div className="mt-5">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Estilo visual</p>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+              {language === 'en' ? 'Visual style' : 'Estilo visual'}
+            </p>
             <div className="mt-3 grid grid-cols-2 gap-2">
               {VISUAL_STYLES.map((item) => (
                 <button
@@ -313,35 +384,59 @@ export default function DashboardStudioPage() {
             disabled={submitting}
             className="mt-5 w-full rounded-[20px] bg-cyan-500 px-4 py-3 text-sm font-semibold text-[#041018] transition-all duration-150 hover:-translate-y-[1px] hover:bg-cyan-400 disabled:opacity-50"
           >
-            ✦ {submitting ? 'Generando...' : 'Generar campaña completa'}
+            ✦{' '}
+            {submitting
+              ? language === 'en'
+                ? 'Generating...'
+                : 'Generando...'
+              : language === 'en'
+                ? 'Generate full campaign'
+                : 'Generar campaña completa'}
           </button>
           <p className="mt-2 text-center text-[11px] text-slate-500">
-            Imagen + Copy + {channels.length} canales
+            {language === 'en'
+              ? `Image + copy + ${channels.length} channels`
+              : `Imagen + copy + ${channels.length} canales`}
           </p>
         </div>
 
         {activeJob ? (
+          <div ref={outputPanelRef} className="flex flex-1">
           <CampaignOutput
-            title={activeJob.title || goal || 'Campaña nueva'}
+            title={activeJob.title || goal || (language === 'en' ? 'New campaign' : 'Campaña nueva')}
             status={language === 'en' ? 'Ready to publish' : 'Lista para publicar'}
             creditsUsed={activeJob.creditsUsed}
             imageUrl={activeJob.output?.imageUrl}
             headline={selectedHook || activeJob.output?.headline}
-            hooks={hooks.length ? hooks : activeJob.output?.bullets?.slice(0, 3) || ['Hook A pendiente', 'Hook B pendiente', 'Hook C pendiente']}
+            hooks={
+              hooks.length
+                ? hooks
+                : activeJob.output?.bullets?.slice(0, 3) ||
+                  (language === 'en'
+                    ? ['Hook A pending', 'Hook B pending', 'Hook C pending']
+                    : ['Hook A pendiente', 'Hook B pendiente', 'Hook C pendiente'])
+            }
             channels={channelCards}
             selectedHook={selectedHook}
             onSelectHook={setSelectedHook}
             onPublish={() => void publishAll()}
             onRegenerate={() => void regenerateCampaign()}
           />
+          </div>
         ) : (
-          <div className="flex min-h-[520px] flex-1 items-center justify-center rounded-[24px] bg-[#040810] p-6">
+          <div ref={outputPanelRef} className="flex min-h-[520px] flex-1 items-center justify-center rounded-[24px] bg-[#040810] p-6">
             <div className="text-center">
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-cyan-500/10 text-cyan-400">
                 <ImageIcon className="h-6 w-6" />
               </div>
-              <p className="mt-4 text-white">Todavía no hay campaña generada.</p>
-              <p className="mt-2 text-sm text-slate-500">Completa el panel izquierdo y lanza tu primera campaña.</p>
+              <p className="mt-4 text-white">
+                {language === 'en' ? 'No campaign generated yet.' : 'Todavía no hay campaña generada.'}
+              </p>
+              <p className="mt-2 text-sm text-slate-500">
+                {language === 'en'
+                  ? 'Complete the brief on the left and generate your first campaign.'
+                  : 'Completa el panel izquierdo y lanza tu primera campaña.'}
+              </p>
             </div>
           </div>
         )}

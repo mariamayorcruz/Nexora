@@ -1,9 +1,15 @@
 import bcrypt from 'bcryptjs';
-process.env.DATABASE_URL = 'postgresql://postgres.rzusbivnegohgbcvffzu:7demaster77vitoco@aws-0-us-west-2.pooler.supabase.com:6543/postgres';
-
+import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 
-console.log('DATABASE_URL:', process.env.DATABASE_URL);
+/** Misma prioridad que Next: `.env` y luego `.env.local` sobrescribe. */
+dotenv.config({ path: '.env' });
+dotenv.config({ path: '.env.local', override: true });
+
+if (!process.env.DATABASE_URL) {
+  console.error('DATABASE_URL no está definida. Configúrala en .env o .env.local (copia desde Supabase → Database).');
+  process.exit(1);
+}
 
 const prisma = new PrismaClient();
 

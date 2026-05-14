@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getFounderPlan, getFounderTrialDays, isAdminEmail, isFounderEmail } from '@/lib/access';
+import { getFounderPlan, getFounderTrialDays, isAdminEmail, isFounderEmail, isInternalOrTestEmail } from '@/lib/access';
 import { buildEntitlementSummary } from '@/lib/entitlements';
 import { getHigherTierPlan } from '@/lib/billing';
 import { getBearerToken, verifyUserToken } from '@/lib/jwt';
@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
 
     const founderAccess = isFounderEmail(user.email);
     const adminAccess = isAdminEmail(user.email) || founderAccess;
+    const previewOnboardingAccess = isInternalOrTestEmail(user.email);
     const founderPlan = founderAccess ? getFounderPlan() : null;
     const effectivePlan = founderAccess
       ? getHigherTierPlan(founderPlan, user.subscription?.plan)
@@ -117,6 +118,7 @@ export async function GET(request: NextRequest) {
         subscription: user.subscription,
         isAdmin: adminAccess,
         founderAccess,
+        previewOnboardingAccess,
         founderPlan: effectivePlan,
         entitlements,
       },
