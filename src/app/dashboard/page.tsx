@@ -570,10 +570,10 @@ export default function DashboardPage() {
             {[
               language === 'en'
                 ? `${activeLeads.length} customers waiting to hear from you.`
-                : `${activeLeads.length} clientes esperando tu respuesta.`,
+                : `${activeLeads.length} ${activeLeads.length === 1 ? 'cliente esperando' : 'clientes esperando'} tu respuesta.`,
               language === 'en'
                 ? `${conversations.length} customers need a reply today.`
-                : `${conversations.length} clientes esperan tu respuesta hoy.`,
+                : `${conversations.length} ${conversations.length === 1 ? 'cliente necesita' : 'clientes necesitan'} respuesta hoy.`,
               language === 'en'
                 ? `${studio?.jobs?.length || 0} assets generated in Nexora Studio.`
                 : `${studio?.jobs?.length || 0} assets generados en Nexora Studio.`,

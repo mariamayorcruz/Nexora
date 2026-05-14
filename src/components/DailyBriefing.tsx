@@ -55,7 +55,9 @@ export default function DailyBriefing({
       icon: '💬',
       text: en
         ? `${waitingForReply} customer${waitingForReply > 1 ? 's are' : ' is'} waiting for your reply.`
-        : `${waitingForReply} cliente${waitingForReply > 1 ? 's esperan' : ' espera'} tu respuesta.`,
+        : waitingForReply === 1
+          ? '1 cliente espera tu respuesta.'
+          : `${waitingForReply} clientes esperan tu respuesta.`,
       tone: 'text-rose-300',
     });
   }
