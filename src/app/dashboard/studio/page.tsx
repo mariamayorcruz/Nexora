@@ -245,6 +245,30 @@ export default function DashboardStudioPage() {
     setMessage(data.message || (language === 'en' ? 'Publish request sent.' : 'Solicitud de publicación enviada.'));
   };
 
+  const publishChannel = async (channelKey: string, copy: string) => {
+    if (!activeJob) return;
+    const token = localStorage.getItem('token');
+    try {
+      const response = await fetch('/api/ai/studio/publish', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          platforms: [channelKey],
+          caption: copy,
+          imageUrl: activeJob.output?.imageUrl,
+          jobId: activeJob.id,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      setMessage(data.message || `Enviado a ${channelKey}`);
+    } catch {
+      setMessage(`Error publicando en ${channelKey}`);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-[70vh] items-center justify-center">
@@ -420,6 +444,7 @@ export default function DashboardStudioPage() {
             selectedHook={selectedHook}
             onSelectHook={setSelectedHook}
             onPublish={() => void publishAll()}
+            onPublishChannel={publishChannel}
             onRegenerate={() => void regenerateCampaign()}
           />
           </div>

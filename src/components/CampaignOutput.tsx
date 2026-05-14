@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { Download, ImageIcon, RefreshCcw, Rocket, Sparkles } from 'lucide-react';
+import { useState } from 'react';
 import AdComposer from '@/components/AdComposer';
 
 type ChannelCard = {
@@ -23,6 +24,7 @@ export default function CampaignOutput({
   selectedHook,
   onSelectHook,
   onPublish,
+  onPublishChannel,
   onRegenerate,
 }: {
   title: string;
@@ -35,8 +37,12 @@ export default function CampaignOutput({
   selectedHook?: string | null;
   onSelectHook?: (hook: string) => void;
   onPublish?: () => void;
+  onPublishChannel?: (channel: string, copy: string) => void;
   onRegenerate?: () => void;
 }) {
+  const [editingHeadline, setEditingHeadline] = useState(false);
+  const [editedHeadline, setEditedHeadline] = useState('');
+
   return (
     <div className="flex min-h-[720px] flex-1 flex-col rounded-[24px] bg-[#040810] p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -57,7 +63,14 @@ export default function CampaignOutput({
             <div className="flex flex-wrap items-center gap-2">
               {[
                 { label: 'Regenerar', icon: RefreshCcw, onClick: onRegenerate },
-                { label: 'Editar', icon: Sparkles, onClick: undefined },
+                {
+                  label: 'Editar',
+                  icon: Sparkles,
+                  onClick: () => {
+                    setEditedHeadline(headline || title);
+                    setEditingHeadline(true);
+                  },
+                },
               ].map((item) => {
                 const Icon = item.icon;
                 return (
@@ -93,6 +106,33 @@ export default function CampaignOutput({
               </button>
             </div>
           </div>
+          {editingHeadline && (
+            <div className="mt-3 flex gap-2">
+              <input
+                value={editedHeadline}
+                onChange={(e) => setEditedHeadline(e.target.value)}
+                className="flex-1 rounded-xl border border-cyan-500/30 bg-[#040810] px-3 py-2 text-sm text-white outline-none"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  onSelectHook?.(editedHeadline);
+                  setEditingHeadline(false);
+                }}
+                className="rounded-xl bg-cyan-500 px-3 py-2 text-xs font-semibold text-white hover:bg-cyan-400"
+              >
+                ✓
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingHeadline(false)}
+                className="rounded-xl bg-white/[0.04] px-3 py-2 text-xs text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+          )}
           {imageUrl ? (
             imageUrl.startsWith('__gemini_description__') ? (
               (() => {
@@ -191,6 +231,7 @@ export default function CampaignOutput({
                     </span>
                     <button
                       type="button"
+                      onClick={() => onPublishChannel?.(channel.key, channel.copy)}
                       className="rounded-full px-3 py-1.5 text-[11px] font-medium transition-all duration-150 hover:-translate-y-[1px]"
                       style={{ backgroundColor: channel.color, color: '#041018' }}
                     >
