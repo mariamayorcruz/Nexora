@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Bot, CalendarPlus2, MessageCircleMore, Rocket, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import DailyBriefing from '@/components/DailyBriefing';
 import NextBestActionPanel from '@/components/NextBestActionPanel';
 import { useAppLanguage } from '@/hooks/use-app-language';
 import { computeNextBestActions } from '@/lib/next-best-action';
@@ -111,6 +112,15 @@ export default function DashboardPage() {
   });
 
   const activeLeads = leads.filter((lead) => lead.stage !== 'won');
+  const waitingForReply = activeLeads.filter(
+    (lead) => (Date.now() - new Date(lead.updatedAt).getTime()) / 3600000 > 24
+  ).length;
+  const hotLead = [...activeLeads]
+    .filter((lead) => lead.confidence >= 65 || lead.value >= 1000)
+    .sort((a, b) => (b.value + b.confidence * 30) - (a.value + a.confidence * 30))[0] || null;
+  const aiConversations = leads.filter((lead) =>
+    lead.source === 'whatsapp' || lead.source === 'sms'
+  ).length;
   const leadStageLeads = activeLeads.filter((lead) => lead.stage === 'lead');
   const staleLeads = activeLeads.filter((lead) => Date.now() - new Date(lead.updatedAt).getTime() > 1000 * 60 * 60 * 24);
   const followUpsPending = activeLeads.filter((lead) => Boolean(lead.nextAction)).length;
@@ -299,6 +309,19 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-5">
+      <DailyBriefing
+        userName={greetingName}
+        language={language}
+        activeLeads={activeLeads.length}
+        waitingForReply={waitingForReply}
+        hotLeads={hotLead ? 1 : 0}
+        hotLeadValue={hotLead?.value || 0}
+        hotLeadName={hotLead?.name || ''}
+        aiConversations={aiConversations}
+        followUpsPending={followUpsPending}
+        wonThisMonth={payload?.overviewFunnel?.crmWon || 0}
+      />
+
       <section className="rounded-[28px] bg-[#040810] p-5 sm:p-6">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <div className="max-w-3xl">
