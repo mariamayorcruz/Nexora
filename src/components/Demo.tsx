@@ -9,7 +9,7 @@ const content = {
   en: {
     tag: 'See it in action',
     h2: 'Your entire business. One screen.',
-    sub: 'Watch how Nexora replaces your CRM, ad tools, follow-up sequences and reporting — in under 10 minutes.',
+    sub: 'See how Nexora replaces your CRM, ad tools, follow-up system and reporting. All in one place.',
     calcTag: 'ROI Calculator',
     calcH2: 'See how much you save.',
     calcSub: 'Select what you currently use and see your monthly savings vs Nexora.',
@@ -29,7 +29,7 @@ const content = {
   es: {
     tag: 'Vélo en acción',
     h2: 'Todo tu negocio. Una sola pantalla.',
-    sub: 'Ve cómo Nexora reemplaza tu CRM, herramientas de anuncios, secuencias de seguimiento y reportes — en menos de 10 minutos.',
+    sub: 'Ve cómo Nexora reemplaza tu CRM, herramientas de anuncios, sistema de seguimiento y reportes. Todo en un solo lugar.',
     calcTag: 'Calculadora de ahorro',
     calcH2: 'Ve cuánto ahorras.',
     calcSub: 'Selecciona lo que usas actualmente y ve tu ahorro mensual vs Nexora.',

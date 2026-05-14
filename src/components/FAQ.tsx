@@ -9,7 +9,7 @@ const faqs = {
     { question: 'What does Nexora actually replace?', answer: 'Nexora replaces your CRM (HubSpot, Pipedrive), your content tools (Jasper, ChatGPT for copy), your automation platform (Zapier, ActiveCampaign) and your campaign reporting. One subscription instead of four.' },
     { question: 'How long does it take to get started?', answer: 'Most users are up and running in under 10 minutes. Connect your accounts, import your leads and your first AI-generated asset is ready in seconds.' },
     { question: 'Does Nexora work for agencies and teams?', answer: 'Yes. Nexora scales with you from solo founders to agencies managing multiple clients. The Professional and Scale plans include multiple workspaces so your team can collaborate.' },
-    { question: 'Can the AI actually write my ads and campaigns?', answer: 'Yes. Nexora Studio generates ad copy, UGC scripts, email sequences, pitch decks and repurposed content for every channel — trained on what actually converts.' },
+    { question: 'Can the AI actually write my ads and campaigns?', answer: 'Yes. Nexora Studio generates ad copy, scripts, email sequences, pitch decks and repurposed content for every channel. Built on what actually converts.' },
     { question: 'What happens if I want to cancel?', answer: 'You can cancel anytime from your billing settings. No contracts, no cancellation fees. Your data stays accessible until the end of your billing period.' },
   ],
   es: [
@@ -17,7 +17,7 @@ const faqs = {
     { question: '¿Qué reemplaza Nexora exactamente?', answer: 'Nexora reemplaza tu CRM (HubSpot, Pipedrive), tus herramientas de contenido (Jasper, ChatGPT), tu plataforma de automatización (Zapier, ActiveCampaign) y tus reportes de campañas. Una sola suscripción.' },
     { question: '¿Cuánto tiempo tarda en funcionar?', answer: 'La mayoría de usuarios están operando en menos de 10 minutos. Conecta tus cuentas, importa tus leads y tu primer asset generado con IA está listo en segundos.' },
     { question: '¿Funciona para agencias y equipos?', answer: 'Sí. Nexora escala contigo desde founders solos hasta agencias que manejan múltiples clientes. Los planes Professional y Scale incluyen múltiples workspaces.' },
-    { question: '¿La IA puede escribir mis anuncios y campañas?', answer: 'Sí. Nexora Studio genera copy para anuncios, guiones UGC, secuencias de email, pitch decks y contenido repurposed para cada canal.' },
+    { question: '¿La IA puede escribir mis anuncios y campañas?', answer: 'Sí. Nexora Studio genera copy para anuncios, guiones, secuencias de email, pitch decks y contenido para cada canal.' },
     { question: '¿Qué pasa si quiero cancelar?', answer: 'Puedes cancelar en cualquier momento desde tu configuración de facturación. Sin contratos, sin cargos por cancelación.' },
   ],
 };

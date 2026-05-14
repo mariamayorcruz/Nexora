@@ -23,31 +23,31 @@ const planContent: Record<BillingPlan, {
 }> = {
   starter: {
     en: {
-      description: 'For businesses that want to organize their marketing operation without heavy overhead.',
+      description: 'For businesses ready to get organized and start closing more customers.',
       features: ['1 workspace', 'Main dashboard', 'Campaign center', 'Base CRM', '250 AI credits / month'],
     },
     es: {
-      description: 'Para negocios que quieren ordenar su operación sin estructura fija.',
+      description: 'Para negocios listos para organizarse y cerrar más clientes.',
       features: ['1 workspace', 'Dashboard principal', 'Centro de campañas', 'CRM base', '250 créditos IA / mes'],
     },
   },
   professional: {
     en: {
-      description: 'The best combination of control, analytics, AI and operational capacity to grow.',
+      description: 'The right balance of AI, automation and analytics for businesses that are growing.',
       features: ['3 workspaces', 'Advanced analytics', 'Creative radar', 'Suggested automations', '1,800 AI credits / month'],
     },
     es: {
-      description: 'La mejor combinación entre control, analítica, IA y capacidad operativa para crecer.',
+      description: 'El balance correcto de IA, automatización y analítica para negocios en crecimiento.',
       features: ['3 workspaces', 'Analítica avanzada', 'Radar creativo', 'Automatizaciones sugeridas', '1,800 créditos IA / mes'],
     },
   },
   enterprise: {
     en: {
-      description: 'For teams that want to operate marketing, content and follow-up at full scale.',
+      description: 'For teams running marketing, content and follow-up at full capacity.',
       features: ['Expanded capacity', 'Priority support', 'Advanced video & repurpose', 'Customization base', '6,500 AI credits / month'],
     },
     es: {
-      description: 'Para equipos que quieren operar marketing, contenido y seguimiento con amplitud real.',
+      description: 'Para equipos que operan marketing, contenido y seguimiento a plena capacidad.',
       features: ['Capacidad ampliada', 'Soporte prioritario', 'Video y repurpose avanzado', 'Base para personalizaciones', '6,500 créditos IA / mes'],
     },
   },
@@ -60,9 +60,9 @@ const content = {
     sub: 'No hidden fees. No agency contracts. Start with a 7-day trial for just $1.',
     billing: 'Billed monthly',
     featured: 'Most popular',
-    cta: (featured: boolean, price: number) => featured ? `Get started — $${price}/mo` : `Start for $${price}/mo`,
-    trial: '7-day trial · $1 today',
-    guarantee: 'No commitment · Cancel anytime · Instant access',
+    cta: (featured: boolean, price: number) => featured ? `Get started for $${price}/mo` : `Start for $${price}/mo`,
+    trial: '7-day trial. $1 today.',
+    guarantee: 'No commitment. Cancel anytime. Instant access.',
   },
   es: {
     tag: 'Precios',
@@ -70,9 +70,9 @@ const content = {
     sub: 'Sin tarifas ocultas. Sin contratos. Empieza con 7 días de prueba por solo $1.',
     billing: 'Facturación mensual',
     featured: 'Más popular',
-    cta: (featured: boolean, price: number) => featured ? `Empezar ahora — $${price}/mes` : `Empezar por $${price}/mes`,
-    trial: 'Prueba 7 días · $1 hoy',
-    guarantee: 'Sin compromiso · Cancela cuando quieras · Acceso inmediato',
+    cta: (_featured: boolean, price: number) => `Empezar por $${price}/mes`,
+    trial: 'Prueba 7 días. $1 hoy.',
+    guarantee: 'Sin compromiso. Cancela cuando quieras. Acceso inmediato.',
   },
 };
 

@@ -6,28 +6,28 @@ import DashboardMockupHero from '@/components/DashboardMockupHero';
 
 const stats = [
   { value: '3.4x', label: 'Average ROAS', labelEs: 'ROAS promedio' },
-  { value: '−12h', label: 'Saved per week', labelEs: 'ahorradas / semana' },
-  { value: '<10min', label: 'To set up', labelEs: 'para empezar' },
+  { value: '−12h', label: 'Saved every week', labelEs: 'ahorradas cada semana' },
+  { value: '<10min', label: 'To get started', labelEs: 'para comenzar' },
 ];
 
 const copy = {
   en: {
-    badge: 'CRM + AI + Automation — in one place',
-    h1a: 'Turn leads into clients.',
-    h1b: 'Automatically.',
-    sub: 'Nexora gives your business the AI-powered system to attract, follow up, and close — without agencies, without chaos.',
+    badge: 'CRM + AI + Automation. One platform.',
+    h1a: 'Stop losing customers.',
+    h1b: 'Start closing them.',
+    sub: 'Nexora gives your business the AI system to attract, follow up and close more customers. No agencies. No chaos.',
     cta1: 'Start free trial',
-    cta2: 'Watch demo',
-    trial: '7-day trial · $1 today · Cancel anytime',
+    cta2: 'See how it works',
+    trial: '7-day trial. $1 today. Cancel anytime.',
   },
   es: {
-    badge: 'CRM + IA + Automatización — en un solo lugar',
-    h1a: 'Convierte leads en clientes.',
-    h1b: 'Automáticamente.',
-    sub: 'Nexora le da a tu negocio el sistema con IA para atraer, hacer seguimiento y cerrar — sin agencias, sin caos.',
+    badge: 'CRM + IA + Automatización. Una sola plataforma.',
+    h1a: 'Deja de perder clientes.',
+    h1b: 'Empieza a cerrarlos.',
+    sub: 'Nexora le da a tu negocio el sistema con IA para atraer, dar seguimiento y cerrar más clientes. Sin agencias. Sin caos.',
     cta1: 'Prueba gratis 7 días',
-    cta2: 'Ver demo',
-    trial: 'Prueba 7 días · Solo $1 hoy · Cancela cuando quieras',
+    cta2: 'Cómo funciona',
+    trial: 'Prueba 7 días. Solo $1 hoy. Cancela cuando quieras.',
   },
 };
 
@@ -91,10 +91,10 @@ export default function Hero() {
             </div>
             <div className="absolute -bottom-4 -left-4 rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-lg">
               <p className="text-xs text-slate-400">Trusted by</p>
-              <p className="text-sm font-semibold text-slate-900">SMBs · Agencies · Creators</p>
+              <p className="text-sm font-semibold text-slate-900">Businesses growing with Nexora</p>
             </div>
             <div className="absolute -right-4 -top-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-2 shadow-lg">
-              <p className="text-xs font-semibold text-sky-600">● Live AI</p>
+              <p className="text-xs font-semibold text-sky-600">● AI active</p>
             </div>
           </div>
         </div>

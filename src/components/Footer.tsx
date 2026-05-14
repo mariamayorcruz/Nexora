@@ -5,7 +5,7 @@ import { useLang } from '@/context/LanguageContext';
 
 const content = {
   en: {
-    tagline: 'CRM + AI + Automation for businesses that want to grow without the chaos.',
+    tagline: 'CRM + AI + Automation for businesses that want to grow without hiring an agency.',
     product: 'Product',
     productLinks: [
       { href: '#solution', label: 'Features' },
@@ -20,7 +20,7 @@ const content = {
       { href: '/dashboard', label: 'Dashboard' },
     ],
     why: 'Why Nexora',
-    whyText: 'Because your business deserves a system that attracts, follows up, and closes — powered by AI, without agency fees.',
+    whyText: 'Because your business deserves a system that attracts, follows up and closes customers. Powered by AI, without agency fees.',
     legal: 'Legal',
     legalLinks: [
       { href: '/legal/terms', label: 'Terms of Service' },
@@ -32,7 +32,7 @@ const content = {
     copyright: '© 2026 Nexora, Inc. All rights reserved. San Francisco, CA.',
   },
   es: {
-    tagline: 'CRM + IA + Automatización para negocios que quieren crecer sin el caos.',
+    tagline: 'CRM + IA + Automatización para negocios que quieren crecer sin contratar una agencia.',
     product: 'Producto',
     productLinks: [
       { href: '#solution', label: 'Características' },
@@ -47,7 +47,7 @@ const content = {
       { href: '/dashboard', label: 'Dashboard' },
     ],
     why: 'Por qué Nexora',
-    whyText: 'Porque tu negocio merece un sistema que atraiga, haga seguimiento y cierre — con IA, sin tarifas de agencia.',
+    whyText: 'Porque tu negocio merece un sistema que atraiga, dé seguimiento y cierre clientes. Con IA, sin tarifas de agencia.',
     legal: 'Legal',
     legalLinks: [
       { href: '/legal/terms', label: 'Términos de servicio' },

@@ -5,19 +5,19 @@ import { useLang } from '@/context/LanguageContext';
 const content = {
   en: {
     tag: 'Get started today',
-    h2: 'Ready to grow without the chaos?',
-    sub: 'Join businesses already using Nexora to close more leads, automate follow-ups and run smarter campaigns.',
-    cta: 'Start free trial — $1 today',
+    h2: 'Ready to grow without hiring an agency?',
+    sub: 'Join businesses already using Nexora to close more customers, automate follow-up and run better campaigns.',
+    cta: 'Start free trial. $1 today.',
     cta2: 'Watch demo',
-    sub2: 'Setup in under 10 minutes — Cancel anytime',
+    sub2: 'Setup in under 10 minutes. Cancel anytime.',
   },
   es: {
     tag: 'Empieza hoy',
-    h2: '¿Listo para crecer sin el caos?',
-    sub: 'Únete a los negocios que ya usan Nexora para cerrar más leads, automatizar seguimientos y lanzar campañas más inteligentes.',
-    cta: 'Prueba gratis — $1 hoy',
+    h2: '¿Listo para crecer sin contratar una agencia?',
+    sub: 'Únete a los negocios que ya usan Nexora para cerrar más clientes, automatizar el seguimiento y lanzar mejores campañas.',
+    cta: 'Prueba gratis. $1 hoy.',
     cta2: 'Ver demo',
-    sub2: 'Configuración en menos de 10 minutos — Cancela cuando quieras',
+    sub2: 'Configuración en menos de 10 minutos. Cancela cuando quieras.',
   },
 };
 
