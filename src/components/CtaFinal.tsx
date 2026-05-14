@@ -13,11 +13,11 @@ const content = {
   },
   es: {
     tag: 'Empieza hoy',
-    h2: 'Listo para crecer sin el caos?',
-    sub: 'Unete a los negocios que ya usan Nexora para cerrar mas leads, automatizar seguimientos y lanzar campanas mas inteligentes.',
+    h2: '¿Listo para crecer sin el caos?',
+    sub: 'Únete a los negocios que ya usan Nexora para cerrar más leads, automatizar seguimientos y lanzar campañas más inteligentes.',
     cta: 'Prueba gratis — $1 hoy',
     cta2: 'Ver demo',
-    sub2: 'Configuracion en menos de 10 minutos — Cancela cuando quieras',
+    sub2: 'Configuración en menos de 10 minutos — Cancela cuando quieras',
   },
 };
 

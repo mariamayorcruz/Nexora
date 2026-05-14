@@ -13,12 +13,12 @@ const faqs = {
     { question: 'What happens if I want to cancel?', answer: 'You can cancel anytime from your billing settings. No contracts, no cancellation fees. Your data stays accessible until the end of your billing period.' },
   ],
   es: [
-    { question: 'Necesito conocimientos tecnicos para usar Nexora?', answer: 'No. Nexora esta disenado para duenos de negocio, marketers y creadores. Puedes conectar tus herramientas, configurar automatizaciones y lanzar campanas sin escribir una linea de codigo.' },
-    { question: 'Que reemplaza Nexora exactamente?', answer: 'Nexora reemplaza tu CRM (HubSpot, Pipedrive), tus herramientas de contenido (Jasper, ChatGPT), tu plataforma de automatizacion (Zapier, ActiveCampaign) y tus reportes de campanas. Una sola suscripcion.' },
-    { question: 'Cuanto tiempo tarda en funcionar?', answer: 'La mayoria de usuarios estan operando en menos de 10 minutos. Conecta tus cuentas, importa tus leads y tu primer asset generado con IA esta listo en segundos.' },
-    { question: 'Funciona para agencias y equipos?', answer: 'Si. Nexora escala contigo desde founders solos hasta agencias que manejan multiples clientes. Los planes Professional y Scale incluyen multiples workspaces.' },
-    { question: 'La IA puede escribir mis anuncios y campanas?', answer: 'Si. Nexora Studio genera copy para anuncios, guiones UGC, secuencias de email, pitch decks y contenido repurposed para cada canal.' },
-    { question: 'Que pasa si quiero cancelar?', answer: 'Puedes cancelar en cualquier momento desde tu configuracion de facturacion. Sin contratos, sin cargos por cancelacion.' },
+    { question: '¿Necesito conocimientos técnicos para usar Nexora?', answer: 'No. Nexora está diseñado para dueños de negocio, marketers y creadores. Puedes conectar tus herramientas, configurar automatizaciones y lanzar campañas sin escribir una línea de código.' },
+    { question: '¿Qué reemplaza Nexora exactamente?', answer: 'Nexora reemplaza tu CRM (HubSpot, Pipedrive), tus herramientas de contenido (Jasper, ChatGPT), tu plataforma de automatización (Zapier, ActiveCampaign) y tus reportes de campañas. Una sola suscripción.' },
+    { question: '¿Cuánto tiempo tarda en funcionar?', answer: 'La mayoría de usuarios están operando en menos de 10 minutos. Conecta tus cuentas, importa tus leads y tu primer asset generado con IA está listo en segundos.' },
+    { question: '¿Funciona para agencias y equipos?', answer: 'Sí. Nexora escala contigo desde founders solos hasta agencias que manejan múltiples clientes. Los planes Professional y Scale incluyen múltiples workspaces.' },
+    { question: '¿La IA puede escribir mis anuncios y campañas?', answer: 'Sí. Nexora Studio genera copy para anuncios, guiones UGC, secuencias de email, pitch decks y contenido repurposed para cada canal.' },
+    { question: '¿Qué pasa si quiero cancelar?', answer: 'Puedes cancelar en cualquier momento desde tu configuración de facturación. Sin contratos, sin cargos por cancelación.' },
   ],
 };
 
@@ -33,7 +33,7 @@ export default function FAQ() {
         <div className="max-w-2xl">
           <span className="inline-flex items-center rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-sky-700">FAQ</span>
           <h2 className="mt-4 text-4xl font-extrabold text-slate-900 md:text-5xl">
-            {lang === 'en' ? 'Questions? Answered.' : 'Preguntas? Respondidas.'}
+            {lang === 'en' ? 'Questions? Answered.' : '¿Preguntas? Respondidas.'}
           </h2>
           <p className="mt-4 text-lg text-slate-500">
             {lang === 'en' ? 'Everything you need to know before getting started.' : 'Todo lo que necesitas saber antes de empezar.'}
@@ -64,7 +64,7 @@ export default function FAQ() {
         </div>
 
         <div className="mt-12 rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center">
-          <p className="text-sm text-slate-500">{lang === 'en' ? 'Still have questions?' : 'Todavia tienes preguntas?'}</p>
+          <p className="text-sm text-slate-500">{lang === 'en' ? 'Still have questions?' : '¿Todavía tienes preguntas?'}</p>
           <a href="mailto:support@gotnexora.com" className="mt-2 inline-block text-sm font-semibold text-sky-600 transition hover:text-sky-500">
             support@gotnexora.com →
           </a>
