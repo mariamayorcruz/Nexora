@@ -31,10 +31,12 @@ const TAB_LABELS: Record<ComposerTab, string> = {
 
 export default function FocusPanel({
   lead,
+  riskLabel,
   messageLabel,
   onSend,
 }: {
   lead: FocusLead | null;
+  riskLabel?: string;
   messageLabel?: string;
   onSend?: (lead: FocusLead, channel: ComposerTab, text: string) => Promise<void> | void;
 }) {
@@ -155,12 +157,13 @@ export default function FocusPanel({
         <AISuggestionBar
           compact
           suggestion={
+            riskLabel ||
             messageLabel ||
             lead.nextAction ||
             (en ? 'Follow up today while momentum is still warm.' : 'Haz follow-up hoy para mantener el momentum.')
           }
           actionLabel={en ? 'Use suggestion' : 'Usar sugerencia'}
-          onUse={() => setDraft(messageLabel || lead.nextAction || '')}
+          onUse={() => setDraft(riskLabel || messageLabel || lead.nextAction || '')}
         />
 
         <div className="space-y-2">

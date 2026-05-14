@@ -56,6 +56,33 @@ function timeSince(value: string) {
   return `${Math.floor(hours / 24)}d`;
 }
 
+function leadRiskLevel(lead: LeadRow): 'critical' | 'warning' | 'ok' {
+  const hoursSinceUpdate = (Date.now() - new Date(lead.updatedAt).getTime()) / 3600000;
+  if (lead.stage === 'won') return 'ok';
+  if (hoursSinceUpdate > 72) return 'critical';
+  if (hoursSinceUpdate > 24) return 'warning';
+  return 'ok';
+}
+
+function leadRiskLabel(lead: LeadRow, language: string): string {
+  const hoursSinceUpdate = (Date.now() - new Date(lead.updatedAt).getTime()) / 3600000;
+  const days = Math.floor(hoursSinceUpdate / 24);
+  const hours = Math.floor(hoursSinceUpdate);
+  if (lead.stage === 'won') return '';
+  const en = language === 'en';
+  if (hoursSinceUpdate > 72) {
+    return en
+      ? `No contact for ${days} days. This customer may think you forgot about them.`
+      : `Sin contacto hace ${days} días. Este cliente puede pensar que lo olvidaste.`;
+  }
+  if (hoursSinceUpdate > 24) {
+    return en
+      ? `${hours}h without a reply. A quick message keeps this warm.`
+      : `${hours}h sin respuesta. Un mensaje rápido mantiene el interés.`;
+  }
+  return '';
+}
+
 export default function DashboardCrmPage() {
   const { language } = useAppLanguage();
   const [leads, setLeads] = useState<LeadRow[]>([]);
@@ -132,6 +159,8 @@ export default function DashboardCrmPage() {
     })[0] || null;
   const newestLead =
     [...leads].sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt))[0] || null;
+  const criticalLeads = leads.filter((lead) => leadRiskLevel(lead) === 'critical');
+  const warningLeads = leads.filter((lead) => leadRiskLevel(lead) === 'warning');
 
   const metrics = useMemo(() => {
     const pipelineTotal = filtered.filter((lead) => lead.stage !== 'won').reduce((sum, lead) => sum + Number(lead.value || 0), 0);
@@ -202,10 +231,18 @@ export default function DashboardCrmPage() {
     return {
       eyebrow: en ? 'Pipeline Command Center' : 'Centro de comando del pipeline',
       title: en ? 'Focus on leads that matter now' : 'Enfócate en los leads que importan ahora',
-      detail: en
-        ? 'Keep follow-ups moving and guide each opportunity to a clear next step.'
-        : 'Mantén los seguimientos en marcha y guía cada oportunidad hacia un siguiente paso claro.',
-      accent: 'text-cyan-300',
+      detail: criticalLeads.length > 0
+        ? en
+          ? `${criticalLeads.length} customer${criticalLeads.length > 1 ? 's' : ''} haven't heard from you in 3+ days. They may think you forgot about them.`
+          : `${criticalLeads.length} cliente${criticalLeads.length > 1 ? 's' : ''} no han recibido respuesta en 3+ días. Pueden pensar que los olvidaste.`
+        : warningLeads.length > 0
+          ? en
+            ? `${warningLeads.length} customer${warningLeads.length > 1 ? 's' : ''} are waiting for a reply. A quick message keeps them warm.`
+            : `${warningLeads.length} cliente${warningLeads.length > 1 ? 's' : ''} esperan respuesta. Un mensaje rápido mantiene el interés.`
+          : en
+            ? 'Keep follow-ups moving and guide each opportunity to a clear next step.'
+            : 'Mantén los seguimientos en marcha y guía cada oportunidad hacia un siguiente paso claro.',
+      accent: criticalLeads.length > 0 ? 'text-rose-300' : warningLeads.length > 0 ? 'text-amber-300' : 'text-cyan-300',
       ctaLabel: hottestLead
         ? en
           ? 'Open hot opportunity'
@@ -220,7 +257,7 @@ export default function DashboardCrmPage() {
         ? ['Start with high-intent opportunities', 'Act where timing matters most']
         : ['Empieza por las oportunidades de alta intención', 'Actúa donde el timing importe más'],
     };
-  }, [hottestLead, language, leads.length, loading, newestLead, sampleLead]);
+  }, [criticalLeads.length, hottestLead, language, leads.length, loading, newestLead, sampleLead, warningLeads.length]);
 
   const handleCommandCenterCta = () => {
     if (commandCenter?.ctaViewMode && commandCenter.ctaViewMode !== viewMode) {
@@ -625,7 +662,16 @@ export default function DashboardCrmPage() {
                         <p className="text-sm text-slate-300">{detectChannel(lead).toUpperCase()}</p>
                         <p className="text-sm text-white">${lead.value.toLocaleString()}</p>
                         <p className="text-sm text-slate-500">{timeSince(lead.updatedAt)}</p>
-                        <ChevronRight className="h-4 w-4 self-center text-slate-600" />
+                        <div className="flex items-center self-center">
+                          <ChevronRight className="h-4 w-4 text-slate-600" />
+                          {leadRiskLevel(lead) !== 'ok' && (
+                            <span
+                              className={`ml-1 h-2 w-2 rounded-full ${
+                                leadRiskLevel(lead) === 'critical' ? 'bg-rose-400' : 'bg-amber-400'
+                              }`}
+                            />
+                          )}
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -662,6 +708,20 @@ export default function DashboardCrmPage() {
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <p className="truncate text-sm font-medium text-white">{lead.name}</p>
+                            {leadRiskLevel(lead) !== 'ok' && (
+                              <span
+                                className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                                  leadRiskLevel(lead) === 'critical'
+                                    ? 'bg-rose-500/10 text-rose-300'
+                                    : 'bg-amber-500/10 text-amber-300'
+                                }`}
+                              >
+                                {leadRiskLevel(lead) === 'critical' ? '⚠ ' : '• '}
+                                {language === 'en'
+                                  ? leadRiskLevel(lead) === 'critical' ? 'No contact 3d+' : 'No reply 24h+'
+                                  : leadRiskLevel(lead) === 'critical' ? 'Sin contacto 3d+' : 'Sin respuesta 24h+'}
+                              </span>
+                            )}
                             <p className="truncate text-xs text-slate-500">{lead.company || lead.source}</p>
                           </div>
                           <span className={`mt-1 h-2.5 w-2.5 rounded-full ${leadPriority(lead) === 'hot' ? 'bg-rose-400' : leadPriority(lead) === 'warm' ? 'bg-amber-400' : 'bg-cyan-400'}`} />
@@ -711,11 +771,13 @@ export default function DashboardCrmPage() {
         ) : null}
         <FocusPanel
           lead={selectedLead}
+          riskLabel={selectedLead ? leadRiskLabel(selectedLead, language) : undefined}
           messageLabel={
             selectedLead
-              ? language === 'en'
-                ? `Suggested move: confirm next step with ${selectedLead.name} today.`
-                : `Sugerencia IA: confirma el siguiente paso con ${selectedLead.name} hoy.`
+              ? leadRiskLabel(selectedLead, language) ||
+                (language === 'en'
+                  ? `Suggested move: confirm next step with ${selectedLead.name} today.`
+                  : `Sugerencia IA: confirma el siguiente paso con ${selectedLead.name} hoy.`)
               : undefined
           }
           onSend={handleSend}
