@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ArrowRight, Bot, CalendarPlus2, MessageCircleMore, Rocket, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import NextBestActionPanel from '@/components/NextBestActionPanel';
@@ -60,6 +61,7 @@ function leadChannel(lead: LeadRow) {
 
 export default function DashboardPage() {
   const { language } = useAppLanguage();
+  const router = useRouter();
   const [payload, setPayload] = useState<DashboardPayload | null>(null);
   const [leads, setLeads] = useState<LeadRow[]>([]);
   const [studio, setStudio] = useState<StudioPayload | null>(null);
@@ -455,6 +457,9 @@ export default function DashboardPage() {
         <NextBestActionPanel
           actions={nextBestActions}
           language={language}
+          onSelectLead={(leadId) => {
+            router.push(`/dashboard/crm?leadId=${leadId}`);
+          }}
         />
       )}
 

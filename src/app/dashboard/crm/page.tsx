@@ -1,6 +1,7 @@
 'use client';
 
 import { ChevronRight, Clock3, Columns3, Flame, Plus, Search, Sparkles } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import CrmAddLeadModal from '@/components/CrmAddLeadModal';
 import FocusPanel, { type FocusLead } from '@/components/FocusPanel';
@@ -85,6 +86,7 @@ function leadRiskLabel(lead: LeadRow, language: string): string {
 
 export default function DashboardCrmPage() {
   const { language } = useAppLanguage();
+  const searchParams = useSearchParams();
   const [leads, setLeads] = useState<LeadRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
@@ -122,6 +124,21 @@ export default function DashboardCrmPage() {
   useEffect(() => {
     void fetchLeads();
   }, []);
+
+  useEffect(() => {
+    const leadIdFromUrl = searchParams.get('leadId');
+    if (leadIdFromUrl && leads.length > 0) {
+      setSelectedLeadId(leadIdFromUrl);
+      setHighlightedLeadId(leadIdFromUrl);
+      setViewMode('list');
+      setTimeout(() => {
+        pipelineSectionRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        });
+      }, 300);
+    }
+  }, [searchParams, leads]);
 
   useEffect(() => {
     if (!selectedLeadId && leads.length) {
