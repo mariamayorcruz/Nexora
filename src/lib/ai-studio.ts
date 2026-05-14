@@ -1,6 +1,6 @@
 import { BillingPlan, getBillingPlan } from '@/lib/billing';
 
-const AI_STUDIO_GROQ_MODEL = 'llama-3.3-70b-versatile';
+const AI_STUDIO_MODEL = 'claude-haiku-4-5';
 
 export type AiToolKey =
   | 'ad-copy'
@@ -787,9 +787,9 @@ async function tryOpenRouterAiStudio(params: {
   businessContext?: Record<string, unknown> | null;
   customContext?: string;
 }): Promise<AiOutputPayload | null> {
-  const apiKey = String(process.env.GROQ_API_KEY || '').trim();
+  const apiKey = String(process.env.ANTHROPIC_API_KEY || '').trim();
   if (!apiKey) {
-    console.error('[ai-studio] tryOpenRouterAiStudio: OPENROUTER_API_KEY missing at runtime');
+    console.warn('[ai-studio] ANTHROPIC_API_KEY no configurada');
     return null;
   }
 
@@ -825,113 +825,64 @@ async function tryOpenRouterAiStudio(params: {
     ],
   };
 
+  const systemPrompt = buildAiStudioOpenRouterSystemPrompt();
+  const messages = [
+    { role: 'user', content: JSON.stringify(userPayload, null, 2) },
+  ];
+
   try {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${String(process.env.GROQ_API_KEY || '').trim()}`,
       },
       body: JSON.stringify({
-        model: AI_STUDIO_GROQ_MODEL,
-        messages: [
-          { role: 'system', content: `NOMBRE DEL NEGOCIO PARA ESTE REQUEST: "${String((params.businessContext as Record<string, unknown>)?.businessName ?? params.offer ?? 'negocio')}" — úsalo en TODO el copy sin excepción.\n\n` + buildAiStudioOpenRouterSystemPrompt() },
-          { role: 'user', content: JSON.stringify(userPayload, null, 2) },
-        ],
-        temperature: 0.72,
+        model: AI_STUDIO_MODEL,
         max_tokens: 4000,
+        system: systemPrompt,
+        messages,
       }),
     });
 
-    const responseText = await response.text();
     if (!response.ok) {
-      console.error('[ai-studio] tryOpenRouterAiStudio: OpenRouter HTTP error', {
-        status: response.status,
-        statusText: response.statusText,
-        model: AI_STUDIO_GROQ_MODEL,
-        bodyPreview: responseText.slice(0, 2000),
-      });
+      const errorText = await response.text().catch(() => '');
+      console.error('[ai-studio] Claude Haiku error:', response.status, errorText);
       return null;
     }
 
-    let payload: {
-      choices?: Array<{ message?: { content?: string } }>;
-      error?: { message?: string; code?: number };
-    };
-    try {
-      payload = JSON.parse(responseText) as typeof payload;
-    } catch (parseErr) {
-      console.error('[ai-studio] tryOpenRouterAiStudio: response body is not JSON', {
-        err: String(parseErr),
-        preview: responseText.slice(0, 800),
-      });
-      return null;
-    }
+    const data = await response.json();
+    const text = String(data?.content?.[0]?.text || '').trim();
 
-    if (payload.error?.message) {
-      console.error('[ai-studio] tryOpenRouterAiStudio: OpenRouter error field in body', {
-        message: payload.error.message,
-        code: payload.error.code,
-        rawPreview: responseText.slice(0, 1500),
-      });
-      return null;
-    }
-
-    const text = (payload.choices || [])
-      .map((c) => c.message?.content || '')
-      .join('\n')
-      .trim();
     if (!text) {
-      console.error('[ai-studio] tryOpenRouterAiStudio: empty assistant content', {
-        model: AI_STUDIO_GROQ_MODEL,
-        payloadPreview: responseText.slice(0, 1500),
-      });
+      console.error('[ai-studio] Claude Haiku: empty response');
       return null;
     }
 
     let raw: unknown;
     try {
       const extracted = extractLlmJsonObject(text);
-      // Intentar parse directo primero
+      raw = JSON.parse(extracted);
+    } catch {
+      const cleaned = text
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+        .replace(/,(\s*[}\]])/g, '$1');
       try {
+        const extracted = extractLlmJsonObject(cleaned);
         raw = JSON.parse(extracted);
-      } catch {
-        // Si falla, limpiar más agresivamente
-        const cleaned = extracted
-          // Remover caracteres de control
-          .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ' ')
-          // Escapar saltos de línea dentro de strings JSON
-          .replace(/("(?:[^"\\]|\\.)*")|(\n)/g, (match, stringMatch) => {
-            if (stringMatch) return stringMatch;
-            return '\\n';
-          })
-          // Remover trailing commas antes de } o ]
-          .replace(/,(\s*[}\]])/g, '$1');
-        raw = JSON.parse(cleaned);
+      } catch (parseErr) {
+        console.error('[ai-studio] Claude Haiku JSON parse failed:', {
+          err: String(parseErr),
+          textPreview: text.slice(0, 1200),
+        });
+        return null;
       }
-    } catch (parseErr) {
-      console.error('[ai-studio] tryOpenRouterAiStudio: LLM output JSON parse failed', {
-        err: String(parseErr),
-        textPreview: text.slice(0, 1200),
-      });
-      return null;
     }
 
-    const normalized = normalizeLlmAiOutputPayload(raw, generationConfig);
-    if (!normalized) {
-      console.error('[ai-studio] tryOpenRouterAiStudio: normalizeLlmAiOutputPayload rejected', {
-        rawKeys: raw && typeof raw === 'object' ? Object.keys(raw as object) : [],
-        rawPreview: JSON.stringify(raw).slice(0, 1200),
-      });
-      return null;
-    }
-
-    return normalized;
-  } catch (err) {
-    console.error('[ai-studio] tryOpenRouterAiStudio: fetch or unexpected error', {
-      message: err instanceof Error ? err.message : String(err),
-      stack: err instanceof Error ? err.stack : undefined,
-    });
+    return normalizeLlmAiOutputPayload(raw, generationConfig);
+  } catch (error) {
+    console.error('[ai-studio] Claude Haiku error:', error);
     return null;
   }
 }
