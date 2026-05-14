@@ -1,6 +1,7 @@
 'use client';
 
 import { CalendarPlus2, Search, Sparkles } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import AISuggestionBar from '@/components/AISuggestionBar';
 import { useAppLanguage } from '@/hooks/use-app-language';
@@ -61,6 +62,7 @@ function buildMessages(lead: LeadRow): ChatMessage[] {
 }
 
 export default function ConversacionesPage() {
+  const router = useRouter();
   const { language } = useAppLanguage();
   const [leads, setLeads] = useState<LeadRow[]>([]);
   const [activeTab, setActiveTab] = useState<ConversationFilter>('all');
@@ -69,6 +71,9 @@ export default function ConversacionesPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [composerTab, setComposerTab] = useState<ComposerTab>('whatsapp');
   const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendSuccess, setSendSuccess] = useState(false);
+  const [sendError, setSendError] = useState('');
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -141,6 +146,37 @@ export default function ConversacionesPage() {
     if (!selected) return;
     setComposerTab(selected.channel);
   }, [selected]);
+
+  const handleSend = async () => {
+    if (!selected || !draft.trim()) return;
+    setSending(true);
+    setSendSuccess(false);
+    setSendError('');
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/crm/leads/${selected.id}/message`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          channel: composerTab,
+          message: draft.trim(),
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Error al enviar');
+      setDraft('');
+      setSendSuccess(true);
+      setTimeout(() => setSendSuccess(false), 3000);
+    } catch (error) {
+      setSendError(error instanceof Error ? error.message : 'Error al enviar');
+      setTimeout(() => setSendError(''), 4000);
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -255,10 +291,18 @@ export default function ConversacionesPage() {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" className="rounded-full bg-white/[0.03] px-3 py-1.5 text-xs text-slate-300 transition hover:text-white">
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/dashboard/crm?leadId=${selected.id}`)}
+                    className="rounded-full bg-white/[0.03] px-3 py-1.5 text-xs text-slate-300 transition hover:text-white"
+                  >
                     {language === 'en' ? 'View lead' : 'Ver lead'}
                   </button>
-                  <button type="button" className="rounded-full bg-white/[0.03] px-3 py-1.5 text-xs text-slate-300 transition hover:text-white">
+                  <button
+                    type="button"
+                    onClick={() => router.push('/dashboard/calendario')}
+                    className="rounded-full bg-white/[0.03] px-3 py-1.5 text-xs text-slate-300 transition hover:text-white"
+                  >
                     {language === 'en' ? 'Schedule' : 'Agendar'}
                   </button>
                   <button type="button" className="rounded-full bg-cyan-500/10 px-3 py-1.5 text-xs text-cyan-300">AI activo</button>
@@ -320,7 +364,17 @@ export default function ConversacionesPage() {
                       {tab.toUpperCase()}
                     </button>
                   ))}
-                  <button type="button" className="ml-auto rounded-full bg-white/[0.03] px-3 py-1.5 text-[11px] text-slate-300">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDraft(
+                        language === 'en'
+                          ? 'I can help today. Would 2:00 PM or 4:30 PM work better for you?'
+                          : 'Te puedo ayudar hoy mismo. ¿Te funciona mejor a las 2:00 PM o 4:30 PM?'
+                      )
+                    }
+                    className="ml-auto rounded-full bg-white/[0.03] px-3 py-1.5 text-[11px] text-slate-300"
+                  >
                     <Sparkles className="mr-1 inline h-3.5 w-3.5" />
                     IA
                   </button>
@@ -331,13 +385,26 @@ export default function ConversacionesPage() {
                   placeholder={language === 'en' ? 'Write your reply...' : 'Escribe tu respuesta...'}
                   className="min-h-[120px] w-full resize-none rounded-2xl bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600"
                 />
+                {sendSuccess && (
+                  <div className="mb-2 rounded-xl bg-emerald-500/10 px-3 py-2 text-xs text-emerald-400">
+                    {language === 'en' ? '✓ Message sent' : '✓ Mensaje enviado'}
+                  </div>
+                )}
+                {sendError && (
+                  <div className="mb-2 rounded-xl bg-rose-500/10 px-3 py-2 text-xs text-rose-400">
+                    {sendError}
+                  </div>
+                )}
                 <div className="mt-3 flex justify-end">
                   <button
                     type="button"
-                    onClick={() => setDraft('')}
-                    className="rounded-full bg-cyan-500 px-4 py-2 text-sm font-semibold text-[#041018] transition-all duration-150 hover:-translate-y-[1px] hover:bg-cyan-400"
+                    onClick={() => void handleSend()}
+                    disabled={sending || !draft.trim()}
+                    className="rounded-full bg-cyan-500 px-4 py-2 text-sm font-semibold text-[#041018] transition-all duration-150 hover:-translate-y-[1px] hover:bg-cyan-400 disabled:opacity-50"
                   >
-                    {language === 'en' ? 'Send' : 'Enviar'}
+                    {sending
+                      ? language === 'en' ? 'Sending...' : 'Enviando...'
+                      : language === 'en' ? 'Send' : 'Enviar'}
                   </button>
                 </div>
               </div>
@@ -411,11 +478,19 @@ export default function ConversacionesPage() {
               </div>
 
               <div className="mt-4 flex gap-2">
-                <button type="button" className="flex-1 rounded-full bg-white/[0.03] px-3 py-2 text-xs text-slate-300 transition hover:text-white">
+                <button
+                  type="button"
+                  onClick={() => router.push('/dashboard/calendario')}
+                  className="flex-1 rounded-full bg-white/[0.03] px-3 py-2 text-xs text-slate-300 transition hover:text-white"
+                >
                   <CalendarPlus2 className="mr-1 inline h-3.5 w-3.5" />
                   Agendar
                 </button>
-                <button type="button" className="flex-1 rounded-full bg-cyan-500/10 px-3 py-2 text-xs text-cyan-300 transition hover:bg-cyan-500/15">
+                <button
+                  type="button"
+                  onClick={() => router.push(`/dashboard/crm?leadId=${selected.id}`)}
+                  className="flex-1 rounded-full bg-cyan-500/10 px-3 py-2 text-xs text-cyan-300 transition hover:bg-cyan-500/15"
+                >
                   Ver lead
                 </button>
               </div>
