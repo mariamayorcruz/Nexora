@@ -95,7 +95,7 @@ export default function OnboardingPage() {
 
         const data = (await response.json()) as MeResponse;
         const status = data?.user?.subscription?.status?.toLowerCase?.() || null;
-        const completed = data?.user?.onboardingCompletedAt ? null;
+        const completed = data?.user?.onboardingCompletedAt ?? null;
         const canPreview = Boolean(previewMode && data?.user?.previewOnboardingAccess);
         const onboardingData =
           data?.user?.onboardingData && typeof data.user.onboardingData === 'object' && !Array.isArray(data.user.onboardingData)
