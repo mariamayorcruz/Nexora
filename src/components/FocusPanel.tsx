@@ -77,7 +77,8 @@ export default function FocusPanel({
     ]);
     setAddingTask(false);
     setNewTask('');
-  }, [en, lead?.id, lead?.stage]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lead?.id, lead?.stage]);
 
   const handleSubmit = async () => {
     if (!lead || !draft.trim()) return;
