@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { getFounderPlan, getFounderTrialDays, isAdminEmail, isFounderEmail, isInternalOrTestEmail } from '@/lib/access';
 import { buildEntitlementSummary } from '@/lib/entitlements';
@@ -147,6 +148,8 @@ export async function PATCH(request: NextRequest) {
       currentPassword?: string;
       newPassword?: string;
       cancelSubscription?: boolean;
+      churnReason?: string;
+      churnComment?: string | null;
     };
 
     const updateData: {
@@ -154,6 +157,7 @@ export async function PATCH(request: NextRequest) {
       marketingOptIn?: boolean;
       marketingOptInAt?: Date | null;
       password?: string;
+      onboardingData?: Prisma.InputJsonValue;
     } = {};
 
     if (body.name !== undefined) {
@@ -195,6 +199,15 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (body.cancelSubscription === true) {
+      if (body.churnReason) {
+        updateData.onboardingData = {
+          ...(((user.onboardingData as Record<string, unknown>) || {})),
+          churnReason: body.churnReason,
+          churnComment: body.churnComment || null,
+          churnedAt: new Date().toISOString(),
+        } as Prisma.InputJsonValue;
+      }
+
       const subscription = await prisma.subscription.findUnique({ where: { userId: user.id } });
 
       if (!subscription) {
@@ -230,6 +243,15 @@ export async function PATCH(request: NextRequest) {
           stripeSubId: true,
         },
       });
+
+      if (updateData.onboardingData) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            onboardingData: updateData.onboardingData,
+          },
+        });
+      }
 
       return NextResponse.json({
         ok: true,

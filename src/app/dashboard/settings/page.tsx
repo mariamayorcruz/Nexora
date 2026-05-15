@@ -35,6 +35,10 @@ export default function SettingsPage() {
   const [processingPassword, setProcessingPassword] = useState(false);
   const [processingCancelSubscription, setProcessingCancelSubscription] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
+  const [showChurnModal, setShowChurnModal] = useState(false);
+  const [churnReason, setChurnReason] = useState('');
+  const [churnComment, setChurnComment] = useState('');
+  const [submittingChurn, setSubmittingChurn] = useState(false);
 
   const loadNotificationPreferences = (userId: string) => {
     try {
@@ -204,24 +208,43 @@ export default function SettingsPage() {
     }
   };
 
-  const handleCancelSubscription = async () => {
-    const confirmed = window.confirm('Se cancelará tu suscripción al final del período actual. ¿Deseas continuar?');
-    if (!confirmed) return;
+  const handleCancelSubscription = () => {
+    setShowChurnModal(true);
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!churnReason) return;
+    setSubmittingChurn(true);
     setProcessingCancelSubscription(true);
     try {
       const token = localStorage.getItem('token');
+
       const response = await fetch('/api/users/me', {
         method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cancelSubscription: true }),
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          cancelSubscription: true,
+          churnReason,
+          churnComment: churnComment.trim() || null,
+        }),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || 'No se pudo cancelar la suscripción.');
-      setUser((current: any) => ({ ...current, subscription: data.subscription || current?.subscription }));
-      showStatus(data.message || 'Suscripción cancelada al final del período actual.');
+      if (!response.ok) {
+        throw new Error((data as { error?: string }).error || 'No se pudo cancelar.');
+      }
+
+      setShowChurnModal(false);
+      setChurnReason('');
+      setChurnComment('');
+      setUser((current: any) => ({ ...current }));
+      showStatus('Suscripción cancelada. Lamentamos verte partir.');
     } catch (error) {
-      showStatus(error instanceof Error ? error.message : 'No se pudo cancelar la suscripción.');
+      showStatus('No se pudo cancelar. Intenta de nuevo.');
     } finally {
+      setSubmittingChurn(false);
       setProcessingCancelSubscription(false);
     }
   };
@@ -441,6 +464,76 @@ export default function SettingsPage() {
           {processingCancelSubscription ? 'Cancelando...' : 'Cancelar Suscripción'}
         </button>
       </section>
+      {showChurnModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+          <div className="w-full max-w-md rounded-[28px] bg-[#040810] p-6">
+            <p className="text-[11px] uppercase tracking-[0.2em] text-rose-400">
+              Cancelar suscripción
+            </p>
+            <h2 className="mt-2 text-xl font-semibold text-white">
+              ¿Por qué cancelas?
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Tu feedback nos ayuda a mejorar Nexora.
+            </p>
+
+            <div className="mt-5 space-y-2">
+              {[
+                { value: 'too_expensive', label: '💸 Es muy caro para mi presupuesto' },
+                { value: 'missing_features', label: '🔍 No encontré lo que buscaba' },
+                { value: 'switched_tool', label: '🔄 Cambié a otra herramienta' },
+                { value: 'just_testing', label: '🧪 Solo quería probarlo' },
+                { value: 'technical_issues', label: '⚙️ Tuve problemas técnicos' },
+                { value: 'not_using', label: '😴 No lo estoy usando suficiente' },
+                { value: 'other', label: '💬 Otra razón' },
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setChurnReason(option.value)}
+                  className={`w-full rounded-[18px] px-4 py-3 text-left text-sm transition-all duration-150 ${
+                    churnReason === option.value
+                      ? 'bg-rose-500/15 border border-rose-500/30 text-white'
+                      : 'bg-white/[0.03] border border-transparent text-slate-300 hover:bg-white/[0.05]'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
+            <textarea
+              value={churnComment}
+              onChange={(e) => setChurnComment(e.target.value)}
+              placeholder="¿Algo más que quieras decirnos? (opcional)"
+              className="mt-4 w-full resize-none rounded-xl border border-white/[0.08] bg-[#030610] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-rose-500/30"
+              rows={3}
+            />
+
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => void handleConfirmCancel()}
+                disabled={!churnReason || submittingChurn}
+                className="flex-1 rounded-xl bg-rose-500/80 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:opacity-50"
+              >
+                {submittingChurn ? 'Cancelando...' : 'Confirmar cancelación'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowChurnModal(false);
+                  setChurnReason('');
+                  setChurnComment('');
+                }}
+                className="rounded-xl bg-white/[0.04] px-4 py-2.5 text-sm text-slate-300 hover:text-white"
+              >
+                Volver
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
