@@ -467,7 +467,7 @@ export default function BillingPage() {
               <div className="mt-6">
                 <p className="text-4xl font-bold text-white">${plan.monthlyPrice}</p>
                 <p className="text-sm text-slate-400">por mes</p>
-                <p className="mt-1 text-xs text-cyan-300">✦ 7 días gratis para nuevos usuarios</p>
+                <p className="mt-1 text-xs text-cyan-300">✦ 7 días por $1 · Sin compromiso</p>
               </div>
 
               <ul className="mt-6 space-y-3 text-sm text-slate-300">

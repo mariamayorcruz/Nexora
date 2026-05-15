@@ -5,6 +5,8 @@ import { prisma } from '@/lib/prisma';
 import { getStripeClient } from '@/lib/stripe';
 import { getBearerToken, getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 
+const TRIAL_FEE_PRICE_ID = 'price_1TXTv5PltMpbjE7QkgsbHnT3';
+
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
@@ -90,6 +92,10 @@ export async function POST(request: NextRequest) {
       client_reference_id: user.id,
       payment_method_types: ['card'],
       line_items: [
+        ...(withTrial ? [{
+          price: TRIAL_FEE_PRICE_ID,
+          quantity: 1,
+        }] : []),
         {
           price: priceId,
           quantity: 1,
@@ -117,6 +123,11 @@ export async function POST(request: NextRequest) {
               },
             }
           : undefined,
+        ...(withTrial && {
+          add_invoice_items: [{
+            price: TRIAL_FEE_PRICE_ID,
+          }],
+        }),
       },
     };
 
