@@ -470,8 +470,9 @@ export default function DashboardCrmPage() {
   };
 
   const handleSend = async (lead: FocusLead, channel: 'whatsapp' | 'sms' | 'email' | 'nota', text: string) => {
+    const token = localStorage.getItem('token');
+
     if (channel === 'nota') {
-      const token = localStorage.getItem('token');
       const response = await fetch(`/api/crm/leads/${lead.id}`, {
         method: 'PATCH',
         headers: {
@@ -485,11 +486,31 @@ export default function DashboardCrmPage() {
         setMessage(language === 'en' ? 'Note saved.' : 'Nota guardada.');
         return;
       }
+      setMessage(language === 'en' ? 'Error saving note.' : 'Error al guardar la nota.');
+      return;
     }
+
+    const response = await fetch(`/api/crm/leads/${lead.id}/message`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ channel, message: text }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      setMessage(data.error || (language === 'en' ? 'Error sending message.' : 'Error al enviar el mensaje.'));
+      return;
+    }
+
+    await fetchLeads();
     setMessage(
       language === 'en'
-        ? `Ready to send via ${channel.toUpperCase()}.`
-        : `Listo para enviar por ${channel.toUpperCase()}.`
+        ? `Message sent via ${channel.toUpperCase()}.`
+        : `Mensaje enviado por ${channel.toUpperCase()}.`
     );
   };
 
