@@ -74,6 +74,7 @@ export default function ConversacionesPage() {
   const [sending, setSending] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
   const [sendError, setSendError] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -146,6 +147,34 @@ export default function ConversacionesPage() {
     if (!selected) return;
     setComposerTab(selected.channel);
   }, [selected]);
+
+  const handleAiSuggest = async () => {
+    if (!selected) return;
+    setAiLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const prompt =
+        language === 'en'
+          ? `Suggest a short reply message for this lead. Name: ${selected.name}. Stage: ${selected.stage}. Notes: ${selected.notes || 'none'}. Next action: ${selected.nextAction || 'none'}. Channel: ${selected.channel.toUpperCase()}. Write only the reply message, 2-3 sentences max, no preamble.`
+          : `Sugiere un mensaje de respuesta corto para este lead. Nombre: ${selected.name}. Etapa: ${selected.stage}. Notas: ${selected.notes || 'ninguna'}. Próxima acción: ${selected.nextAction || 'ninguna'}. Canal: ${selected.channel.toUpperCase()}. Escribe solo el mensaje de respuesta, máximo 2-3 oraciones, sin preámbulo.`;
+      const response = await fetch('/api/support/assistant', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: prompt, page: 'conversaciones' }),
+      });
+      const data = await response.json();
+      if (response.ok && data.reply) {
+        setDraft(String(data.reply));
+      }
+    } catch {
+      // silently fall back — user can still type manually
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const handleSend = async () => {
     if (!selected || !draft.trim()) return;
@@ -305,7 +334,17 @@ export default function ConversacionesPage() {
                   >
                     {language === 'en' ? 'Schedule' : 'Agendar'}
                   </button>
-                  <button type="button" className="rounded-full bg-cyan-500/10 px-3 py-1.5 text-xs text-cyan-300">AI activo</button>
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/dashboard/crm?leadId=${selected.id}`)}
+                    className={`rounded-full px-3 py-1.5 text-xs transition hover:opacity-80 ${
+                      selected.aiActive ? 'bg-cyan-500/10 text-cyan-300' : 'bg-white/[0.04] text-slate-500'
+                    }`}
+                  >
+                    {selected.aiActive
+                      ? (language === 'en' ? 'AI active' : 'AI activo')
+                      : (language === 'en' ? 'AI paused' : 'AI pausado')}
+                  </button>
                 </div>
               </div>
 
@@ -366,17 +405,14 @@ export default function ConversacionesPage() {
                   ))}
                   <button
                     type="button"
-                    onClick={() =>
-                      setDraft(
-                        language === 'en'
-                          ? 'I can help today. Would 2:00 PM or 4:30 PM work better for you?'
-                          : 'Te puedo ayudar hoy mismo. ¿Te funciona mejor a las 2:00 PM o 4:30 PM?'
-                      )
-                    }
-                    className="ml-auto rounded-full bg-white/[0.03] px-3 py-1.5 text-[11px] text-slate-300"
+                    onClick={() => void handleAiSuggest()}
+                    disabled={aiLoading || !selected}
+                    className="ml-auto rounded-full bg-white/[0.03] px-3 py-1.5 text-[11px] text-slate-300 transition hover:text-white disabled:opacity-50"
                   >
                     <Sparkles className="mr-1 inline h-3.5 w-3.5" />
-                    IA
+                    {aiLoading
+                      ? (language === 'en' ? 'Generating...' : 'Generando...')
+                      : 'IA'}
                   </button>
                 </div>
                 <textarea

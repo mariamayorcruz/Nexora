@@ -38,8 +38,9 @@ export default function CalendarioPage() {
     void Promise.all([
       fetch('/api/crm/leads', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }).then((res) => res.json()),
       fetch('/api/ai/studio', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }).then((res) => res.json()).catch(() => ({ jobs: [] })),
+      fetch('/api/crm/calendar/events', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }).then((res) => res.json()).catch(() => ({ events: [] })),
     ])
-      .then(([leadData, studioData]) => {
+      .then(([leadData, studioData, calendarData]) => {
         const leadEvents: EventItem[] = (Array.isArray(leadData?.leads) ? leadData.leads : []).slice(0, 16).map((lead: Record<string, unknown>, index: number) => ({
           id: String(lead.id || index),
           title: String(lead.name || 'Lead'),
@@ -56,7 +57,8 @@ export default function CalendarioPage() {
           time: new Date(String(job.createdAt || Date.now())).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
           type: 'campaign',
         }));
-        setEvents([...leadEvents, ...campaignEvents]);
+        const manualEvents: EventItem[] = (Array.isArray(calendarData?.events) ? calendarData.events : []);
+        setEvents([...leadEvents, ...campaignEvents, ...manualEvents]);
       })
       .catch(() => setEvents([]));
   }, []);
@@ -353,18 +355,25 @@ export default function CalendarioPage() {
               <button
                 type="button"
                 onClick={() => {
-                  if (newEventTitle.trim()) {
-                    setEvents((prev) => [
-                      ...prev,
-                      {
-                        id: `manual-${Date.now()}`,
-                        title: newEventTitle.trim(),
-                        detail: language === 'en' ? 'Manual event' : 'Evento manual',
-                        date: selectedDate.toISOString(),
-                        time: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-                        type: 'lead',
-                      },
-                    ]);
+                  const title = newEventTitle.trim();
+                  if (title) {
+                    const newEvent: EventItem = {
+                      id: `manual-${Date.now()}`,
+                      title,
+                      detail: language === 'en' ? 'Manual event' : 'Evento manual',
+                      date: selectedDate.toISOString(),
+                      time: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+                      type: 'lead',
+                    };
+                    setEvents((prev) => [...prev, newEvent]);
+                    const token = localStorage.getItem('token');
+                    if (token) {
+                      void fetch('/api/crm/calendar/events', {
+                        method: 'POST',
+                        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: newEvent.id, title: newEvent.title, detail: newEvent.detail, date: newEvent.date }),
+                      });
+                    }
                   }
                   setNewEventTitle('');
                   setAddEventOpen(false);
