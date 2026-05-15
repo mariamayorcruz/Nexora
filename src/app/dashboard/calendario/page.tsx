@@ -149,7 +149,10 @@ export default function CalendarioPage() {
           <div className="overflow-x-auto pb-1">
             <div className="min-w-[860px]">
               <div className="mb-4 grid grid-cols-7 gap-3 text-center text-[11px] uppercase tracking-[0.16em] text-slate-500">
-                {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map((day) => (
+                {(language === 'en'
+                  ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+                  : ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+                ).map((day) => (
                   <div key={day} className="py-2">
                     {day}
                   </div>
@@ -288,7 +291,7 @@ export default function CalendarioPage() {
       <aside className="rounded-[28px] bg-[#040810] p-4 sm:p-5">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Día seleccionado</p>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{language === 'en' ? 'Selected day' : 'Día seleccionado'}</p>
             <p className="mt-2 text-sm text-white">{selectedDate.toLocaleDateString(language === 'en' ? 'en-US' : 'es-ES', { weekday: 'long', day: 'numeric', month: 'short' })}</p>
           </div>
           <button
@@ -303,7 +306,7 @@ export default function CalendarioPage() {
 
         <div className="mt-4 space-y-2">
           {dayEvents.length === 0 ? (
-            <div className="rounded-[20px] bg-[#030610] px-4 py-4 text-sm text-slate-500">Sin eventos para este día.</div>
+            <div className="rounded-[20px] bg-[#030610] px-4 py-4 text-sm text-slate-500">{language === 'en' ? 'No events for this day.' : 'Sin eventos para este día.'}</div>
           ) : (
             dayEvents.map((event) => (
               <div key={event.id} className="rounded-[20px] bg-[#030610] p-3">
@@ -319,7 +322,7 @@ export default function CalendarioPage() {
         </div>
 
         <div className="mt-5 rounded-[20px] bg-[#030610] p-4">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Resumen de semana</p>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{language === 'en' ? 'Week summary' : 'Resumen de semana'}</p>
           <div className="mt-3 space-y-2">
             {(Object.keys(TYPE_META) as Array<keyof typeof TYPE_META>).map((key) => (
               <div key={key} className="flex items-center justify-between text-sm">

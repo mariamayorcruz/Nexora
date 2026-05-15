@@ -583,17 +583,7 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-sm text-slate-200">{event}</p>
                   <p className="text-[11px] text-slate-500">
-                    {index === 0
-                      ? language === 'en'
-                        ? 'Now'
-                        : 'Ahora'
-                      : index === 1
-                        ? language === 'en'
-                          ? '18 min ago'
-                          : 'Hace 18 min'
-                        : language === 'en'
-                          ? '1 h ago'
-                          : 'Hace 1 h'}
+                    {language === 'en' ? 'Now' : 'Ahora'}
                   </p>
                 </div>
               </div>

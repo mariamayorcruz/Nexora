@@ -29,6 +29,11 @@ const TAB_LABELS: Record<ComposerTab, string> = {
   nota: 'Nota',
 };
 
+function getTabLabel(tab: ComposerTab, en: boolean): string {
+  if (tab === 'nota') return en ? 'Note' : 'Nota';
+  return TAB_LABELS[tab];
+}
+
 export default function FocusPanel({
   lead,
   riskLabel,
@@ -323,7 +328,7 @@ export default function FocusPanel({
                   activeTab === tab ? 'bg-cyan-500/10 text-cyan-300' : 'text-slate-500 hover:bg-white/[0.04] hover:text-white'
                 }`}
               >
-                {TAB_LABELS[tab]}
+                {getTabLabel(tab, en)}
               </button>
             ))}
           </div>
@@ -332,8 +337,8 @@ export default function FocusPanel({
             onChange={(event) => setDraft(event.target.value)}
             placeholder={
               en
-                ? `Write your ${TAB_LABELS[activeTab].toLowerCase()} message...`
-                : `Escribe ${TAB_LABELS[activeTab].toLowerCase()}...`
+                ? `Write your ${getTabLabel(activeTab, en).toLowerCase()} message...`
+                : `Escribe ${getTabLabel(activeTab, en).toLowerCase()}...`
             }
             className="min-h-[92px] w-full resize-none rounded-2xl bg-white/[0.03] px-3 py-3 text-sm text-white outline-none placeholder:text-slate-600"
           />
@@ -358,8 +363,8 @@ export default function FocusPanel({
                 ? 'Sending...'
                 : 'Enviando...'
               : en
-                ? `Send via ${TAB_LABELS[activeTab]}`
-                : `Enviar por ${TAB_LABELS[activeTab]}`}
+                ? `Send via ${getTabLabel(activeTab, en)}`
+                : `Enviar por ${getTabLabel(activeTab, en)}`}
           </button>
         </div>
       </div>

@@ -429,6 +429,7 @@ export default function DashboardStudioPage() {
           <CampaignOutput
             title={activeJob.title || goal || (language === 'en' ? 'New campaign' : 'Campaña nueva')}
             status={language === 'en' ? 'Ready to publish' : 'Lista para publicar'}
+            language={language}
             creditsUsed={activeJob.creditsUsed}
             imageUrl={activeJob.output?.imageUrl}
             headline={selectedHook || activeJob.output?.headline}

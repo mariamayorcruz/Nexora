@@ -155,7 +155,7 @@ export default function AnalyticsPage() {
   if (!user?.entitlements?.capabilities.canUseAdvancedAnalytics) {
     return (
       <section className="rounded-[28px] bg-[#040810] p-8">
-        <p className="text-xs uppercase tracking-[0.28em] text-cyan-300">Analitica avanzada</p>
+        <p className="text-xs uppercase tracking-[0.28em] text-cyan-300">Analítica avanzada</p>
         <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-white">Desbloquea inteligencia de crecimiento.</h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
           Esta vista une campañas, leads y pipeline en una lectura ejecutiva limpia.
@@ -274,7 +274,7 @@ export default function AnalyticsPage() {
         </div>
 
         <div className="rounded-[28px] bg-[#040810] p-5">
-          <h2 className="text-lg font-semibold text-white">Proximas jugadas</h2>
+          <h2 className="text-lg font-semibold text-white">Próximas jugadas</h2>
           <div className="mt-4 space-y-2">
             {actionItems.map((item) => (
               <div

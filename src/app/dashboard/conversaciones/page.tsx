@@ -367,10 +367,6 @@ export default function ConversacionesPage() {
                   </div>
                 ))}
 
-                <div className="flex items-center gap-2 pl-2 text-sm text-slate-500">
-                  <span className="h-2 w-2 animate-pulse rounded-full bg-cyan-400" />
-                  <span>Escribiendo...</span>
-                </div>
               </div>
 
               <AISuggestionBar
@@ -465,15 +461,15 @@ export default function ConversacionesPage() {
           {selected ? (
             <>
               <div className="rounded-[20px] bg-rose-500/10 px-3 py-3 text-sm text-rose-200">
-                AI Agent activo · respondiendo
+                {language === 'en' ? 'AI Agent active · responding' : 'AI Agent activo · respondiendo'}
               </div>
               <div className="mt-4 space-y-3 rounded-[20px] bg-[#030610] p-4">
                 {[
-                  { label: 'Estado', value: selected.stage },
+                  { label: language === 'en' ? 'Status' : 'Estado', value: selected.stage },
                   { label: 'Score', value: `${selected.confidence}%` },
-                  { label: 'Valor', value: `$${selected.value.toLocaleString()}` },
-                  { label: 'Canal', value: selected.channel.toUpperCase() },
-                  { label: 'Tiempo activo', value: new Date(selected.updatedAt).toLocaleDateString('es-ES') },
+                  { label: language === 'en' ? 'Value' : 'Valor', value: `$${selected.value.toLocaleString()}` },
+                  { label: language === 'en' ? 'Channel' : 'Canal', value: selected.channel.toUpperCase() },
+                  { label: language === 'en' ? 'Last activity' : 'Tiempo activo', value: new Date(selected.updatedAt).toLocaleDateString(language === 'en' ? 'en-US' : 'es-ES') },
                 ].map((item) => (
                   <div key={item.label} className="flex items-center justify-between text-sm">
                     <span className="text-slate-500">{item.label}</span>
@@ -483,13 +479,20 @@ export default function ConversacionesPage() {
               </div>
 
               <div className="mt-4 rounded-[20px] bg-[#030610] p-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Respuestas rápidas</p>
+                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{language === 'en' ? 'Quick replies' : 'Respuestas rápidas'}</p>
                 <div className="mt-3 space-y-2">
-                  {[
-                    'Te mando dos opciones y cerramos hoy.',
-                    '¿Prefieres llamada corta o mensaje con propuesta?',
-                    'Puedo enviarte pricing y siguiente paso ahora.',
-                  ].map((template) => (
+                  {(language === 'en'
+                    ? [
+                        'I\'ll send you two options and we can close today.',
+                        'Do you prefer a quick call or a written proposal?',
+                        'I can send you pricing and next steps right now.',
+                      ]
+                    : [
+                        'Te mando dos opciones y cerramos hoy.',
+                        '¿Prefieres llamada corta o mensaje con propuesta?',
+                        'Puedo enviarte pricing y siguiente paso ahora.',
+                      ]
+                  ).map((template) => (
                     <button
                       key={template}
                       type="button"
@@ -503,7 +506,7 @@ export default function ConversacionesPage() {
               </div>
 
               <div className="mt-4 rounded-[20px] bg-[#030610] p-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Historial de canales</p>
+                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{language === 'en' ? 'Channel history' : 'Historial de canales'}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {[selected.channel.toUpperCase(), 'AI Agent', 'CRM'].map((item) => (
                     <span key={item} className="rounded-full bg-white/[0.04] px-2.5 py-1 text-[10px] text-slate-300">
@@ -520,14 +523,14 @@ export default function ConversacionesPage() {
                   className="flex-1 rounded-full bg-white/[0.03] px-3 py-2 text-xs text-slate-300 transition hover:text-white"
                 >
                   <CalendarPlus2 className="mr-1 inline h-3.5 w-3.5" />
-                  Agendar
+                  {language === 'en' ? 'Schedule' : 'Agendar'}
                 </button>
                 <button
                   type="button"
                   onClick={() => router.push(`/dashboard/crm?leadId=${selected.id}`)}
                   className="flex-1 rounded-full bg-cyan-500/10 px-3 py-2 text-xs text-cyan-300 transition hover:bg-cyan-500/15"
                 >
-                  Ver lead
+                  {language === 'en' ? 'View lead' : 'Ver lead'}
                 </button>
               </div>
             </>

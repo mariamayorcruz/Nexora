@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface CampaignDraft {
   name: string;
@@ -62,14 +62,14 @@ export default function DashboardChatbot() {
     },
   ]);
 
-  // Cargar configuración de API key guardada
-  useState(() => {
+  useEffect(() => {
     const savedKey = localStorage.getItem('nexora_ai_api_key') || '';
     const savedProvider = (localStorage.getItem('nexora_ai_provider') || 'openrouter') as typeof providerInput;
     setApiKeyInput(savedKey);
     setProviderInput(savedProvider);
     setAiActive(Boolean(savedKey));
-  });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const saveApiConfig = () => {
     const key = apiKeyInput.trim();
@@ -160,7 +160,7 @@ export default function DashboardChatbot() {
             {
               role: 'assistant',
               title: 'Primero conecta una cuenta',
-              text: 'Necesitas conectar al menos una cuenta publicitaria antes de crear una campana.',
+              text: 'Necesitas conectar al menos una cuenta publicitaria antes de crear una campaña.',
               steps: ['Abre Conectar redes.', 'Conecta Meta, Google o TikTok.', 'Vuelve al chat y crea el borrador.'],
             },
           ]);
@@ -176,8 +176,8 @@ export default function DashboardChatbot() {
         {
           role: 'assistant',
           title: 'Borrador creado',
-          text: `Listo: cree la campana "${data.campaign?.name || draft.name}" con estado draft.`,
-          steps: ['Abre Campanas para revisarla.', 'Ajusta presupuesto y mensaje.', 'Luego publicala en tu plataforma conectada.'],
+          text: `Listo: creé la campaña "${data.campaign?.name || draft.name}" con estado draft.`,
+          steps: ['Abre Campañas para revisarla.', 'Ajusta presupuesto y mensaje.', 'Luego publícala en tu plataforma conectada.'],
         },
       ]);
       router.push('/dashboard/campaigns');
@@ -188,8 +188,8 @@ export default function DashboardChatbot() {
         {
           role: 'assistant',
           title: 'No pude crear el borrador',
-          text: 'Hubo un problema creando la campana desde el chat. Puedes intentar de nuevo en unos segundos.',
-          steps: ['Verifica que tu sesion siga activa.', 'Reintenta desde el mismo mensaje.', 'Si persiste, usa Soporte.'],
+          text: 'Hubo un problema creando la campaña desde el chat. Puedes intentar de nuevo en unos segundos.',
+          steps: ['Verifica que tu sesión siga activa.', 'Reintenta desde el mismo mensaje.', 'Si persiste, usa Soporte.'],
         },
       ]);
     } finally {
@@ -304,7 +304,7 @@ export default function DashboardChatbot() {
                     <p className="mt-2 text-xs text-cyan-900"><strong>Hook:</strong> {message.campaignDraft.hook}</p>
                     <p className="mt-1 text-xs text-cyan-900"><strong>Promesa:</strong> {message.campaignDraft.promise}</p>
                     <p className="mt-1 text-xs text-cyan-900"><strong>CTA:</strong> {message.campaignDraft.cta}</p>
-                    <p className="mt-1 text-xs text-cyan-900"><strong>Angulo:</strong> {message.campaignDraft.angle}</p>
+                    <p className="mt-1 text-xs text-cyan-900"><strong>Ángulo:</strong> {message.campaignDraft.angle}</p>
                     {message.campaignDraft.checklist?.length ? (
                       <div className="mt-2 space-y-1">
                         {message.campaignDraft.checklist.slice(0, 5).map((item) => (
@@ -319,7 +319,7 @@ export default function DashboardChatbot() {
                       disabled={creatingDraft}
                       className="mt-3 rounded-lg bg-slate-950 px-3 py-2 text-xs font-semibold text-white disabled:opacity-60"
                     >
-                      {creatingDraft ? 'Creando...' : 'Crear borrador en Campanas'}
+                      {creatingDraft ? 'Creando...' : 'Crear borrador en Campañas'}
                     </button>
                   </div>
                 ) : null}

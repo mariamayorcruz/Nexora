@@ -4,11 +4,18 @@ import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { type NextBestAction, getUrgencyBg, getUrgencyColor } from '@/lib/next-best-action';
 
-const CHANNEL_LABEL: Record<NextBestAction['channel'], string> = {
+const CHANNEL_LABEL_ES: Record<NextBestAction['channel'], string> = {
   whatsapp: 'WhatsApp',
   sms: 'SMS',
   email: 'Email',
   call: 'Llamar',
+};
+
+const CHANNEL_LABEL_EN: Record<NextBestAction['channel'], string> = {
+  whatsapp: 'WhatsApp',
+  sms: 'SMS',
+  email: 'Email',
+  call: 'Call',
 };
 
 export default function NextBestActionPanel({
@@ -62,7 +69,7 @@ export default function NextBestActionPanel({
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
                 <p className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${getUrgencyColor(action.urgency)}`}>
-                  {action.timeframe} · {CHANNEL_LABEL[action.channel]}
+                  {action.timeframe} · {(en ? CHANNEL_LABEL_EN : CHANNEL_LABEL_ES)[action.channel]}
                 </p>
                 <p className="mt-1.5 text-sm font-medium text-white">{action.action}</p>
                 <p className="mt-1 text-xs leading-5 text-slate-400">{action.reason}</p>

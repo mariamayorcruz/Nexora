@@ -26,6 +26,7 @@ export default function CampaignOutput({
   onPublish,
   onPublishChannel,
   onRegenerate,
+  language = 'es',
 }: {
   title: string;
   status: string;
@@ -39,7 +40,9 @@ export default function CampaignOutput({
   onPublish?: () => void;
   onPublishChannel?: (channel: string, copy: string) => void;
   onRegenerate?: () => void;
+  language?: string;
 }) {
+  const en = language === 'en';
   const [editingHeadline, setEditingHeadline] = useState(false);
   const [editedHeadline, setEditedHeadline] = useState('');
 
@@ -52,42 +55,42 @@ export default function CampaignOutput({
         </div>
         <div className="flex items-center gap-2">
           <span className="rounded-full bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-300">{status}</span>
-          <span className="rounded-full bg-white/[0.04] px-3 py-1.5 text-xs text-slate-300">{creditsUsed} créditos</span>
+          <span className="rounded-full bg-white/[0.04] px-3 py-1.5 text-xs text-slate-300">{creditsUsed} {en ? 'credits' : 'créditos'}</span>
         </div>
       </div>
 
       <div className="mt-5 grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
         <div className="rounded-[22px] bg-[#030610] p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-medium text-white">Visual principal</p>
+            <p className="text-sm font-medium text-white">{en ? 'Main visual' : 'Visual principal'}</p>
             <div className="flex flex-wrap items-center gap-2">
               {[
-                { label: 'Regenerar', icon: RefreshCcw, onClick: onRegenerate },
+                { labelKey: en ? 'Regenerate' : 'Regenerar', icon: RefreshCcw, onClick: onRegenerate, isRegen: true },
                 {
-                  label: 'Editar',
+                  labelKey: en ? 'Edit' : 'Editar',
                   icon: Sparkles,
                   onClick: () => {
                     setEditedHeadline(headline || title);
                     setEditingHeadline(true);
                   },
+                  isRegen: false,
                 },
               ].map((item) => {
                 const Icon = item.icon;
                 return (
                   <button
-                    key={item.label}
+                    key={item.labelKey}
                     type="button"
                     onClick={item.onClick}
-                    disabled={item.label === 'Regenerar' && !onRegenerate}
+                    disabled={item.isRegen && !onRegenerate}
                     className="flex items-center gap-1.5 rounded-full bg-white/[0.04] px-3 py-1.5 text-[11px] text-slate-300 transition-all duration-150 hover:bg-white/[0.06] hover:text-white disabled:opacity-50"
                   >
                     <Icon className="h-3.5 w-3.5" />
-                    {item.label}
+                    {item.labelKey}
                   </button>
                 );
               })}
               <button
-                key="Descargar"
                 type="button"
                 onClick={() => {
                   if (!imageUrl || imageUrl.startsWith('__gemini_description__')) return;
@@ -102,7 +105,7 @@ export default function CampaignOutput({
                 className="flex items-center gap-1.5 rounded-full bg-white/[0.04] px-3 py-1.5 text-[11px] text-slate-300 transition-all duration-150 hover:bg-white/[0.06] hover:text-white"
               >
                 <Download className="h-3.5 w-3.5" />
-                Descargar
+                {en ? 'Download' : 'Descargar'}
               </button>
             </div>
           </div>
@@ -152,7 +155,7 @@ export default function CampaignOutput({
                         {desc.colors ? <span className="rounded-full bg-white/[0.04] px-3 py-1 text-[10px] text-slate-400">{desc.colors}</span> : null}
                         {desc.mood ? <span className="rounded-full bg-white/[0.04] px-3 py-1 text-[10px] text-slate-400">{desc.mood}</span> : null}
                       </div>
-                      <p className="mt-4 text-[11px] text-slate-600">Activa fal.ai para generar imagen real →</p>
+                      <p className="mt-4 text-[11px] text-slate-600">{en ? 'Enable fal.ai to generate a real image →' : 'Activa fal.ai para generar imagen real →'}</p>
                     </div>
                   );
                 } catch {
@@ -174,14 +177,14 @@ export default function CampaignOutput({
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-cyan-500/10 text-cyan-400">
                 <ImageIcon className="h-6 w-6" />
               </div>
-              <p className="text-sm text-slate-400">Tu visual aparecerá aquí cuando generes la campaña.</p>
+              <p className="text-sm text-slate-400">{en ? 'Your visual will appear here after generating.' : 'Tu visual aparecerá aquí cuando generes la campaña.'}</p>
             </div>
           )}
         </div>
 
         <div className="space-y-5">
           <div className="rounded-[22px] bg-[#030610] p-4">
-            <p className="text-sm font-medium text-white">Hooks A / B / C</p>
+            <p className="text-sm font-medium text-white">{en ? 'Hooks A / B / C' : 'Hooks A / B / C'}</p>
             <div className="mt-4 grid gap-3">
               {hooks.map((hook, index) => (
                 <div key={`${hook}-${index}`} className="rounded-[18px] bg-white/[0.03] p-4">
@@ -199,7 +202,7 @@ export default function CampaignOutput({
                           : 'bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20'
                       }`}
                     >
-                      {selectedHook === hook ? '✓ Usando' : 'Usar'}
+                      {selectedHook === hook ? (en ? '✓ Using' : '✓ Usando') : (en ? 'Use' : 'Usar')}
                     </button>
                   </div>
                 </div>
@@ -209,14 +212,15 @@ export default function CampaignOutput({
 
           <div className="rounded-[22px] bg-[#030610] p-4">
             <div className="mb-4 flex items-center justify-between">
-              <p className="text-sm font-medium text-white">Copies por canal</p>
+              <p className="text-sm font-medium text-white">{en ? 'Copies by channel' : 'Copies por canal'}</p>
               <button
                 type="button"
                 onClick={onPublish}
-                className="flex items-center gap-2 rounded-full bg-cyan-500 px-4 py-2 text-xs font-semibold text-[#041018] transition-all duration-150 hover:-translate-y-[1px] hover:bg-cyan-400"
+                disabled={!onPublish}
+                className="flex items-center gap-2 rounded-full bg-cyan-500 px-4 py-2 text-xs font-semibold text-[#041018] transition-all duration-150 hover:-translate-y-[1px] hover:bg-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Rocket className="h-3.5 w-3.5" />
-                Publicar todo
+                {en ? 'Publish all' : 'Publicar todo'}
               </button>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
@@ -235,7 +239,7 @@ export default function CampaignOutput({
                       className="rounded-full px-3 py-1.5 text-[11px] font-medium transition-all duration-150 hover:-translate-y-[1px]"
                       style={{ backgroundColor: channel.color, color: '#041018' }}
                     >
-                      Publicar
+                      {en ? 'Publish' : 'Publicar'}
                     </button>
                   </div>
                   <p className="mt-3 whitespace-pre-line text-sm leading-6 text-white">
@@ -255,33 +259,33 @@ export default function CampaignOutput({
 
           {imageUrl && !imageUrl.startsWith('__gemini_description__') && (
             <div className="rounded-[22px] bg-[#030610] p-4">
-              <p className="mb-4 text-sm font-medium text-white">✦ Ads con branding aplicado</p>
+              <p className="mb-4 text-sm font-medium text-white">✦ {en ? 'Branded ad previews' : 'Ads con branding aplicado'}</p>
               <div className="grid gap-4 sm:grid-cols-2">
                 <AdComposer
                   imageUrl={imageUrl}
                   headline={headline || title}
-                  subline="Sin contratos · After hours · 15% descuento"
-                  cta="Cotización gratis →"
+                  subline={en ? 'No contracts · After hours · 15% off' : 'Sin contratos · After hours · 15% descuento'}
+                  cta={en ? 'Free quote →' : 'Cotización gratis →'}
                   brand={{
                     primaryColor: '#2AAFB0',
                     secondaryColor: '#3D4F5E',
                     accentColor: '#8B7D35',
                     terracottaColor: '#B85C38',
-                    businessName: 'Mayor Excelsior',
+                    businessName: 'Nexora',
                   }}
                   format="square"
                 />
                 <AdComposer
                   imageUrl={imageUrl}
                   headline={headline || title}
-                  subline="Sin contratos · After hours · 15% descuento"
-                  cta="Cotización gratis →"
+                  subline={en ? 'No contracts · After hours · 15% off' : 'Sin contratos · After hours · 15% descuento'}
+                  cta={en ? 'Free quote →' : 'Cotización gratis →'}
                   brand={{
                     primaryColor: '#2AAFB0',
                     secondaryColor: '#3D4F5E',
                     accentColor: '#8B7D35',
                     terracottaColor: '#B85C38',
-                    businessName: 'Mayor Excelsior',
+                    businessName: 'Nexora',
                   }}
                   format="story"
                 />
@@ -298,16 +302,17 @@ export default function CampaignOutput({
               <Rocket className="h-4.5 w-4.5" />
             </span>
             <div>
-              <p className="text-sm font-medium text-white">Publish bar</p>
-              <p className="text-xs text-slate-400">Lista para lanzar en todos los canales seleccionados.</p>
+              <p className="text-sm font-medium text-white">{en ? 'Publish bar' : 'Barra de publicación'}</p>
+              <p className="text-xs text-slate-400">{en ? 'Ready to launch on all selected channels.' : 'Lista para lanzar en todos los canales seleccionados.'}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onPublish}
-            className="rounded-full border border-white/[0.06] px-4 py-2 text-sm text-cyan-300 transition-all duration-150 hover:bg-white/[0.04] hover:text-white"
+            disabled={!onPublish}
+            className="rounded-full border border-white/[0.06] px-4 py-2 text-sm text-cyan-300 transition-all duration-150 hover:bg-white/[0.04] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Publicar todo {'->'}
+            {en ? 'Publish all ->' : 'Publicar todo ->'}
           </button>
         </div>
       </div>
