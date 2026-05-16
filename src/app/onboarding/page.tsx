@@ -3,37 +3,46 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Building2, CheckCircle2, Sparkles, Target, Waves, Workflow } from 'lucide-react';
+import { useAppLanguage } from '@/hooks/use-app-language';
 
 const BUSINESS_TYPE_OPTIONS = [
-  { value: 'cleaning_company', label: 'Cleaning Company', icon: Waves },
-  { value: 'contractor', label: 'Contractor', icon: Workflow },
-  { value: 'coach', label: 'Coach', icon: Sparkles },
-  { value: 'med_spa', label: 'Med Spa', icon: CheckCircle2 },
-  { value: 'real_estate', label: 'Real Estate', icon: Building2 },
-  { value: 'insurance', label: 'Insurance', icon: Target },
-  { value: 'agency', label: 'Agency', icon: Sparkles },
-  { value: 'other_service_business', label: 'Other Service Business', icon: Building2 },
+  { value: 'cleaning_company', labelEn: 'Cleaning Company', labelEs: 'Empresa de Limpieza', icon: Waves },
+  { value: 'contractor', labelEn: 'Contractor', labelEs: 'Contratista', icon: Workflow },
+  { value: 'coach', labelEn: 'Coach / Consultant', labelEs: 'Coach / Consultor', icon: Sparkles },
+  { value: 'med_spa', labelEn: 'Med Spa / Wellness', labelEs: 'Med Spa / Bienestar', icon: CheckCircle2 },
+  { value: 'real_estate', labelEn: 'Real Estate', labelEs: 'Bienes Raíces', icon: Building2 },
+  { value: 'insurance', labelEn: 'Insurance', labelEs: 'Seguros', icon: Target },
+  { value: 'agency', labelEn: 'Agency', labelEs: 'Agencia', icon: Sparkles },
+  { value: 'other_service_business', labelEn: 'Other Service Business', labelEs: 'Otro Negocio de Servicios', icon: Building2 },
 ] as const;
 
 const MAIN_GOAL_OPTIONS = [
-  { value: 'get_more_leads', label: 'Get More Leads' },
-  { value: 'close_more_clients', label: 'Close More Clients' },
-  { value: 'automate_follow_up', label: 'Automate Follow-Up' },
+  { value: 'get_more_leads', labelEn: 'Get More Leads', labelEs: 'Conseguir Más Leads' },
+  { value: 'close_more_clients', labelEn: 'Close More Clients', labelEs: 'Cerrar Más Clientes' },
+  { value: 'automate_follow_up', labelEn: 'Automate Follow-Up', labelEs: 'Automatizar Seguimiento' },
 ] as const;
 
 const PREFERRED_CHANNEL_OPTIONS = [
-  { value: 'sms', label: 'SMS' },
-  { value: 'email', label: 'Email' },
-  { value: 'phone', label: 'Phone' },
-  { value: 'mixed', label: 'Mixed' },
+  { value: 'sms', labelEn: 'SMS', labelEs: 'SMS' },
+  { value: 'email', labelEn: 'Email', labelEs: 'Email' },
+  { value: 'phone', labelEn: 'Phone', labelEs: 'Teléfono' },
+  { value: 'mixed', labelEn: 'Mixed', labelEs: 'Mixto' },
 ] as const;
 
-const BUILDING_MESSAGES = [
+const BUILDING_MESSAGES_EN = [
   'Creating your growth system...',
   'Setting up your pipeline...',
   'Preparing your follow-up templates...',
   'Creating your first lead...',
   'Personalizing your dashboard...',
+] as const;
+
+const BUILDING_MESSAGES_ES = [
+  'Creando tu sistema de crecimiento...',
+  'Configurando tu pipeline...',
+  'Preparando tus plantillas de seguimiento...',
+  'Creando tu primer lead...',
+  'Personalizando tu dashboard...',
 ] as const;
 
 type MeResponse = {
@@ -73,6 +82,9 @@ export default function OnboardingPage() {
     businessName: '',
     preferredChannels: ['mixed'] as string[],
   });
+  const { language } = useAppLanguage();
+  const en = language === 'en';
+  const BUILDING_MESSAGES = en ? BUILDING_MESSAGES_EN : BUILDING_MESSAGES_ES;
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -169,7 +181,7 @@ export default function OnboardingPage() {
   const selectedGoal = MAIN_GOAL_OPTIONS.find((option) => option.value === form.mainGoal);
   const selectedChannelLabels = PREFERRED_CHANNEL_OPTIONS
     .filter((option) => form.preferredChannels.includes(option.value))
-    .map((option) => option.label);
+    .map((option) => (en ? option.labelEn : option.labelEs));
 
   const togglePreferredChannel = (channel: (typeof PREFERRED_CHANNEL_OPTIONS)[number]['value']) => {
     setForm((current) => {
@@ -211,7 +223,7 @@ export default function OnboardingPage() {
 
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
-        setError(payload?.error || 'No pudimos guardar tu onboarding.');
+        setError(payload?.error || (en ? 'We could not save your onboarding.' : 'No pudimos guardar tu onboarding.'));
         return;
       }
 
@@ -219,7 +231,7 @@ export default function OnboardingPage() {
       setLaunchReady(true);
     } catch (requestError) {
       console.error('Onboarding submit failed:', requestError);
-      setError('No pudimos guardar tu onboarding. Intenta nuevamente.');
+      setError(en ? 'We could not save your onboarding. Please try again.' : 'No pudimos guardar tu onboarding. Intenta nuevamente.');
     } finally {
       setSaving(false);
     }
@@ -230,7 +242,7 @@ export default function OnboardingPage() {
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-slate-950 to-slate-900 px-6 text-slate-200">
         <div className="text-center">
           <div className="inline-block h-12 w-12 animate-spin rounded-full border-b-2 border-cyan-400" />
-          <p className="mt-4 text-sm text-slate-400">Preparing your workspace...</p>
+          <p className="mt-4 text-sm text-slate-400">{en ? 'Preparing your workspace...' : 'Preparando tu espacio...'}</p>
         </div>
       </div>
     );
@@ -241,9 +253,11 @@ export default function OnboardingPage() {
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-slate-950 to-slate-900 px-4 py-10 text-slate-200 sm:px-6 lg:px-8">
         <section className="w-full max-w-xl rounded-[32px] border border-slate-700/50 bg-slate-900/80 p-8 shadow-[0_18px_60px_rgba(2,6,23,0.35)] backdrop-blur-xl">
           <p className="text-sm font-semibold uppercase tracking-[0.32em] text-cyan-300">Nexora Launch Assistant</p>
-          <h1 className="mt-4 text-3xl font-bold text-white">We’re setting up your growth system</h1>
+          <h1 className="mt-4 text-3xl font-bold text-white">
+            {en ? "We're setting up your growth system" : 'Estamos configurando tu sistema de crecimiento'}
+          </h1>
           <p className="mt-4 text-sm leading-7 text-slate-400">
-            {selectedBusinessType?.label || 'Your business'} + {selectedGoal?.label || 'your goal'} is enough for Nexora to create a strong first setup.
+            {(selectedBusinessType ? (en ? selectedBusinessType.labelEn : selectedBusinessType.labelEs) : en ? 'Your business' : 'Tu negocio')} + {(selectedGoal ? (en ? selectedGoal.labelEn : selectedGoal.labelEs) : en ? 'your goal' : 'tu objetivo')} {en ? 'is enough for Nexora to create a strong first setup.' : 'es suficiente para que Nexora prepare una primera configuración sólida.'}
           </p>
 
           <div className="mt-8 space-y-3">
@@ -273,18 +287,18 @@ export default function OnboardingPage() {
           </div>
 
           <div className="mt-8 rounded-[24px] bg-[#030610] p-5">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">What’s being prepared</p>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{en ? "What's being prepared" : 'Lo que estamos preparando'}</p>
             <div className="mt-4 space-y-2 text-sm text-slate-300">
-              <p>• Your business-ready pipeline preset</p>
-              <p>• Follow-up templates matched to your offer</p>
-              <p>• A sample lead so you can see the system working</p>
-              <p>• A simplified first dashboard experience</p>
+              <p>{en ? '• Your business-ready pipeline preset' : '• Tu pipeline listo para operar'}</p>
+              <p>{en ? '• Follow-up templates matched to your offer' : '• Plantillas de seguimiento alineadas con tu oferta'}</p>
+              <p>{en ? '• A sample lead so you can see the system working' : '• Un lead de ejemplo para que veas el sistema funcionando'}</p>
+              <p>{en ? '• A simplified first dashboard experience' : '• Un dashboard inicial simplificado y listo para usar'}</p>
             </div>
             <p className="mt-4 text-xs text-slate-500">
-              Preferred channels: {selectedChannelLabels.join(', ') || 'Mixed'}
+              {en ? 'Preferred channels:' : 'Canales preferidos:'} {selectedChannelLabels.join(', ') || (en ? 'Mixed' : 'Mixto')}
             </p>
             {previewModeAllowed ? (
-              <p className="mt-2 text-xs text-amber-300">Preview mode is active for this account.</p>
+              <p className="mt-2 text-xs text-amber-300">{en ? 'Preview mode is active for this account.' : 'El modo preview está activo para esta cuenta.'}</p>
             ) : null}
           </div>
         </section>
@@ -298,21 +312,26 @@ export default function OnboardingPage() {
         <div className="text-center">
           <p className="text-sm font-semibold uppercase tracking-[0.32em] text-cyan-300">Nexora Launch Assistant</p>
           <h1 className="mt-4 text-3xl font-bold text-white sm:text-4xl">
-            Let’s build your business system
+            {en ? "Let's build your business system" : 'Construyamos tu sistema de negocio'}
           </h1>
           <p className="mt-4 text-sm leading-7 text-slate-400">
             {userName
-              ? `${userName}, answer these quick questions and Nexora will prepare your first growth system for you.`
-              : 'Answer these quick questions and Nexora will prepare your first growth system for you.'}
+              ? en
+                ? `${userName}, answer these quick questions and Nexora will prepare your first growth system for you.`
+                : `${userName}, responde estas preguntas rápidas y Nexora preparará tu primer sistema de crecimiento para ti.`
+              : en
+                ? 'Answer these quick questions and Nexora will prepare your first growth system for you.'
+                : 'Responde estas preguntas rápidas y Nexora preparará tu primer sistema de crecimiento para ti.'}
           </p>
           {previewModeAllowed ? (
             <div className="mx-auto mt-5 max-w-2xl rounded-[22px] border border-amber-400/20 bg-amber-500/10 px-4 py-4 text-left sm:px-5">
               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-300">
-                Preview Mode Active
+                {en ? 'Preview Mode Active' : 'Modo Preview Activo'}
               </p>
               <p className="mt-2 text-sm leading-6 text-slate-300">
-                You&apos;re testing the onboarding experience for this demo/internal account. Submitting this flow may
-                refresh demo setup data, but it won&apos;t affect billing or real customer access.
+                {en
+                  ? "You're testing the onboarding experience for this demo/internal account. Submitting this flow may refresh demo setup data, but it won't affect billing or real customer access."
+                  : 'Estás probando el onboarding para esta cuenta demo/interna. Enviar este flujo puede refrescar datos demo, pero no afectará facturación ni acceso real de clientes.'}
               </p>
             </div>
           ) : null}
@@ -320,7 +339,7 @@ export default function OnboardingPage() {
 
         <div className="mt-8">
           <div className="mb-3 flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Launch progress</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{en ? 'Launch progress' : 'Progreso'}</p>
             <p className="text-sm font-bold text-cyan-300">{progress}%</p>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-slate-800">
@@ -341,7 +360,7 @@ export default function OnboardingPage() {
           <div className="space-y-3">
             <label className="flex items-center gap-2 text-sm font-semibold text-white">
               <Building2 className="h-4 w-4 text-cyan-300" />
-              What type of business do you run?
+              {en ? 'What type of business do you run?' : '¿Qué tipo de negocio tienes?'}
             </label>
             <div className="grid gap-3 sm:grid-cols-2">
               {BUSINESS_TYPE_OPTIONS.map((option) => {
@@ -362,7 +381,7 @@ export default function OnboardingPage() {
                     <span className={`flex h-10 w-10 items-center justify-center rounded-2xl ${active ? 'bg-cyan-400/15 text-cyan-300' : 'bg-white/[0.04] text-slate-500'}`}>
                       <Icon className="h-4 w-4" />
                     </span>
-                    <span>{option.label}</span>
+                    <span>{en ? option.labelEn : option.labelEs}</span>
                   </button>
                 );
               })}
@@ -372,7 +391,7 @@ export default function OnboardingPage() {
           <div className="space-y-3">
             <label className="flex items-center gap-2 text-sm font-semibold text-white">
               <Target className="h-4 w-4 text-cyan-300" />
-              What do you want Nexora to help with first?
+              {en ? 'What do you want Nexora to help with first?' : '¿Con qué quieres que Nexora te ayude primero?'}
             </label>
             <div className="grid gap-3 sm:grid-cols-3">
               {MAIN_GOAL_OPTIONS.map((option) => {
@@ -388,7 +407,7 @@ export default function OnboardingPage() {
                         : 'border-slate-600 bg-slate-800/50 text-slate-300 hover:border-slate-500 hover:bg-slate-800'
                     }`}
                   >
-                    {option.label}
+                    {en ? option.labelEn : option.labelEs}
                   </button>
                 );
               })}
@@ -398,7 +417,7 @@ export default function OnboardingPage() {
           <div className="space-y-3">
             <label className="flex items-center gap-2 text-sm font-semibold text-white">
               <Building2 className="h-4 w-4 text-cyan-300" />
-              Business name
+              {en ? 'Business name' : 'Nombre del negocio'}
             </label>
             <input
               type="text"
@@ -411,7 +430,7 @@ export default function OnboardingPage() {
           </div>
 
           <div className="space-y-3">
-            <label className="text-sm font-semibold text-white">Preferred communication channels</label>
+            <label className="text-sm font-semibold text-white">{en ? 'Preferred communication channels' : 'Canales de comunicación preferidos'}</label>
             <div className="flex flex-wrap gap-3">
               {PREFERRED_CHANNEL_OPTIONS.map((option) => {
                 const active = form.preferredChannels.includes(option.value);
@@ -428,7 +447,7 @@ export default function OnboardingPage() {
                     }`}
                   >
                     <CheckCircle2 className={`h-4 w-4 ${active ? 'text-cyan-300' : 'text-slate-500'}`} />
-                    {option.label}
+                    {en ? option.labelEn : option.labelEs}
                   </button>
                 );
               })}
@@ -436,13 +455,13 @@ export default function OnboardingPage() {
           </div>
 
           <div className="rounded-[24px] bg-[#030610] p-5">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">What Nexora will prepare</p>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{en ? 'What Nexora will prepare' : 'Lo que Nexora va a preparar'}</p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {[
-                'A business-ready pipeline preset',
-                'Three follow-up templates to get started',
-                'One sample lead so you can see the flow live',
-                'A simplified dashboard focused on your first win',
+                en ? 'A business-ready pipeline preset' : 'Un pipeline listo para operar',
+                en ? 'Three follow-up templates to get started' : 'Tres plantillas de seguimiento para empezar',
+                en ? 'One sample lead so you can see the flow live' : 'Un lead de ejemplo para ver el flujo funcionando',
+                en ? 'A simplified dashboard focused on your first win' : 'Un dashboard simplificado enfocado en tu primera victoria',
               ].map((item) => (
                 <div key={item} className="rounded-2xl bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
                   {item}
@@ -453,14 +472,14 @@ export default function OnboardingPage() {
 
           <div className="flex flex-col gap-3 border-t border-slate-800 pt-6 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-slate-400">
-              We’ll keep this simple and make it feel ready fast.
+              {en ? "We'll keep this simple and make it feel ready fast." : 'Lo haremos simple y rápido.'}
             </p>
             <button
               type="submit"
               disabled={saving}
               className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-500 to-cyan-400 px-5 py-3 text-sm font-bold text-slate-950 transition hover:brightness-110 disabled:opacity-60 sm:w-auto"
             >
-              {saving ? 'Saving your setup...' : 'Build my growth system'}
+              {saving ? (en ? 'Saving your setup...' : 'Guardando...') : (en ? 'Build my growth system' : 'Construir mi sistema')}
               {!saving && <ArrowRight className="h-4 w-4" />}
             </button>
           </div>
