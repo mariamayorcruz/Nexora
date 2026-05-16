@@ -28,10 +28,13 @@ const MAIN_GOAL_OPTIONS = [
 ] as const;
 
 const PREFERRED_CHANNEL_OPTIONS = [
+  { value: 'whatsapp', labelEn: 'WhatsApp', labelEs: 'WhatsApp' },
   { value: 'sms', labelEn: 'SMS', labelEs: 'SMS' },
   { value: 'email', labelEn: 'Email', labelEs: 'Email' },
   { value: 'phone', labelEn: 'Phone', labelEs: 'Teléfono' },
-  { value: 'mixed', labelEn: 'Mixed', labelEs: 'Mixto' },
+  { value: 'instagram', labelEn: 'Instagram DM', labelEs: 'Instagram DM' },
+  { value: 'facebook', labelEn: 'Facebook', labelEs: 'Facebook' },
+  { value: 'mixed', labelEn: 'All channels', labelEs: 'Todos los canales' },
 ] as const;
 
 const BUILDING_MESSAGES_EN = [
@@ -87,7 +90,7 @@ export default function OnboardingPage() {
     businessName: '',
     websiteUrl: '',
     businessDescription: '',
-    preferredChannels: ['mixed'] as string[],
+    preferredChannels: ['whatsapp'] as string[],
   });
   const { language } = useAppLanguage();
   const en = language === 'en';
