@@ -13,7 +13,12 @@ const BUSINESS_TYPE_OPTIONS = [
   { value: 'real_estate', labelEn: 'Real Estate', labelEs: 'Bienes Raíces', icon: Building2 },
   { value: 'insurance', labelEn: 'Insurance', labelEs: 'Seguros', icon: Target },
   { value: 'agency', labelEn: 'Agency', labelEs: 'Agencia', icon: Sparkles },
-  { value: 'other_service_business', labelEn: 'Other Service Business', labelEs: 'Otro Negocio de Servicios', icon: Building2 },
+  { value: 'content_creator', labelEn: 'Content Creator', labelEs: 'Creador de Contenido', icon: Sparkles },
+  { value: 'ecommerce', labelEn: 'E-commerce / Store', labelEs: 'Tienda / E-commerce', icon: Building2 },
+  { value: 'restaurant', labelEn: 'Restaurant / Food', labelEs: 'Restaurante / Comida', icon: Waves },
+  { value: 'health', labelEn: 'Health / Medical', labelEs: 'Salud / Médico', icon: CheckCircle2 },
+  { value: 'education', labelEn: 'Education / Courses', labelEs: 'Educación / Cursos', icon: Target },
+  { value: 'other_service_business', labelEn: 'Other', labelEs: 'Otro', icon: Building2 },
 ] as const;
 
 const MAIN_GOAL_OPTIONS = [
@@ -80,6 +85,8 @@ export default function OnboardingPage() {
     businessType: '',
     mainGoal: '',
     businessName: '',
+    websiteUrl: '',
+    businessDescription: '',
     preferredChannels: ['mixed'] as string[],
   });
   const { language } = useAppLanguage();
@@ -122,6 +129,8 @@ export default function OnboardingPage() {
             businessType: String(onboardingData.businessType || current.businessType || ''),
             mainGoal: String(onboardingData.mainGoal || current.mainGoal || ''),
             businessName: String(onboardingData.businessName || current.businessName || ''),
+            websiteUrl: String(onboardingData.websiteUrl || current.websiteUrl || ''),
+            businessDescription: String(onboardingData.businessDescription || current.businessDescription || ''),
             preferredChannels:
               Array.isArray(onboardingData.preferredChannels) && onboardingData.preferredChannels.length > 0
                 ? onboardingData.preferredChannels.map((item) => String(item || '').toLowerCase())
@@ -386,6 +395,18 @@ export default function OnboardingPage() {
                 );
               })}
             </div>
+            {form.businessType === 'other_service_business' && (
+              <div className="mt-3">
+                <input
+                  type="text"
+                  value={form.businessDescription}
+                  onChange={(event) => setForm((current) => ({ ...current, businessDescription: event.target.value }))}
+                  className={inputClassName}
+                  placeholder={en ? 'Describe your business briefly...' : 'Describe brevemente tu negocio...'}
+                  maxLength={200}
+                />
+              </div>
+            )}
           </div>
 
           <div className="space-y-3">
@@ -427,6 +448,26 @@ export default function OnboardingPage() {
               placeholder="Example: Mayor Excelsior"
               maxLength={120}
             />
+          </div>
+
+          <div className="space-y-3">
+            <label className="flex items-center gap-2 text-sm font-semibold text-white">
+              <Building2 className="h-4 w-4 text-cyan-300" />
+              {en ? 'Website (optional)' : 'Página web (opcional)'}
+            </label>
+            <input
+              type="url"
+              value={form.websiteUrl}
+              onChange={(event) => setForm((current) => ({ ...current, websiteUrl: event.target.value }))}
+              className={inputClassName}
+              placeholder="https://tunegocio.com"
+              maxLength={200}
+            />
+            <p className="text-xs text-slate-500">
+              {en
+                ? 'Nexora will use this to personalize your experience.'
+                : 'Nexora usará esto para personalizar tu experiencia.'}
+            </p>
           </div>
 
           <div className="space-y-3">
