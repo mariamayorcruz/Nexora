@@ -7,9 +7,9 @@ const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   applicationName: 'Nexora Studio',
-  title: 'Nexora | Plataforma para operar y vender mejor tus anuncios',
+  title: 'GotNexora. Stop losing customers. Start closing them.',
   description:
-    'Nexora centraliza campañas, analítica, administración y cobros en una sola experiencia para equipos que necesitan una operación publicitaria más ordenada.',
+    'GotNexora gives your business the AI system to attract, follow up and close more customers. No agencies. No chaos.',
   metadataBase: new URL(`https://${process.env.NEXT_PUBLIC_DOMAIN || 'gotnexora.com'}`),
   manifest: '/manifest.webmanifest',
   icons: {
@@ -21,16 +21,17 @@ export const metadata: Metadata = {
     title: 'Nexora',
   },
   openGraph: {
-    title: 'Nexora | Plataforma para operar y vender mejor tus anuncios',
+    title: 'GotNexora. Stop losing customers. Start closing them.',
     description:
-      'Centraliza campañas, analítica y administración en una sola experiencia más clara, más rápida y lista para crecer.',
+      'GotNexora gives your business the AI system to attract, follow up and close more customers. No agencies. No chaos.',
+    siteName: 'GotNexora',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Nexora | Plataforma para operar y vender mejor tus anuncios',
+    title: 'GotNexora. Stop losing customers. Start closing them.',
     description:
-      'Una landing más fuerte y una base de producto más creíble para vender mejor tu software de anuncios.',
+      'GotNexora gives your business the AI system to attract, follow up and close more customers. No agencies. No chaos.',
   },
 };
 
