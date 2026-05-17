@@ -1,12 +1,30 @@
-import { randomUUID } from 'node:crypto';
+import { createHmac, randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 import { calendarOAuthRedirectUri } from '@/lib/app-base-url';
 
 export const dynamic = 'force-dynamic';
 
+function getOAuthStateSecret() {
+  return process.env.OAUTH_STATE_SECRET || '';
+}
+
 function encodeState(payload: Record<string, string>) {
-  return Buffer.from(JSON.stringify(payload), 'utf-8').toString('base64url');
+  const secret = getOAuthStateSecret();
+  if (!secret) {
+    throw new Error('Missing OAUTH_STATE_SECRET');
+  }
+
+  const payloadJson = JSON.stringify(payload);
+  const signature = createHmac('sha256', secret).update(payloadJson).digest('hex');
+
+  return Buffer.from(
+    JSON.stringify({
+      payload,
+      signature,
+    }),
+    'utf-8'
+  ).toString('base64url');
 }
 
 export async function POST(request: NextRequest) {
@@ -34,6 +52,13 @@ export async function POST(request: NextRequest) {
           },
         },
         { status: 412 }
+      );
+    }
+
+    if (!getOAuthStateSecret()) {
+      return NextResponse.json(
+        { error: 'Falta OAUTH_STATE_SECRET en el servidor.' },
+        { status: 500 }
       );
     }
 

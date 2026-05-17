@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { parseStoredCadence, serializeCadence, type SalesEngineConfig } from '@/lib/crm-sequences';
@@ -9,14 +10,35 @@ type OAuthState = {
   ts: string;
 };
 
+function getOAuthStateSecret() {
+  return process.env.OAUTH_STATE_SECRET || '';
+}
+
 function decodeState(stateValue: string | null): OAuthState | null {
   if (!stateValue) return null;
 
   try {
     const raw = Buffer.from(stateValue, 'base64url').toString('utf-8');
-    const parsed = JSON.parse(raw) as Partial<OAuthState>;
-    if (!parsed.userId || !parsed.nonce || !parsed.ts) return null;
-    return parsed as OAuthState;
+    const parsed = JSON.parse(raw) as {
+      payload?: Partial<OAuthState>;
+      signature?: string;
+    };
+    const secret = getOAuthStateSecret();
+
+    if (!secret || !parsed.payload || !parsed.signature) return null;
+
+    const payloadJson = JSON.stringify(parsed.payload);
+    const expectedSignature = createHmac('sha256', secret).update(payloadJson).digest('hex');
+
+    const received = Buffer.from(parsed.signature, 'utf-8');
+    const expected = Buffer.from(expectedSignature, 'utf-8');
+
+    if (received.length !== expected.length || !timingSafeEqual(received, expected)) {
+      return null;
+    }
+
+    if (!parsed.payload.userId || !parsed.payload.nonce || !parsed.payload.ts) return null;
+    return parsed.payload as OAuthState;
   } catch {
     return null;
   }
