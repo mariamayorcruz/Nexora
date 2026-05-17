@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { Menu, X } from 'lucide-react';
 import { useState } from 'react';
@@ -31,10 +32,13 @@ export default function Navbar() {
 
         {/* Logo */}
         <Link href="/" aria-label="GotNexora home">
-          <img
+          <Image
             src="/LogoHorizontal.png"
             alt="GotNexora"
+            width={140}
+            height={36}
             className="h-9 w-auto"
+            priority
           />
         </Link>
 

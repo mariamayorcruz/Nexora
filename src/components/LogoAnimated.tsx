@@ -1,3 +1,5 @@
+import Image from 'next/image';
+
 export default function LogoAnimated() {
   return (
     <div className="flex items-center justify-center w-screen h-screen bg-black">
@@ -20,11 +22,13 @@ export default function LogoAnimated() {
         }
       `}</style>
 
-      <img
+      <Image
         src="/LogoHorizontal.png"
         alt="GotNexora"
+        width={900}
+        height={300}
         className="gotnexora-logo-reveal h-auto w-full max-w-[900px]"
-        aria-hidden="true"
+        priority
       />
     </div>
   );
