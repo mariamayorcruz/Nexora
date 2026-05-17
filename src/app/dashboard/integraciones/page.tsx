@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { useAppLanguage } from '@/hooks/use-app-language';
 
 type Integration = {
   id: string;
@@ -19,12 +20,29 @@ type Integration = {
 
 export default function IntegracionesPage() {
   const router = useRouter();
+  const { language } = useAppLanguage();
+  const en = language === 'en';
   const [mounted, setMounted] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [connecting, setConnecting] = useState<string | null>(null);
   const [connectedAccounts, setConnectedAccounts] = useState<string[]>([]);
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    void fetch('/api/users/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        setIsAdmin(Boolean(data?.user?.isAdmin));
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -58,28 +76,99 @@ export default function IntegracionesPage() {
     setConnecting(platform);
     try {
       const token = localStorage.getItem('token');
-    const response = await fetch('/api/connect/oauth/start', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ platform }),
-    });
-    const data = await response.json();
-    console.log('OAuth response:', response.status, data);
-    if (!response.ok) throw new Error(data.error || 'Error iniciando OAuth');
-    if (data.url) {
-      console.log('Redirecting to:', data.url);
-      window.location.href = data.url;
-    }
-  } catch (error) {
+      const response = await fetch('/api/connect/oauth/start', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ platform }),
+      });
+      const data = await response.json();
+      console.log('OAuth response:', response.status, data);
+      if (!response.ok) throw new Error(data.error || 'Error iniciando OAuth');
+      if (data.url) {
+        console.log('Redirecting to:', data.url);
+        window.location.href = data.url;
+      }
+    } catch (error) {
       console.error('OAuth error:', error);
       setConnecting(null);
     }
   };
 
-  const integrations: Integration[] = [
+  const clientIntegrations: Integration[] = [
+    {
+      id: 'instagram',
+      label: 'Instagram',
+      description: en ? 'Publish AI-generated content directly to Instagram.' : 'Publica contenido generado con IA directamente en Instagram.',
+      status: connectedAccounts.includes('instagram') ? 'active' : 'disconnected',
+      statusLabel: connectedAccounts.includes('instagram') ? '● Conectado' : 'No conectado',
+      detail: connectedAccounts.includes('instagram')
+        ? en ? 'Instagram Business connected. Publish campaigns from Studio IA.' : 'Instagram Business conectado. Publica campañas desde Studio IA.'
+        : en ? 'Connect your Instagram Business account to publish campaigns.' : 'Conecta tu cuenta de Instagram Business para publicar campañas.',
+      actionLabel: connectedAccounts.includes('instagram') ? (en ? 'Reconnect' : 'Reconectar') : (en ? 'Connect →' : 'Conectar →'),
+      onConnect: () => handleConnect('instagram'),
+      color: connectedAccounts.includes('instagram') ? 'text-emerald-400' : 'text-slate-500',
+    },
+    {
+      id: 'facebook',
+      label: 'Facebook Ads',
+      description: en ? 'Manage and publish ads directly from Nexora.' : 'Gestiona y publica anuncios directamente desde Nexora.',
+      status: connectedAccounts.includes('facebook') ? 'active' : 'disconnected',
+      statusLabel: connectedAccounts.includes('facebook') ? '● Conectado' : 'No conectado',
+      detail: connectedAccounts.includes('facebook')
+        ? en ? 'Facebook Ads connected. Manage campaigns from Nexora.' : 'Facebook Ads conectado. Gestiona campañas desde Nexora.'
+        : en ? 'Connect your Facebook Business account.' : 'Conecta tu cuenta de Facebook Business.',
+      actionLabel: connectedAccounts.includes('facebook') ? (en ? 'Reconnect' : 'Reconectar') : (en ? 'Connect →' : 'Conectar →'),
+      onConnect: () => handleConnect('facebook'),
+      color: connectedAccounts.includes('facebook') ? 'text-emerald-400' : 'text-slate-500',
+    },
+    {
+      id: 'google',
+      label: 'Google Ads',
+      description: en ? 'Connect Google Ads to manage campaigns from Nexora.' : 'Conecta Google Ads para gestionar campañas desde Nexora.',
+      status: connectedAccounts.includes('google') ? 'active' : 'disconnected',
+      statusLabel: connectedAccounts.includes('google') ? '● Conectado' : 'Próximamente',
+      detail: en ? 'Google Ads integration coming soon.' : 'Integración con Google Ads próximamente.',
+      actionLabel: en ? 'Coming soon' : 'Próximamente',
+      color: 'text-slate-500',
+    },
+    {
+      id: 'tiktok',
+      label: 'TikTok Ads',
+      description: en ? 'Connect TikTok Ads to reach younger audiences.' : 'Conecta TikTok Ads para llegar a audiencias más jóvenes.',
+      status: 'disconnected',
+      statusLabel: en ? 'Coming soon' : 'Próximamente',
+      detail: en ? 'TikTok Ads integration coming soon.' : 'Integración con TikTok Ads próximamente.',
+      actionLabel: en ? 'Coming soon' : 'Próximamente',
+      color: 'text-slate-500',
+    },
+    {
+      id: 'whatsapp',
+      label: 'WhatsApp Business',
+      description: en ? 'Send and receive WhatsApp messages with your leads.' : 'Envía y recibe mensajes de WhatsApp con tus leads.',
+      status: 'pending',
+      statusLabel: `⏳ ${en ? 'Pending verification' : 'Verificación pendiente'}`,
+      detail: en ? 'WhatsApp Business verification in progress.' : 'Verificación de WhatsApp Business en progreso.',
+      actionLabel: en ? 'Learn more' : 'Más información',
+      actionHref: 'https://business.facebook.com',
+      color: 'text-amber-400',
+    },
+    {
+      id: 'sms',
+      label: 'SMS',
+      description: en ? 'Send automated SMS messages to your leads.' : 'Envía mensajes SMS automáticos a tus leads.',
+      status: 'pending',
+      statusLabel: `⏳ ${en ? 'Pending approval' : 'Aprobación pendiente'}`,
+      detail: en ? 'SMS campaign approval in progress.' : 'Aprobación de campaña SMS en progreso.',
+      actionLabel: en ? 'Learn more' : 'Más información',
+      actionHref: 'https://console.twilio.com',
+      color: 'text-amber-400',
+    },
+  ];
+
+  const adminIntegrations: Integration[] = [
     {
       id: 'twilio-sms',
       label: 'SMS · Twilio',
@@ -92,17 +181,6 @@ export default function IntegracionesPage() {
       color: 'text-amber-400',
     },
     {
-      id: 'whatsapp',
-      label: 'WhatsApp Business',
-      description: 'Canal de mensajería para clientes latinos y comunicación multicanal.',
-      status: 'pending',
-      statusLabel: '⏳ Verificación Meta',
-      detail: 'Número +1 385 284 4488 pendiente de verificación con Meta. Reintentar en 24h usando llamada telefónica.',
-      actionLabel: 'Ver en Meta →',
-      actionHref: 'https://business.facebook.com',
-      color: 'text-amber-400',
-    },
-    {
       id: 'ai-agent',
       label: 'AI Agent · n8n',
       description: 'Agente conversacional que responde leads y captura datos al CRM automáticamente.',
@@ -112,32 +190,6 @@ export default function IntegracionesPage() {
       actionLabel: 'Abrir n8n →',
       actionHref: 'https://gotnexora.app.n8n.cloud',
       color: 'text-emerald-400',
-    },
-    {
-      id: 'instagram',
-      label: 'Instagram',
-      description: 'Publicación de contenido generado en Studio IA directamente a Instagram.',
-      status: connectedAccounts.includes('instagram') ? 'active' : 'disconnected',
-      statusLabel: connectedAccounts.includes('instagram') ? '● Conectado' : 'No conectado',
-      detail: connectedAccounts.includes('instagram')
-        ? 'Cuenta de Instagram Business conectada. Puedes publicar campañas desde Studio IA.'
-        : 'Conecta tu cuenta de Instagram Business para publicar campañas desde Studio IA.',
-      actionLabel: connectedAccounts.includes('instagram') ? 'Reconectar →' : 'Conectar →',
-      onConnect: () => handleConnect('instagram'),
-      color: connectedAccounts.includes('instagram') ? 'text-emerald-400' : 'text-slate-500',
-    },
-    {
-      id: 'facebook',
-      label: 'Facebook Ads',
-      description: 'Publicación y gestión de anuncios desde Nexora.',
-      status: connectedAccounts.includes('facebook') ? 'active' : 'disconnected',
-      statusLabel: connectedAccounts.includes('facebook') ? '● Conectado' : 'No conectado',
-      detail: connectedAccounts.includes('facebook')
-        ? 'Cuenta de Facebook Ads conectada. Puedes gestionar campañas desde Nexora.'
-        : 'Conecta tu cuenta de Facebook Business para gestionar campañas y leads.',
-      actionLabel: connectedAccounts.includes('facebook') ? 'Reconectar →' : 'Conectar →',
-      onConnect: () => handleConnect('facebook'),
-      color: connectedAccounts.includes('facebook') ? 'text-emerald-400' : 'text-slate-500',
     },
     {
       id: 'gemini',
@@ -174,6 +226,10 @@ export default function IntegracionesPage() {
     },
   ];
 
+  const integrations = isAdmin
+    ? [...clientIntegrations, ...adminIntegrations]
+    : clientIntegrations;
+
   const statusOrder = { active: 0, pending: 1, error: 2, disconnected: 3 };
   const sorted = [...integrations].sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
 
@@ -182,18 +238,20 @@ export default function IntegracionesPage() {
   return (
     <div className="space-y-5">
       <section className="rounded-[28px] bg-[#040810] px-6 py-6">
-        <p className="text-[11px] uppercase tracking-[0.2em] text-cyan-300">✦ Integraciones</p>
+        <p className="text-[11px] uppercase tracking-[0.2em] text-cyan-300">✦ {en ? 'Integrations' : 'Integraciones'}</p>
         <h1 className="mt-3 text-[28px] font-semibold tracking-[-0.03em] text-white sm:text-[32px]">
-          Canales y servicios conectados
+          {en ? 'Connected channels and services' : 'Canales y servicios conectados'}
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
-          Estado en tiempo real de todas las integraciones de Nexora — mensajería, IA, pagos y base de datos.
+          {en
+            ? 'Real-time status of your marketing, messaging and platform integrations.'
+            : 'Estado en tiempo real de tus integraciones de marketing, mensajería y plataforma.'}
         </p>
         <div className="mt-4 flex flex-wrap gap-3">
           {[
-            { label: 'Activos', count: integrations.filter((integration) => integration.status === 'active').length, color: 'text-emerald-400 bg-emerald-500/8 border-emerald-500/15' },
-            { label: 'Pendientes', count: integrations.filter((integration) => integration.status === 'pending').length, color: 'text-amber-400 bg-amber-500/8 border-amber-500/15' },
-            { label: 'Sin conectar', count: integrations.filter((integration) => integration.status === 'disconnected').length, color: 'text-slate-400 bg-white/4 border-white/8' },
+            { label: en ? 'Active' : 'Activos', count: integrations.filter((integration) => integration.status === 'active').length, color: 'text-emerald-400 bg-emerald-500/8 border-emerald-500/15' },
+            { label: en ? 'Pending' : 'Pendientes', count: integrations.filter((integration) => integration.status === 'pending').length, color: 'text-amber-400 bg-amber-500/8 border-amber-500/15' },
+            { label: en ? 'Disconnected' : 'Sin conectar', count: integrations.filter((integration) => integration.status === 'disconnected').length, color: 'text-slate-400 bg-white/4 border-white/8' },
           ].map((item) => (
             <div key={item.label} className={`rounded-full border px-3 py-1 text-xs font-medium ${item.color}`}>
               {item.count} {item.label}
@@ -234,14 +292,14 @@ export default function IntegracionesPage() {
                   rel="noopener noreferrer"
                   className="inline-flex rounded-full bg-white/[0.04] px-3 py-1.5 text-xs text-slate-300 transition hover:bg-white/[0.07] hover:text-white"
                 >
-                  Ver en Meta →
+                  {en ? 'View in Meta →' : 'Ver en Meta →'}
                 </a>
                 <button
                   type="button"
                   onClick={integration.onConnect}
                   className="inline-flex rounded-full bg-white/[0.02] px-3 py-1.5 text-xs text-slate-500 transition hover:text-white"
                 >
-                  Reconectar
+                  {en ? 'Reconnect' : 'Reconectar'}
                 </button>
               </div>
             ) : integration.onConnect ? (
@@ -251,7 +309,7 @@ export default function IntegracionesPage() {
                 disabled={connecting === integration.id}
                 className="mt-4 inline-flex rounded-full bg-cyan-500/10 px-3 py-1.5 text-xs text-cyan-300 transition-all duration-150 hover:bg-cyan-500/20 disabled:opacity-50"
               >
-                {connecting === integration.id ? 'Conectando...' : integration.actionLabel}
+                {connecting === integration.id ? (en ? 'Connecting...' : 'Conectando...') : integration.actionLabel}
               </button>
             ) : integration.actionHref?.startsWith('http') ? (
               <a
