@@ -36,7 +36,6 @@ async function generateImageWithFal(prompt: string): Promise<string | null> {
     const imageUrl = data?.images?.[0]?.url;
     if (!imageUrl) return null;
 
-    console.log('[image-gen] fal.ai image generated:', imageUrl);
     return imageUrl;
   } catch (error) {
     console.error('[image-gen] fal.ai error:', error);

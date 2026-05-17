@@ -85,10 +85,8 @@ export default function IntegracionesPage() {
         body: JSON.stringify({ platform }),
       });
       const data = await response.json();
-      console.log('OAuth response:', response.status, data);
       if (!response.ok) throw new Error(data.error || 'Error iniciando OAuth');
       if (data.url) {
-        console.log('Redirecting to:', data.url);
         window.location.href = data.url;
       }
     } catch (error) {

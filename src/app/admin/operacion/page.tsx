@@ -160,18 +160,7 @@ export default function AdminOperacionPage() {
           typeof statsData.stats === 'object' &&
           !Array.isArray(statsData.stats);
 
-        console.log('[admin/stats debug operacion]', {
-          httpStatus: statsResponse.status,
-          tokenPresent: Boolean(token),
-          payloadKeys: statsData && typeof statsData === 'object' ? Object.keys(statsData) : [],
-          hasStatsKey: Object.prototype.hasOwnProperty.call(statsData, 'stats'),
-          statsType: statsData.stats === null ? 'null' : typeof statsData.stats,
-          statsIsArray: Array.isArray(statsData.stats),
-          statsAccepted,
-        });
-
         if (statsAccepted) {
-          console.log('[admin/stats debug operacion] setStats applied');
           setStats(statsData.stats as AdminStats);
         } else {
           console.error('[admin/stats debug operacion] stats rejected', statsResponse.status, statsData?.error);

@@ -103,23 +103,9 @@ export default function AutomationWorkflowPage() {
           typeof statsData.stats === 'object' &&
           !Array.isArray(statsData.stats);
 
-        console.log('[admin/stats debug automation]', {
-          httpStatus: statsRes.status,
-          tokenPresent: Boolean(token),
-          payloadKeys: statsData && typeof statsData === 'object' ? Object.keys(statsData) : [],
-          hasStatsKey: Object.prototype.hasOwnProperty.call(statsData, 'stats'),
-          statsType: statsData.stats === null ? 'null' : typeof statsData.stats,
-          statsIsArray: Array.isArray(statsData.stats),
-          statsAccepted,
-        });
-
         if (statsAccepted) {
           const funnel = statsData.stats.funnel as { won?: number; conversions?: FunnelConversionRow[] } | undefined;
           if (funnel) {
-            console.log('[admin/stats debug automation] setFunnelWon/setFunnelConversions applied', {
-              won: funnel.won,
-              conversionsLen: Array.isArray(funnel.conversions) ? funnel.conversions.length : 0,
-            });
             setFunnelWon(typeof funnel.won === 'number' ? funnel.won : null);
             setFunnelConversions(Array.isArray(funnel.conversions) ? funnel.conversions : []);
           } else {

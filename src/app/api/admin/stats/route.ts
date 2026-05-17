@@ -79,9 +79,6 @@ export async function GET(request: NextRequest) {
   if (adminCheck instanceof NextResponse) return adminCheck;
 
   try {
-    console.log('[admin/stats] step: start handler');
-
-    console.log('[admin/stats] before querying subscriptions + invoices + users (parallel)');
     const [users, subscriptions, invoices] = await Promise.all([
       prisma.user.findMany({
         orderBy: { createdAt: 'desc' },
@@ -106,13 +103,6 @@ export async function GET(request: NextRequest) {
         select: { id: true, userId: true, amount: true, status: true, createdAt: true },
       }),
     ]);
-    console.log('[admin/stats] after users/subscriptions/invoices', {
-      users: users.length,
-      subscriptions: subscriptions.length,
-      invoices: invoices.length,
-    });
-
-    console.log('[admin/stats] before querying campaigns + paymentSettings (parallel)');
     const [campaigns, paymentSettings] = await Promise.all([
       prisma.campaign.findMany({
         orderBy: { createdAt: 'desc' },
@@ -122,12 +112,6 @@ export async function GET(request: NextRequest) {
         orderBy: { createdAt: 'asc' },
       }),
     ]);
-    console.log('[admin/stats] after campaigns/paymentSettings', {
-      campaigns: campaigns.length,
-      hasPaymentSettings: Boolean(paymentSettings),
-    });
-
-    console.log('[admin/stats] before querying lead captures + CRM leads (parallel)');
     const [
       leadCaptureTotal,
       leadCaptureConvertedCount,
@@ -212,20 +196,6 @@ export async function GET(request: NextRequest) {
         },
       }),
     ]);
-    console.log('[admin/stats] after lead captures + crm', {
-      leadCaptureTotal,
-      leadCaptureConvertedCount,
-      paidDistinctEmails: paidCaptureEmailGroups.length,
-      paidRowsSample: paidCaptureRows.length,
-      recentCaptures: leadCaptures.length,
-      crmLeads: crmLeads.length,
-      allCapturesForBusiness: allCapturesForBusiness.length,
-      needsSalesFollowupCount,
-      paidLeadCapturesExcludedCount,
-      onboardingStartedUsersCount,
-      followupQueueSample: followupQueueSample.length,
-    });
-
     const activeSubscriptions = subscriptions.filter((subscription) => subscription.status === 'active').length;
     const totalRevenue = invoices
       .filter((invoice) => invoice.status === 'paid')
@@ -478,9 +448,6 @@ export async function GET(request: NextRequest) {
       if (c.trackerId) conversionTrackerIds.add(c.trackerId);
     }
 
-    console.log('[admin/stats] before querying attribution sessions', {
-      conversionTrackerIds: conversionTrackerIds.size,
-    });
     const attributionSessions =
       conversionTrackerIds.size > 0
         ? await prisma.attributionSession.findMany({
@@ -495,8 +462,6 @@ export async function GET(request: NextRequest) {
             },
           })
         : [];
-    console.log('[admin/stats] after attribution sessions', { rows: attributionSessions.length });
-
     const attributionByTrackerId = buildAttributionByTrackerId(attributionSessions);
 
     const userIdByEmailLower = new Map<string, string>();
@@ -615,13 +580,6 @@ export async function GET(request: NextRequest) {
       revenueBySource,
     };
 
-    console.log('[admin/stats] business metrics', {
-      conversionRate,
-      revenuePerLead,
-      revenueByPlanLen: revenueByPlan.length,
-      revenueBySourceLen: revenueBySource.length,
-    });
-
     const funnelConversions = Array.from(conversionMap.values())
       .map((r) => ({
         email: r.email,
@@ -637,8 +595,6 @@ export async function GET(request: NextRequest) {
         const tb = b.convertedToPaidAt ? new Date(b.convertedToPaidAt).getTime() : 0;
         return tb - ta;
       });
-
-    console.log('[admin/stats] funnel conversions built', { count: funnelConversions.length });
 
     const subscriptionByEmailLower = new Map<
       string,
@@ -693,7 +649,6 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    console.log('[admin/stats] before building funnel summary object');
     const funnelSummary = {
       captured: leadCaptureTotal,
       convertedToCrm: leadCaptureConvertedCount,
@@ -702,14 +657,6 @@ export async function GET(request: NextRequest) {
       recent: recentFunnelLeads.slice(0, 8),
       conversions: funnelConversions,
     };
-    console.log('[admin/stats] funnel summary', {
-      captured: funnelSummary.captured,
-      convertedToCrm: funnelSummary.convertedToCrm,
-      qualified: funnelSummary.qualified,
-      won: funnelSummary.won,
-      conversionsLen: funnelSummary.conversions.length,
-    });
-
     const conversionAutomation = {
       needsSalesFollowupCount,
       /** LeadCapture con `paid: true` (excluidos de follow-up comercial por bandera de pago). */
@@ -725,7 +672,6 @@ export async function GET(request: NextRequest) {
       })),
     };
 
-    console.log('[admin/stats] before return 200');
     return NextResponse.json({
       stats: {
         totalUsers: users.length,
