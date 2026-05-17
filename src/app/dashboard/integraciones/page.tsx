@@ -226,12 +226,12 @@ export default function IntegracionesPage() {
     },
   ];
 
-  const integrations = isAdmin
+  const allIntegrations = isAdmin
     ? [...clientIntegrations, ...adminIntegrations]
     : clientIntegrations;
 
   const statusOrder = { active: 0, pending: 1, error: 2, disconnected: 3 };
-  const sorted = [...integrations].sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
+  const sorted = [...allIntegrations].sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
 
   if (!mounted) return null;
 
@@ -249,9 +249,9 @@ export default function IntegracionesPage() {
         </p>
         <div className="mt-4 flex flex-wrap gap-3">
           {[
-            { label: en ? 'Active' : 'Activos', count: integrations.filter((integration) => integration.status === 'active').length, color: 'text-emerald-400 bg-emerald-500/8 border-emerald-500/15' },
-            { label: en ? 'Pending' : 'Pendientes', count: integrations.filter((integration) => integration.status === 'pending').length, color: 'text-amber-400 bg-amber-500/8 border-amber-500/15' },
-            { label: en ? 'Disconnected' : 'Sin conectar', count: integrations.filter((integration) => integration.status === 'disconnected').length, color: 'text-slate-400 bg-white/4 border-white/8' },
+            { label: en ? 'Active' : 'Activos', count: allIntegrations.filter((integration) => integration.status === 'active').length, color: 'text-emerald-400 bg-emerald-500/8 border-emerald-500/15' },
+            { label: en ? 'Pending' : 'Pendientes', count: allIntegrations.filter((integration) => integration.status === 'pending').length, color: 'text-amber-400 bg-amber-500/8 border-amber-500/15' },
+            { label: en ? 'Disconnected' : 'Sin conectar', count: allIntegrations.filter((integration) => integration.status === 'disconnected').length, color: 'text-slate-400 bg-white/4 border-white/8' },
           ].map((item) => (
             <div key={item.label} className={`rounded-full border px-3 py-1 text-xs font-medium ${item.color}`}>
               {item.count} {item.label}
