@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BILLING_PLANS, BillingCycle, BillingPlan } from '@/lib/billing';
 
 declare global {
@@ -74,7 +74,7 @@ function SignupForm() {
     [selectedPlan]
   );
 
-  const handleGoogleResponse = async (response: { credential: string }) => {
+  const handleGoogleResponse = useCallback(async (response: { credential: string }) => {
     setGoogleLoading(true);
     setError('');
     try {
@@ -106,7 +106,7 @@ function SignupForm() {
     } finally {
       setGoogleLoading(false);
     }
-  };
+  }, [selectedPlanConfig, selectedBilling, router]);
 
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) return;
