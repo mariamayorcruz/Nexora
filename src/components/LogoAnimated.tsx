@@ -1,6 +1,6 @@
 export default function LogoAnimated() {
   return (
-    <div className="flex items-center justify-center w-full h-full bg-black">
+    <div className="flex items-center justify-center w-screen h-screen bg-black">
       <style>{`
         .gotnexora-logo-reveal {
           opacity: 0;
@@ -23,7 +23,7 @@ export default function LogoAnimated() {
       <img
         src="/LogoHorizontal.png"
         alt="GotNexora"
-        className="gotnexora-logo-reveal h-auto w-full max-w-[700px] px-16"
+        className="gotnexora-logo-reveal h-auto w-full max-w-[900px]"
         aria-hidden="true"
       />
     </div>
