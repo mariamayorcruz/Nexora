@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import Link from 'next/link';
 import { BarChart2, Bot, Users, Zap } from 'lucide-react';
@@ -11,9 +11,9 @@ const content = {
     sub: 'CRM, AI, campaigns and automation. One clean workspace.',
     story: 'A lead comes in at 11pm. You\'re asleep. Nexora responds, qualifies and books the appointment. You close in the morning.',
     metrics: [
-      { value: '2.8x', label: 'More leads closed', detail: 'Teams using Nexora close nearly 3x more leads in their first 60 days.' },
-      { value: '91%', label: 'Less manual follow-up', detail: '91% of follow-ups are automated so your team can focus on closing.' },
-      { value: '99%', label: 'Lower cost vs agencies', detail: 'Agency-level results at a fraction of the price.' },
+      { value: 'More', label: 'Leads closed', detail: 'Teams using Nexora close more leads by automating follow-up from day one.' },
+      { value: 'Auto', label: 'Follow-up automated', detail: 'Most follow-ups run automatically so your team focuses on closing, not chasing.' },
+      { value: 'Less', label: 'Than hiring an agency', detail: 'Get agency-level results without agency prices or contracts.' },
     ],
     features: [
       { icon: Users, title: 'Smart CRM', desc: 'Track every customer, deal and opportunity in one place. AI tells you what to do next so nothing falls through.' },
@@ -21,25 +21,25 @@ const content = {
       { icon: Zap, title: 'Automation Engine', desc: 'Set up follow-up sequences, campaign triggers and reminders once. Nexora runs them for you, 24/7.' },
       { icon: BarChart2, title: 'Campaign Analytics', desc: 'Connect Meta, Google and TikTok. See exactly what is working and where to move your budget.' },
     ],
-    cta: 'Start free trial →',
+    cta: 'Start free trial â†’',
   },
   es: {
-    story: 'Un lead llega a las 11pm. Tú duermes. Nexora responde, califica y agenda la cita. Tú cierras en la mañana.',
-    tag: 'Por qué Nexora',
+    story: 'Un lead llega a las 11pm. TÃº duermes. Nexora responde, califica y agenda la cita. TÃº cierras en la maÃ±ana.',
+    tag: 'Por quÃ© Nexora',
     h2: 'El sistema que tu negocio necesita para crecer.',
-    sub: 'CRM, IA, campañas y automatización. Un solo workspace.',
+    sub: 'CRM, IA, campaÃ±as y automatizaciÃ³n. Un solo workspace.',
     metrics: [
-      { value: '2.8x', label: 'Más leads cerrados', detail: 'Los equipos que usan Nexora cierran casi 3 veces más leads en sus primeros 60 días.' },
-      { value: '91%', label: 'Menos seguimiento manual', detail: 'El 91% de los seguimientos se automatizan para que tu equipo pueda enfocarse en cerrar.' },
-      { value: '99%', label: 'Menor costo vs agencias', detail: 'Resultados de agencia a una fracción del precio.' },
+      { value: 'More', label: 'Leads cerrados', detail: 'Los equipos que usan Nexora cierran más leads automatizando el seguimiento desde el primer día.' },
+      { value: 'Auto', label: 'Seguimiento automatizado', detail: 'La mayoría de los seguimientos corren solos para que tu equipo se enfoque en cerrar.' },
+      { value: 'Less', label: 'Que contratar una agencia', detail: 'Resultados de agencia sin los precios ni los contratos.' },
     ],
     features: [
-      { icon: Users, title: 'CRM Inteligente', desc: 'Gestiona cada cliente, negocio y oportunidad en un solo lugar. La IA te dice qué hacer a continuación.' },
-      { icon: Bot, title: 'Studio IA de Contenido', desc: 'Genera anuncios, guiones, secuencias de email y pitch decks en segundos. Diseñado para convertir, no solo para verse bien.' },
-      { icon: Zap, title: 'Motor de Automatización', desc: 'Configura secuencias de seguimiento, disparadores de campaña y recordatorios una vez. Nexora los ejecuta por ti, 24/7.' },
-      { icon: BarChart2, title: 'Analítica de Campañas', desc: 'Conecta Meta, Google y TikTok. Ve exactamente qué funciona y dónde mover tu presupuesto.' },
+      { icon: Users, title: 'CRM Inteligente', desc: 'Gestiona cada cliente, negocio y oportunidad en un solo lugar. La IA te dice quÃ© hacer a continuaciÃ³n.' },
+      { icon: Bot, title: 'Studio IA de Contenido', desc: 'Genera anuncios, guiones, secuencias de email y pitch decks en segundos. DiseÃ±ado para convertir, no solo para verse bien.' },
+      { icon: Zap, title: 'Motor de AutomatizaciÃ³n', desc: 'Configura secuencias de seguimiento, disparadores de campaÃ±a y recordatorios una vez. Nexora los ejecuta por ti, 24/7.' },
+      { icon: BarChart2, title: 'AnalÃ­tica de CampaÃ±as', desc: 'Conecta Meta, Google y TikTok. Ve exactamente quÃ© funciona y dÃ³nde mover tu presupuesto.' },
     ],
-    cta: 'Empezar prueba gratis →',
+    cta: 'Empezar prueba gratis â†’',
   },
 };
 
@@ -104,3 +104,5 @@ export default function Features() {
     </section>
   );
 }
+
+
