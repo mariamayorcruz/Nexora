@@ -245,7 +245,7 @@ export default function CampaignOutput({
                   <p className="mt-3 whitespace-pre-line text-sm leading-6 text-white">
                     {(channel.copy || '')
                       .replace(/Â·/g, '·')
-                      .replace(/â€"/g, '—')
+                      .replace(/—/g, '—')
                       .replace(/✨/g, '')
                       .replace(/Campaign Assembly Engine[^.]*[\.\s]*/gi, '')
                       .replace(/·\s*(Corporativo|Premium|Cercano|Urgente)\s*/gi, '')

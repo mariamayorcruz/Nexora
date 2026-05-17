@@ -36,7 +36,7 @@ const VISUAL_STYLES = ['Corporativo', 'Premium', 'Cercano', 'Urgente'];
 function stripCampaignAssemblyText(value: string) {
   return value
     .replace(/Â·/g, '·')
-    .replace(/â€"/g, '—')
+    .replace(/—/g, '—')
     .replace(/✨/g, '')
     .replace(/Campaign Assembly Engine\s*[·-]\s*Premium\s*✨?/gi, '')
     .replace(/Campaign Assembly Engine\s*[·-]\s*\w+\s*✨?/gi, '')
