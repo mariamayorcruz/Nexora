@@ -22,14 +22,14 @@ const copy = {
     trial: '7-day trial. $1 today. Cancel anytime.',
   },
   es: {
-    pain: 'Tu competencia respondiÃ³ en 2 minutos. TÃº en 3 horas. AhÃ­ perdiste al cliente.',
-    badge: 'CRM + IA + AutomatizaciÃ³n. Una sola plataforma.',
+    pain: 'Tu competencia respondió en 2 minutos. Tú en 3 horas. Ahí perdiste al cliente.',
+    badge: 'CRM + IA + Automatización. Una sola plataforma.',
     h1a: 'Deja de perder clientes.',
     h1b: 'Empieza a cerrarlos.',
-    sub: 'Nexora le da a tu negocio el sistema con IA para atraer, dar seguimiento y cerrar mÃ¡s clientes. Sin agencias. Sin caos.',
-    cta1: 'Prueba gratis 7 dÃ­as',
-    cta2: 'CÃ³mo funciona',
-    trial: 'Prueba 7 dÃ­as. Solo $1 hoy. Cancela cuando quieras.',
+    sub: 'Nexora le da a tu negocio el sistema con IA para atraer, dar seguimiento y cerrar más clientes. Sin agencias. Sin caos.',
+    cta1: 'Prueba gratis 7 días',
+    cta2: 'Cómo funciona',
+    trial: 'Prueba 7 días. Solo $1 hoy. Cancela cuando quieras.',
   },
 };
 
@@ -47,7 +47,7 @@ export default function Hero() {
           {/* Left */}
           <div>
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-700">
-              âœ¦ {t.badge}
+              ✦ {t.badge}
             </div>
 
             <p className="mb-4 text-sm font-medium text-red-500">{t.pain}</p>
@@ -71,7 +71,7 @@ export default function Hero() {
                 href="#demo"
                 className="rounded-xl border border-slate-300 bg-transparent px-8 py-4 text-base font-semibold text-slate-800 transition hover:bg-slate-50"
               >
-                {t.cta2} â†’
+                {t.cta2} →
               </Link>
             </div>
 
@@ -87,7 +87,7 @@ export default function Hero() {
             </div>
           </div>
 
-          {/* Right â€” mockup */}
+          {/* Right — mockup */}
           <div className="relative">
             <div className="rounded-2xl border border-slate-200 shadow-2xl overflow-hidden">
               <DashboardMockupHero />
@@ -97,7 +97,7 @@ export default function Hero() {
               <p className="text-sm font-semibold text-slate-900">Businesses growing with Nexora</p>
             </div>
             <div className="absolute -right-4 -top-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-2 shadow-lg">
-              <p className="text-xs font-semibold text-sky-600">â— AI active</p>
+              <p className="text-xs font-semibold text-sky-600">● AI active</p>
             </div>
           </div>
         </div>
