@@ -59,10 +59,10 @@ export default function FocusPanel({
   const computed = useMemo(() => {
     if (!lead) return null;
     const tags = [];
-    if (lead.confidence >= 75) tags.push(en ? 'High intent' : 'Alta intención');
-    if (lead.confidence >= 45 && lead.confidence < 75) tags.push(en ? 'Quick responder' : 'Responde rápido');
+    if (lead.confidence >= 75) tags.push(en ? 'Very interested' : 'Muy interesado');
+    if (lead.confidence >= 45 && lead.confidence < 75) tags.push(en ? 'Responds fast' : 'Responde rápido');
     if ((lead.value || 0) >= 2500) tags.push(en ? 'High value' : 'Ticket alto');
-    if (!tags.length) tags.push(en ? 'Active follow-up' : 'Seguimiento activo');
+    if (!tags.length) tags.push(en ? 'Active conversation' : 'Conversación activa');
     return tags.slice(0, 2);
   }, [en, lead]);
 
@@ -71,13 +71,13 @@ export default function FocusPanel({
     setTasks([
       {
         done: false,
-        label: en ? 'Reply to first message' : 'Responder mensaje inicial',
+        label: en ? 'Send first reply' : 'Enviar primera respuesta',
         due: en ? 'Today' : 'Hoy',
       },
       {
         done: lead.stage === 'won',
-        label: en ? 'Update stage' : 'Actualizar etapa',
-        due: en ? 'Before close' : 'Antes de cierre',
+        label: en ? 'Update status' : 'Actualizar estado',
+        due: en ? 'Before closing' : 'Antes de cerrar',
       },
     ]);
     setAddingTask(false);
@@ -125,11 +125,11 @@ export default function FocusPanel({
           <div className="flex h-11 w-11 items-center justify-center rounded-full bg-cyan-500/10 text-cyan-400">
             <Star className="h-4.5 w-4.5" />
           </div>
-          <p className="mt-4 text-sm font-medium text-white">{en ? 'Select a lead' : 'Selecciona un lead'}</p>
+          <p className="mt-4 text-sm font-medium text-white">{en ? 'Select a customer' : 'Selecciona un cliente'}</p>
           <p className="mt-2 text-xs leading-6 text-slate-500">
             {en
-              ? 'Score, timeline, tasks, and composer appear here once you choose someone to focus on.'
-              : 'Aquí verás score, timeline, tareas y el composer rápido para mover la conversación.'}
+              ? 'Select a customer to see their history, tasks and send a message.'
+              : 'Selecciona un cliente para ver su historial, tareas y enviarle un mensaje.'}
           </p>
         </div>
       </aside>
@@ -156,14 +156,14 @@ export default function FocusPanel({
           <div className="min-w-0 flex-1">
             <p className="truncate text-base font-semibold text-white">{lead.name}</p>
             <p className="truncate text-xs text-slate-500">
-              {lead.phone || lead.email || (en ? 'No direct contact' : 'Sin contacto directo')}
+              {lead.phone || lead.email || (en ? 'No contact info' : 'Sin información de contacto')}
             </p>
           </div>
         </div>
 
         <div className="rounded-[18px] bg-[#040810] p-3">
           <div className="mb-2 flex items-center justify-between text-[11px] text-slate-400">
-            <span>{en ? 'Lead score' : 'Score del lead'}</span>
+            <span>{en ? 'Interest level' : 'Nivel de interés'}</span>
             <span>{lead.confidence}%</span>
           </div>
           <div className="h-2 rounded-full bg-white/[0.04]">
@@ -187,28 +187,28 @@ export default function FocusPanel({
             riskLabel ||
             messageLabel ||
             lead.nextAction ||
-            (en ? 'Follow up today while momentum is still warm.' : 'Haz follow-up hoy para mantener el momentum.')
+            (en ? 'Good time to reach out today.' : 'Es buen momento para escribirle hoy.')
           }
           actionLabel={en ? 'Use suggestion' : 'Usar sugerencia'}
           onUse={() => setDraft(riskLabel || messageLabel || lead.nextAction || '')}
         />
 
         <div className="space-y-2">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Timeline</p>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{en ? "What's happening" : 'Qué está pasando'}</p>
           {[
             {
               color: 'bg-cyan-400',
-              label: en ? 'Lead created' : 'Lead creado',
+              label: en ? 'Customer added' : 'Cliente agregado',
               time: new Date(lead.updatedAt).toLocaleString(en ? 'en-US' : 'es-ES'),
             },
             {
               color: 'bg-amber-400',
-              label: lead.nextAction || (en ? 'Waiting for next step' : 'Esperando siguiente acción'),
+              label: lead.nextAction || (en ? 'Waiting for next step' : 'Esperando próximo paso'),
               time: en ? 'Now' : 'Ahora',
             },
             {
               color: 'bg-emerald-400',
-              label: `${en ? 'Source' : 'Fuente'}: ${lead.source}`,
+              label: `${en ? 'Origin' : 'Origen'}: ${lead.source}`,
               time: lead.stage,
             },
           ].map((event) => (
@@ -227,10 +227,10 @@ export default function FocusPanel({
             { label: en ? 'Service' : 'Servicio', value: lead.company || (en ? 'General' : 'General') },
             { label: en ? 'Value' : 'Valor', value: `$${(lead.value || 0).toLocaleString()}` },
             {
-              label: en ? 'Size' : 'Tamaño',
-              value: lead.company ? (en ? 'Company' : 'Empresa') : en ? 'Direct lead' : 'Lead directo',
+              label: en ? 'Type' : 'Tipo',
+              value: lead.company ? (en ? 'Company' : 'Empresa') : en ? 'Individual' : 'Individual',
             },
-            { label: en ? 'Stage' : 'Etapa', value: lead.stage },
+            { label: en ? 'Status' : 'Estado', value: lead.stage },
           ].map((item) => (
             <div key={item.label} className="rounded-2xl bg-[#040810] p-3">
               <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">{item.label}</p>
@@ -241,7 +241,7 @@ export default function FocusPanel({
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{en ? 'Tasks' : 'Tareas'}</p>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{en ? 'To do' : 'Por hacer'}</p>
             <button
               type="button"
               onClick={() => setAddingTask(true)}

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BILLING_PLANS, BillingCycle, BillingPlan, getBillingPlanLabel } from '@/lib/billing';
+import { useAppLanguage } from '@/hooks/use-app-language';
 
 interface SubscriptionState {
   plan: string;
@@ -59,6 +60,8 @@ function readBillingQueryState(): BillingQueryState {
 }
 
 export default function BillingPage() {
+  const { language } = useAppLanguage();
+  const en = language === 'en';
   const [subscription, setSubscription] = useState<SubscriptionState | null>(null);
   const [invoices, setInvoices] = useState<BillingInvoiceRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -179,7 +182,9 @@ export default function BillingPage() {
         const plan = data.session?.plan || 'tu nuevo plan';
         setCheckoutState({
           type: 'success',
-          message: `Pago confirmado para ${plan}. Stripe terminó correctamente el checkout y Nexora ya está sincronizando tu suscripción.`,
+          message: en
+            ? `Payment confirmed for ${plan}. Your plan is almost ready.`
+            : `Pago confirmado para ${plan}. Tu plan está casi listo.`,
         });
 
         await fetchSubscription();
@@ -187,7 +192,9 @@ export default function BillingPage() {
         console.error('Error validating checkout session:', error);
         setCheckoutState({
           type: 'error',
-          message: 'Stripe completó el flujo, pero no pudimos validar la sesión desde el dashboard. Revisa de nuevo en unos segundos.',
+          message: en
+            ? 'Your payment went through, but we could not check again from your dashboard yet. Please try again in a few seconds.'
+            : 'El pago se completó, pero no pudimos verificar de nuevo desde tu dashboard. Revisa otra vez en unos segundos.',
         });
       }
     };
@@ -270,7 +277,7 @@ export default function BillingPage() {
         disabled={!!processingPlan || !requestedPlanConfig}
         className="mt-8 w-full rounded-2xl border border-white/10 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white disabled:opacity-60 sm:w-auto"
       >
-        {processingPlan ? 'Abriendo Stripe...' : 'Reintentar pago'}
+        {processingPlan ? (en ? 'Opening billing portal...' : 'Abriendo portal de facturación...') : 'Reintentar pago'}
       </button>
     </div>
   );
@@ -330,7 +337,7 @@ export default function BillingPage() {
             disabled={!!processingPlan}
             className="mt-10 w-full rounded-2xl border border-white/10 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30 hover:text-white disabled:opacity-60"
           >
-            {processingPlan ? 'Abriendo Stripe...' : 'Completar pago'}
+            {processingPlan ? (en ? 'Opening billing portal...' : 'Abriendo portal de facturación...') : 'Completar pago'}
           </button>
 
           <div className="mt-4 space-y-1 text-center text-sm text-slate-400">
@@ -350,7 +357,7 @@ export default function BillingPage() {
           Facturación y suscripción
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          Gestiona tu plan, lanza upgrades y valida el estado real de Stripe.
+          {en ? 'Manage your plan and check your billing status.' : 'Gestiona tu plan y verifica tu estado de facturación.'}
         </p>
       </div>
 
@@ -491,7 +498,7 @@ export default function BillingPage() {
                     : 'bg-cyan-500 text-[#041018] hover:-translate-y-[1px] hover:bg-cyan-400'
                 }`}
               >
-                {isCurrentPlan ? 'Plan actual' : isProcessing ? 'Abriendo Stripe...' : `Activar ${plan.marketingLabel}`}
+                {isCurrentPlan ? 'Plan actual' : isProcessing ? (en ? 'Opening billing portal...' : 'Abriendo portal de facturación...') : `Activar ${plan.marketingLabel}`}
               </button>
             </article>
           );

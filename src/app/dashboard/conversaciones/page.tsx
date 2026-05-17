@@ -49,7 +49,7 @@ function buildMessages(lead: LeadRow): ChatMessage[] {
     {
       id: `${lead.id}-2`,
       role: 'ai',
-      text: `Detecté intención alta. Recomiendo responder con una propuesta concreta y una CTA de agenda.`,
+      text: `Te recomiendo responder hoy con una propuesta clara y dos opciones de horario.`,
       time: '09:13',
     },
     {
@@ -218,7 +218,7 @@ export default function ConversacionesPage() {
               ['whatsapp', 'WhatsApp'],
               ['sms', 'SMS'],
               ['email', 'Email'],
-              ['ai', 'AI Agent'],
+              ['ai', language === 'en' ? 'Assistant' : 'Asistente'],
             ] as Array<[ConversationFilter, string]>).map(([key, label]) => (
               <button
                 key={key}
@@ -315,7 +315,7 @@ export default function ConversacionesPage() {
                   <div>
                     <p className="text-base font-semibold text-white">{selected.name}</p>
                     <p className="text-xs text-slate-500">
-                      online · {selected.channel.toUpperCase()} · score {selected.confidence}
+                      online · {selected.channel.toUpperCase()} · {language === 'en' ? 'interest' : 'interés'} {selected.confidence}
                     </p>
                   </div>
                 </div>
@@ -325,7 +325,7 @@ export default function ConversacionesPage() {
                     onClick={() => router.push(`/dashboard/crm?leadId=${selected.id}`)}
                     className="rounded-full bg-white/[0.03] px-3 py-1.5 text-xs text-slate-300 transition hover:text-white"
                   >
-                    {language === 'en' ? 'View lead' : 'Ver lead'}
+                    {language === 'en' ? 'View customer' : 'Ver cliente'}
                   </button>
                   <button
                     type="button"
@@ -342,8 +342,8 @@ export default function ConversacionesPage() {
                     }`}
                   >
                     {selected.aiActive
-                      ? (language === 'en' ? 'AI active' : 'AI activo')
-                      : (language === 'en' ? 'AI paused' : 'AI pausado')}
+                      ? (language === 'en' ? 'Assistant active' : 'Asistente activo')
+                      : (language === 'en' ? 'Assistant paused' : 'Asistente pausado')}
                   </button>
                 </div>
               </div>
@@ -360,7 +360,7 @@ export default function ConversacionesPage() {
                           : 'rounded-[16px] bg-cyan-500 text-[#041018]'
                       }`}
                     >
-                      {message.role === 'ai' ? <p className="mb-1 text-[10px] uppercase tracking-[0.18em] text-cyan-300">Nexora AI Agent</p> : null}
+                      {message.role === 'ai' ? <p className="mb-1 text-[10px] uppercase tracking-[0.18em] text-cyan-300">{language === 'en' ? 'Nexora Assistant' : 'Asistente Nexora'}</p> : null}
                       <p>{message.text}</p>
                       <p className={`mt-2 text-[11px] ${message.role === 'team' ? 'text-[#06313a]' : 'text-slate-500'}`}>{message.time}</p>
                     </div>
@@ -461,7 +461,7 @@ export default function ConversacionesPage() {
           {selected ? (
             <>
               <div className="rounded-[20px] bg-rose-500/10 px-3 py-3 text-sm text-rose-200">
-                {language === 'en' ? 'AI Agent active · responding' : 'AI Agent activo · respondiendo'}
+                {language === 'en' ? 'Assistant active · responding' : 'Asistente activo · respondiendo'}
               </div>
               <div className="mt-4 space-y-3 rounded-[20px] bg-[#030610] p-4">
                 {[
@@ -508,7 +508,7 @@ export default function ConversacionesPage() {
               <div className="mt-4 rounded-[20px] bg-[#030610] p-4">
                 <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{language === 'en' ? 'Channel history' : 'Historial de canales'}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {[selected.channel.toUpperCase(), 'AI Agent', 'CRM'].map((item) => (
+                  {[selected.channel.toUpperCase(), language === 'en' ? 'Assistant' : 'Asistente', 'CRM'].map((item) => (
                     <span key={item} className="rounded-full bg-white/[0.04] px-2.5 py-1 text-[10px] text-slate-300">
                       {item}
                     </span>
@@ -530,13 +530,13 @@ export default function ConversacionesPage() {
                   onClick={() => router.push(`/dashboard/crm?leadId=${selected.id}`)}
                   className="flex-1 rounded-full bg-cyan-500/10 px-3 py-2 text-xs text-cyan-300 transition hover:bg-cyan-500/15"
                 >
-                  {language === 'en' ? 'View lead' : 'Ver lead'}
+                  {language === 'en' ? 'View customer' : 'Ver cliente'}
                 </button>
               </div>
             </>
           ) : (
             <div className="flex h-full min-h-[420px] items-center justify-center rounded-[22px] bg-[#030610] px-5 text-center text-sm text-slate-500">
-              {language === 'en' ? 'Lead context will appear here.' : 'Aquí aparecerá el contexto del lead.'}
+              {language === 'en' ? 'Customer details will appear here.' : 'Aquí aparecerán los detalles del cliente.'}
             </div>
           )}
         </div>

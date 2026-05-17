@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Bot, Cpu, Layers, Zap } from 'lucide-react';
+import { useAppLanguage } from '@/hooks/use-app-language';
 
 interface SupportReply {
   title: string;
@@ -39,7 +40,10 @@ const PROVIDER_META: Record<string, { label: string; icon: React.ReactNode; colo
 };
 
 export default function SupportPage() {
+  const { language } = useAppLanguage();
+  const en = language === 'en';
   const [user, setUser] = useState<DashboardSupportUser | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [message, setMessage] = useState('');
   const [reply, setReply] = useState<SupportReply | null>(null);
   const [supportEmail, setSupportEmail] = useState('support@nexora.com');
@@ -68,6 +72,7 @@ export default function SupportPage() {
         });
         const data = await response.json();
         setUser(data.user);
+        setIsAdmin(Boolean(data?.user?.isAdmin));
       } catch (error) {
         console.error('Error loading support user:', error);
       }
@@ -142,12 +147,12 @@ export default function SupportPage() {
   return (
     <div className="space-y-6">
       <section className="rounded-[28px] bg-[#040810] px-6 py-7 sm:px-8">
-        <p className="text-[11px] uppercase tracking-[0.2em] text-cyan-300">✦ Soporte</p>
+        <p className="text-[11px] uppercase tracking-[0.2em] text-cyan-300">✦ {en ? 'Support' : 'Soporte'}</p>
         <h1 className="mt-2 text-[28px] font-semibold tracking-[-0.03em] text-white sm:text-[32px]">
-          Soporte IA + operación asistida
+          {en ? 'Help center' : 'Centro de ayuda'}
         </h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
-          Pregunta sobre campañas, métricas, configuración o pide que el asistente cree borradores ejecutables.
+          {en ? 'Ask anything and get instant help.' : 'Pregunta cualquier cosa y recibe ayuda al instante.'}
         </p>
         <div className="mt-6 grid gap-4 md:grid-cols-3">
           <div className="rounded-[20px] bg-[#05080f] p-5">
@@ -155,13 +160,15 @@ export default function SupportPage() {
             <p className="mt-3 text-2xl font-bold tracking-[-0.02em] text-white">{user?.entitlements?.marketingLabel || 'Starter'}</p>
           </div>
           <div className="rounded-[20px] bg-[#05080f] p-5">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Soporte IA</p>
-            <p className="mt-3 text-2xl font-bold tracking-[-0.02em] text-white">Activo · 4 proveedores</p>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{en ? 'AI Assistant' : 'Asistente IA'}</p>
+            <p className="mt-3 text-2xl font-bold tracking-[-0.02em] text-white">{en ? 'AI Assistant · Active' : 'Asistente IA · Activo'}</p>
           </div>
           <div className="rounded-[20px] bg-[#05080f] p-5">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Escalado humano</p>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{en ? 'Human support' : 'Soporte humano'}</p>
             <p className="mt-3 text-2xl font-bold tracking-[-0.02em] text-white">
-              {user?.entitlements?.capabilities.canUsePrioritySupport ? 'Prioritario' : 'Por email'}
+              {user?.entitlements?.capabilities.canUsePrioritySupport
+                ? en ? 'Priority' : 'Prioritario'
+                : en ? 'By email' : 'Por email'}
             </p>
           </div>
         </div>
@@ -170,13 +177,14 @@ export default function SupportPage() {
       <section className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-[28px] bg-[#040810] p-6">
           <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Asistente</p>
-          <h2 className="mt-2 text-[18px] font-semibold tracking-[-0.02em] text-white">Asistente IA</h2>
+          <h2 className="mt-2 text-[18px] font-semibold tracking-[-0.02em] text-white">{en ? 'Assistant' : 'Asistente'}</h2>
           <p className="mt-2 text-sm leading-6 text-slate-400">
-            Escribe tu duda o pide que genere una campaña. Puede crear borradores ejecutables directamente desde el chat.
+            {en ? 'Ask anything and get instant help.' : 'Pregunta cualquier cosa y recibe ayuda al instante.'}
           </p>
 
+          {isAdmin && (
           <div className="mt-5 rounded-[22px] bg-[#030610] p-4">
-            <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Proveedor IA</p>
+            <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">{en ? 'Assistant' : 'Asistente'}</p>
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               <select
                 value={aiProvider}
@@ -203,7 +211,7 @@ export default function SupportPage() {
                 type="button"
                 className="rounded-2xl bg-white/[0.04] px-4 py-2 text-xs font-semibold text-slate-200 transition hover:bg-white/[0.06] hover:text-white"
               >
-                Guardar configuración IA
+                {en ? 'Save assistant settings' : 'Guardar configuración IA'}
               </button>
               <button
                 onClick={() => {
@@ -214,11 +222,12 @@ export default function SupportPage() {
                 type="button"
                 className="rounded-2xl bg-white/[0.03] px-4 py-2 text-xs font-semibold text-slate-400 transition hover:bg-white/[0.05] hover:text-slate-200"
               >
-                Limpiar clave local
+                {en ? 'Clear local key' : 'Limpiar clave local'}
               </button>
             </div>
             {aiStatus && <p className="mt-2 text-xs text-slate-400">{aiStatus}</p>}
           </div>
+          )}
 
           <textarea
             value={message}
@@ -244,7 +253,7 @@ export default function SupportPage() {
               <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Respuesta</p>
               <h2 className="mt-2 text-[18px] font-semibold tracking-[-0.02em] text-white">Respuesta y acciones</h2>
             </div>
-            {providerBadge && (
+            {isAdmin && providerBadge && (
               <span className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${providerBadge.color}`}>
                 {providerBadge.icon}
                 {providerBadge.label}
@@ -307,6 +316,7 @@ export default function SupportPage() {
         </div>
       </section>
 
+      {isAdmin && (
       <section className="rounded-[28px] bg-[#040810] p-6">
         <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Infraestructura</p>
         <h2 className="mt-2 text-[18px] font-semibold tracking-[-0.02em] text-white">Proveedores disponibles</h2>
@@ -326,6 +336,7 @@ export default function SupportPage() {
           ))}
         </div>
       </section>
+      )}
     </div>
   );
 }

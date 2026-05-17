@@ -33,12 +33,12 @@ export default function NextBestActionPanel({
     return (
       <div className="rounded-[24px] bg-[#040810] p-5">
         <p className="text-[11px] uppercase tracking-[0.2em] text-cyan-300">
-          ✦ {en ? 'Next best actions' : 'Próximas acciones'}
+          ✦ {en ? 'What to do next' : 'Qué conviene hacer ahora'}
         </p>
         <p className="mt-4 text-sm text-slate-500">
           {en
-            ? 'All caught up. No urgent actions right now.'
-            : 'Todo al día. No hay acciones urgentes ahora mismo.'}
+            ? 'All good. Nothing urgent right now.'
+            : 'Todo al día. Nada urgente por ahora.'}
         </p>
       </div>
     );
@@ -48,13 +48,13 @@ export default function NextBestActionPanel({
     <div className="rounded-[24px] bg-[#040810] p-5">
       <div className="mb-4 flex items-center justify-between">
         <p className="text-[11px] uppercase tracking-[0.2em] text-cyan-300">
-          ✦ {en ? 'Next best actions' : 'Próximas acciones'}
+          ✦ {en ? 'What to do next' : 'Qué conviene hacer ahora'}
         </p>
         <Link
           href="/dashboard/crm"
           className="text-xs text-slate-500 transition hover:text-white"
         >
-          {en ? 'Open CRM' : 'Abrir CRM'} →
+          {en ? 'See customers' : 'Ver clientes'} →
         </Link>
       </div>
 

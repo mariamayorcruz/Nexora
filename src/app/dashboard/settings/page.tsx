@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useAppLanguage } from '@/hooks/use-app-language';
 
 type IntegrationStatus = {
   metaConnected: boolean;
@@ -10,7 +11,10 @@ type IntegrationStatus = {
 };
 
 export default function SettingsPage() {
+  const { language } = useAppLanguage();
+  const en = language === 'en';
   const [integrationStatus, setIntegrationStatus] = useState<IntegrationStatus | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loadingIntegration, setLoadingIntegration] = useState(true);
   const [sessions, setSessions] = useState<Array<{
     id: string;
@@ -77,6 +81,7 @@ export default function SettingsPage() {
         const response = await fetch('/api/users/me', { headers: { Authorization: `Bearer ${token}` } });
         const data = await response.json();
         setUser(data.user);
+        setIsAdmin(Boolean(data?.user?.isAdmin));
         setProfileName(data.user?.name || '');
         setOffers(Boolean(data.user?.marketingOptIn));
         if (data.user?.id) loadNotificationPreferences(data.user.id);
@@ -167,7 +172,7 @@ export default function SettingsPage() {
     const token = localStorage.getItem('token');
     if (!token) { showStatus('Tu sesión expiró. Inicia sesión nuevamente.'); return; }
     localStorage.setItem(`nexora-2fa-request-${user?.id || 'anonymous'}`, new Date().toISOString());
-    showStatus('Solicitud de activación 2FA registrada. Mantén contraseña robusta y revisa sesiones activas.');
+    showStatus(en ? "Request received. We'll contact you shortly." : 'Solicitud recibida. Te contactamos pronto.');
   };
 
   const handleSessions = () => {
@@ -287,7 +292,7 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between rounded-[22px] bg-[#030610] px-5 py-4">
               <div>
                 <p className="text-sm font-medium text-white">Meta (Facebook / Instagram)</p>
-                {integrationStatus.metaAppId && (
+                {isAdmin && integrationStatus.metaAppId && (
                   <p className="mt-0.5 text-xs text-slate-500">{integrationStatus.metaAppId}</p>
                 )}
               </div>
@@ -297,14 +302,16 @@ export default function SettingsPage() {
                 <span className="rounded-full border border-rose-400/20 bg-rose-500/10 px-3 py-1 text-xs font-semibold text-rose-300">No conectado</span>
               )}
             </div>
-            <div className="flex items-center justify-between rounded-[22px] bg-[#030610] px-5 py-4">
-              <p className="text-sm font-medium text-white">Proveedor IA</p>
-              {integrationStatus.aiConnected ? (
-                <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">{integrationStatus.aiProvider} conectado</span>
-              ) : (
-                <span className="rounded-full border border-rose-400/20 bg-rose-500/10 px-3 py-1 text-xs font-semibold text-rose-300">No conectado</span>
-              )}
-            </div>
+            {isAdmin && (
+              <div className="flex items-center justify-between rounded-[22px] bg-[#030610] px-5 py-4">
+                <p className="text-sm font-medium text-white">Proveedor IA</p>
+                {integrationStatus.aiConnected ? (
+                  <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">{integrationStatus.aiProvider} conectado</span>
+                ) : (
+                  <span className="rounded-full border border-rose-400/20 bg-rose-500/10 px-3 py-1 text-xs font-semibold text-rose-300">No conectado</span>
+                )}
+              </div>
+            )}
           </div>
         )}
       </section>
@@ -388,7 +395,7 @@ export default function SettingsPage() {
             className="w-full rounded-[22px] bg-[#030610] px-5 py-4 text-left transition-all duration-150 hover:bg-white/[0.04]"
           >
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-white">Autenticación de Dos Factores</p>
+              <p className="text-sm font-semibold text-white">{en ? 'Extra account protection' : 'Protección adicional de cuenta'}</p>
               <span className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-300">Solicitar</span>
             </div>
             <p className="mt-0.5 text-xs text-slate-400">Registra tu solicitud de activación de 2FA para esta cuenta.</p>
@@ -397,8 +404,8 @@ export default function SettingsPage() {
             onClick={handleSessions}
             className="w-full rounded-[22px] bg-[#030610] px-5 py-4 text-left transition-all duration-150 hover:bg-white/[0.04]"
           >
-            <p className="text-sm font-semibold text-white">Sesiones Activas</p>
-            <p className="mt-0.5 text-xs text-slate-400">Gestiona tus sesiones conectadas</p>
+            <p className="text-sm font-semibold text-white">{en ? 'Devices with access' : 'Dispositivos con acceso'}</p>
+            <p className="mt-0.5 text-xs text-slate-400">{en ? "See where you're signed in" : 'Ver dónde tienes sesión abierta'}</p>
           </button>
 
           {sessionsVisible && (
@@ -410,7 +417,7 @@ export default function SettingsPage() {
                   disabled={closingSessions}
                   className="rounded-lg border border-rose-400/20 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-300 disabled:opacity-50"
                 >
-                  {closingSessions ? 'Cerrando...' : 'Cerrar otras sesiones'}
+                  {closingSessions ? 'Cerrando...' : en ? 'Sign out other devices' : 'Cerrar sesión en otros dispositivos'}
                 </button>
               </div>
               {loadingSessions ? (

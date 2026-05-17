@@ -76,8 +76,8 @@ export default function DailyBriefing({
     items.push({
       icon: '🤖',
       text: en
-        ? `Your AI Agent handled ${aiConversations} conversation${aiConversations > 1 ? 's' : ''} while you were away.`
-        : `Tu AI Agent manejó ${aiConversations} conversación${aiConversations > 1 ? 'es' : ''} mientras no estabas.`,
+        ? `While you were away, your assistant handled ${aiConversations} conversation${aiConversations > 1 ? 's' : ''}.`
+        : `Mientras no estabas, tu asistente manejó ${aiConversations} conversación${aiConversations > 1 ? 'es' : ''}.`,
       tone: 'text-cyan-300',
     });
   }
@@ -96,8 +96,8 @@ export default function DailyBriefing({
     items.push({
       icon: '✅',
       text: en
-        ? `${wonThisMonth} customer${wonThisMonth > 1 ? 's' : ''} closed this month. Keep the momentum going.`
-        : `${wonThisMonth} cliente${wonThisMonth > 1 ? 's' : ''} cerrado${wonThisMonth > 1 ? 's' : ''} este mes. Mantén el momentum.`,
+        ? `${wonThisMonth} customer${wonThisMonth > 1 ? 's' : ''} closed this month. Keep it up today.`
+        : `${wonThisMonth} cliente${wonThisMonth > 1 ? 's' : ''} cerrado${wonThisMonth > 1 ? 's' : ''} este mes. Sigue así hoy.`,
       tone: 'text-emerald-300',
     });
   }
@@ -106,8 +106,8 @@ export default function DailyBriefing({
     items.push({
       icon: '✦',
       text: en
-        ? 'All caught up. A great day to reach out to new leads.'
-        : 'Todo al día. Un buen momento para contactar nuevos clientes.',
+        ? 'All good. A great time to reach out to new customers.'
+        : 'Todo al día. Buen momento para contactar nuevos clientes.',
       tone: 'text-cyan-300',
     });
   }

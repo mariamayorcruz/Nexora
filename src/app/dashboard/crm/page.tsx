@@ -212,15 +212,15 @@ export default function DashboardCrmPage() {
 
     if (leads.length === 0) {
       return {
-        eyebrow: en ? 'CRM Command Center' : 'Centro de comando CRM',
-        title: en ? 'Your CRM is ready' : 'Tu CRM está listo',
+        eyebrow: en ? 'Your customers' : 'Tus clientes',
+        title: en ? 'Ready to start' : 'Listo para empezar',
         detail: en
-          ? 'When leads arrive, Nexora helps you prioritize follow-ups and keep the pipeline moving.'
-          : 'Cuando lleguen leads, Nexora te ayuda a priorizar seguimientos y mantener el pipeline activo.',
+          ? 'When customers arrive, Nexora helps you prioritize follow-ups and keep things moving.'
+          : 'Cuando lleguen clientes, Nexora te ayuda a priorizar seguimientos y mantener todo en movimiento.',
         accent: 'text-cyan-300',
         pipelineEmptyHint: en
-          ? 'Your pipeline is ready. Add your first lead to start protecting opportunities.'
-          : 'Tu pipeline está listo. Agrega tu primer lead para empezar a proteger oportunidades.',
+          ? 'Add your first customer to start tracking your opportunities.'
+          : 'Agrega tu primer cliente para empezar a proteger tus oportunidades.',
         bullets: en
           ? ['Prioritize who needs attention first', 'Follow up before interest cools']
           : ['Prioriza quién necesita atención primero', 'Da seguimiento antes de que enfríe el interés'],
@@ -229,13 +229,13 @@ export default function DashboardCrmPage() {
 
     if (sampleLead) {
       return {
-        eyebrow: en ? 'CRM Command Center' : 'Centro de comando CRM',
-        title: en ? 'Start with your demo lead' : 'Empieza por tu lead demo',
+        eyebrow: en ? 'Your customers' : 'Tus clientes',
+        title: en ? 'Start with your example customer' : 'Empieza con tu cliente de ejemplo',
         detail: en
           ? 'Move it through the pipeline and test your first follow-up.'
           : 'Muévelo por el pipeline y prueba tu primer seguimiento.',
         accent: 'text-amber-300',
-        ctaLabel: en ? 'Review demo lead' : 'Revisar lead demo',
+        ctaLabel: en ? 'Review example customer' : 'Revisar cliente de ejemplo',
         ctaLeadId: sampleLead.id,
         ctaViewMode: 'list' as ViewMode,
         ctaContext: 'demo' as CommandCenterContext,
@@ -246,8 +246,8 @@ export default function DashboardCrmPage() {
     }
 
     return {
-      eyebrow: en ? 'Pipeline Command Center' : 'Centro de comando del pipeline',
-      title: en ? 'Focus on leads that matter now' : 'Enfócate en los leads que importan ahora',
+      eyebrow: en ? 'Focus for today' : 'Enfoque del día',
+      title: en ? 'Focus on what matters today' : 'Enfócate en lo que importa hoy',
       detail: criticalLeads.length > 0
         ? en
           ? `${criticalLeads.length} customer${criticalLeads.length > 1 ? 's' : ''} haven't heard from you in 3+ days. They may think you forgot about them.`
@@ -257,13 +257,13 @@ export default function DashboardCrmPage() {
             ? `${warningLeads.length} customer${warningLeads.length > 1 ? 's' : ''} are waiting for a reply. A quick message keeps them warm.`
             : `${warningLeads.length} cliente${warningLeads.length > 1 ? 's' : ''} esperan respuesta. Un mensaje rápido mantiene el interés.`
           : en
-            ? 'Keep follow-ups moving and guide each opportunity to a clear next step.'
-            : 'Mantén los seguimientos en marcha y guía cada oportunidad hacia un siguiente paso claro.',
+            ? 'Stay on top of your customers and move each conversation forward.'
+            : 'Mantente al tanto de tus clientes y avanza cada conversación.',
       accent: criticalLeads.length > 0 ? 'text-rose-300' : warningLeads.length > 0 ? 'text-amber-300' : 'text-cyan-300',
       ctaLabel: hottestLead
         ? en
-          ? 'Open hot opportunity'
-          : 'Abrir oportunidad caliente'
+          ? 'Open high-intent customer'
+          : 'Abrir cliente con alta intención'
         : en
           ? 'Review newest lead'
           : 'Revisar lead más reciente',
@@ -363,17 +363,17 @@ export default function DashboardCrmPage() {
     switch (commandCenterSelection?.context) {
       case 'demo':
         return {
-          title: en ? 'Demo lead selected' : 'Lead demo seleccionado',
+          title: en ? 'Example customer selected' : 'Cliente de ejemplo seleccionado',
           detail: en ? 'Move this lead through your pipeline.' : 'Mueve este lead por tu pipeline.',
         };
       case 'newest':
         return {
-          title: en ? 'Newest lead selected' : 'Lead más reciente seleccionado',
-          detail: en ? 'Review latest activity and choose the next step.' : 'Revisa la actividad reciente y elige el siguiente paso.',
+          title: en ? 'Latest customer selected' : 'Cliente más reciente seleccionado',
+          detail: en ? 'Review their history and choose the next step.' : 'Revisa su historial y elige el siguiente paso.',
         };
       case 'hot':
         return {
-          title: en ? 'Hot opportunity selected' : 'Oportunidad caliente seleccionada',
+          title: en ? 'High-intent customer selected' : 'Cliente con alta intención seleccionado',
           detail: en ? 'This lead may need action now.' : 'Este lead puede necesitar acción ahora.',
         };
       default:
@@ -536,7 +536,7 @@ export default function DashboardCrmPage() {
                       className="mt-4 inline-flex items-center gap-2 rounded-full bg-cyan-500 px-4 py-2 text-sm font-semibold text-[#041018] transition-all duration-150 hover:-translate-y-[1px] hover:bg-cyan-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#040810]"
                     >
                       <Plus className="h-4 w-4" />
-                      {language === 'en' ? 'Add first lead' : 'Agregar primer lead'}
+                      {language === 'en' ? 'Add first customer' : 'Agregar primer cliente'}
                     </button>
                   </>
                 ) : (
@@ -568,9 +568,9 @@ export default function DashboardCrmPage() {
         <section className="rounded-[28px] bg-[#040810] px-5 py-5 sm:px-6">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <p className="text-[11px] uppercase tracking-[0.2em] text-cyan-300">✦ CRM & Leads</p>
+              <p className="text-[11px] uppercase tracking-[0.2em] text-cyan-300">{language === 'en' ? '✦ Customers & Opportunities' : '✦ Clientes y Oportunidades'}</p>
               <h1 className="mt-3 text-[28px] font-semibold tracking-[-0.03em] text-white sm:text-[32px] xl:text-[34px]">
-                {language === 'en' ? 'Revenue pipeline in one place' : 'Pipeline comercial en una sola vista'}
+                {language === 'en' ? 'Your customers and opportunities' : 'Tus clientes y oportunidades'}
               </h1>
             </div>
             <div className="flex flex-wrap gap-x-5 gap-y-3 text-sm">
@@ -619,7 +619,7 @@ export default function DashboardCrmPage() {
                 className="inline-flex items-center gap-2 rounded-full border border-white/[0.1] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-slate-200 transition-all duration-150 hover:border-cyan-400/25 hover:bg-white/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
               >
                 <Plus className="h-3.5 w-3.5 text-cyan-300" />
-                {language === 'en' ? 'Add lead' : 'Agregar lead'}
+                {language === 'en' ? 'Add customer' : 'Agregar cliente'}
               </button>
             ) : null}
           </div>
