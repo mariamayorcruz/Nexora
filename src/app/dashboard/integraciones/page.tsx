@@ -58,20 +58,22 @@ export default function IntegracionesPage() {
     setConnecting(platform);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/connect/oauth/start', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ platform }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Error iniciando OAuth');
-      if (data.url) {
-        window.location.href = data.url;
-      }
-    } catch (error) {
+    const response = await fetch('/api/connect/oauth/start', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ platform }),
+    });
+    const data = await response.json();
+    console.log('OAuth response:', response.status, data);
+    if (!response.ok) throw new Error(data.error || 'Error iniciando OAuth');
+    if (data.url) {
+      console.log('Redirecting to:', data.url);
+      window.location.href = data.url;
+    }
+  } catch (error) {
       console.error('OAuth error:', error);
       setConnecting(null);
     }
@@ -224,7 +226,25 @@ export default function IntegracionesPage() {
               </div>
             </div>
             <p className="mt-3 text-xs leading-5 text-slate-600">{integration.detail}</p>
-            {integration.onConnect ? (
+            {integration.onConnect && connectedAccounts.includes(integration.id) ? (
+              <div className="mt-4 flex gap-2">
+                <a
+                  href="https://business.facebook.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex rounded-full bg-white/[0.04] px-3 py-1.5 text-xs text-slate-300 transition hover:bg-white/[0.07] hover:text-white"
+                >
+                  Ver en Meta →
+                </a>
+                <button
+                  type="button"
+                  onClick={integration.onConnect}
+                  className="inline-flex rounded-full bg-white/[0.02] px-3 py-1.5 text-xs text-slate-500 transition hover:text-white"
+                >
+                  Reconectar
+                </button>
+              </div>
+            ) : integration.onConnect ? (
               <button
                 type="button"
                 onClick={integration.onConnect}
