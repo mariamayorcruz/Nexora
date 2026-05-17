@@ -1,3 +1,6 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import { LanguageProvider } from '@/context/LanguageContext';
 import Navbar from '@/components/Navbar';
 import LogoHero from '@/components/LogoHero';
@@ -11,11 +14,21 @@ import FAQ from '@/components/FAQ';
 import Footer from '@/components/Footer';
 
 export default function Home() {
+  const [introDone, setIntroDone] = useState(false);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setIntroDone(true);
+    }, 5500);
+
+    return () => window.clearTimeout(timeout);
+  }, []);
+
   return (
     <LanguageProvider>
-      <Navbar />
-      <main className="pt-16">
-        <LogoHero />
+      {introDone && <Navbar />}
+      {!introDone && <LogoHero />}
+      <main className={`pt-16 transition-opacity duration-700 ${introDone ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         <Hero />
         <Features />
         <Demo />
