@@ -1,5 +1,6 @@
 import { LanguageProvider } from '@/context/LanguageContext';
 import Navbar from '@/components/Navbar';
+import LogoHero from '@/components/LogoHero';
 import Hero from '@/components/Hero';
 import Features from '@/components/Features';
 import Demo from '@/components/Demo';
@@ -14,6 +15,7 @@ export default function Home() {
     <LanguageProvider>
       <Navbar />
       <main className="pt-16">
+        <LogoHero />
         <Hero />
         <Features />
         <Demo />
