@@ -9,6 +9,7 @@ const content = {
     tag: 'Why Nexora',
     h2: 'The system your business needs to grow.',
     sub: 'CRM, AI, campaigns and automation. One clean workspace.',
+    story: 'A lead comes in at 11pm. You\'re asleep. Nexora responds, qualifies and books the appointment. You close in the morning.',
     metrics: [
       { value: '2.8x', label: 'More leads closed', detail: 'Teams using Nexora close nearly 3x more leads in their first 60 days.' },
       { value: '91%', label: 'Less manual follow-up', detail: '91% of follow-ups are automated so your team can focus on closing.' },
@@ -23,6 +24,7 @@ const content = {
     cta: 'Start free trial →',
   },
   es: {
+    story: 'Un lead llega a las 11pm. Tú duermes. Nexora responde, califica y agenda la cita. Tú cierras en la mañana.',
     tag: 'Por qué Nexora',
     h2: 'El sistema que tu negocio necesita para crecer.',
     sub: 'CRM, IA, campañas y automatización. Un solo workspace.',
@@ -56,6 +58,7 @@ export default function Features() {
           </span>
           <h2 className="mt-4 text-4xl font-extrabold leading-tight text-slate-900 md:text-5xl">{t.h2}</h2>
           <p className="mt-4 text-lg text-slate-500">{t.sub}</p>
+          <p className="mt-6 rounded-xl border-l-4 border-sky-400 bg-sky-50 px-6 py-4 text-sm italic text-sky-800">{t.story}</p>
         </div>
 
         {/* Metrics */}

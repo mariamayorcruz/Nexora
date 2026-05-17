@@ -7,11 +7,13 @@ const content = {
     tag: 'Get started today',
     h2: 'Ready to grow without hiring an agency?',
     sub: 'Join businesses already using Nexora to close more customers, automate follow-up and run better campaigns.',
+    stat: '78% of customers choose whoever responds first. How many leads did you lose today?',
     cta: 'Start free trial. $1 today.',
     cta2: 'Watch demo',
     sub2: 'Setup in under 10 minutes. Cancel anytime.',
   },
   es: {
+    stat: 'El 78% de los clientes elige al primero que responde. ¿Cuántos leads perdiste hoy?',
     tag: 'Empieza hoy',
     h2: '¿Listo para crecer sin contratar una agencia?',
     sub: 'Únete a los negocios que ya usan Nexora para cerrar más clientes, automatizar el seguimiento y lanzar mejores campañas.',
@@ -32,6 +34,7 @@ export default function CtaFinal() {
         </span>
         <h2 className="mt-6 text-4xl font-extrabold text-white md:text-6xl">{t.h2}</h2>
         <p className="mx-auto mt-6 max-w-2xl text-lg text-slate-400">{t.sub}</p>
+        <p className="mx-auto mt-4 max-w-xl text-base font-semibold text-sky-400">{t.stat}</p>
         <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
           <Link
             href="/auth/signup"

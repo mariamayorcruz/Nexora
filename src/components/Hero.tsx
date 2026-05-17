@@ -13,6 +13,7 @@ const stats = [
 const copy = {
   en: {
     badge: 'CRM + AI + Automation. One platform.',
+    pain: 'Your competitor replied in 2 minutes. You replied in 3 hours. That\'s where you lost the customer.',
     h1a: 'Stop losing customers.',
     h1b: 'Start closing them.',
     sub: 'Nexora gives your business the AI system to attract, follow up and close more customers. No agencies. No chaos.',
@@ -21,6 +22,7 @@ const copy = {
     trial: '7-day trial. $1 today. Cancel anytime.',
   },
   es: {
+    pain: 'Tu competencia respondió en 2 minutos. Tú en 3 horas. Ahí perdiste al cliente.',
     badge: 'CRM + IA + Automatización. Una sola plataforma.',
     h1a: 'Deja de perder clientes.',
     h1b: 'Empieza a cerrarlos.',
@@ -48,6 +50,7 @@ export default function Hero() {
               ✦ {t.badge}
             </div>
 
+            <p className="mb-4 text-sm font-medium text-red-500">{t.pain}</p>
             <h1 className="text-5xl font-extrabold leading-[1.05] tracking-tight text-slate-900 md:text-6xl lg:text-7xl">
               {t.h1a}<br />
               <span className="text-sky-500">{t.h1b}</span>
