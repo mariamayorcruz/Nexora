@@ -200,7 +200,7 @@ export default function BillingPage() {
     };
 
     void verifyCheckout();
-  }, [checkoutStatus, sessionId]);
+  }, [checkoutStatus, en, sessionId]);
 
   const handlePlanChange = async (plan: BillingPlan, cycle: BillingCycle, withTrial = false) => {
     setProcessingPlan(`${plan}-${cycle}`);

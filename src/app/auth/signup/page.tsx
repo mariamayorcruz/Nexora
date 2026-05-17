@@ -67,6 +67,47 @@ function SignupForm() {
     }
   }, [selectedPlanFromUrl]);
 
+  const selectedPlan = selectedPlanFromUrl || fallbackSelection?.plan || null;
+  const selectedBilling = selectedBillingFromUrl || fallbackSelection?.billing || 'monthly';
+  const selectedPlanConfig = useMemo(
+    () => (selectedPlan ? BILLING_PLANS[selectedPlan] : null),
+    [selectedPlan]
+  );
+
+  const handleGoogleResponse = async (response: { credential: string }) => {
+    setGoogleLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: response.credential }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error con Google');
+      localStorage.setItem('token', data.token);
+      if (selectedPlanConfig && !data.user?.founderAccess) {
+        localStorage.setItem(
+          'nexoraSelectedPlan',
+          JSON.stringify({
+            plan: selectedPlanConfig.key,
+            billing: selectedBilling,
+            savedAt: Date.now(),
+          })
+        );
+        router.push(
+          `/dashboard/billing?plan=${selectedPlanConfig.key}&billing=${selectedBilling}&autostart=1&source=signup`
+        );
+        return;
+      }
+      router.push('/onboarding');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error con Google Sign-In');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) return;
     const script = document.createElement('script');
@@ -92,43 +133,7 @@ function SignupForm() {
     return () => {
       document.head.removeChild(script);
     };
-  }, []);
-
-  const handleGoogleResponse = async (response: { credential: string }) => {
-    setGoogleLoading(true);
-    setError('');
-    try {
-      const res = await fetch('/api/auth/google', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credential: response.credential }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error con Google');
-      localStorage.setItem('token', data.token);
-      if (selectedPlanConfig && !data.user?.founderAccess) {
-        localStorage.setItem('nexoraSelectedPlan', JSON.stringify({
-          plan: selectedPlanConfig.key,
-          billing: selectedBilling,
-          savedAt: Date.now(),
-        }));
-        router.push(`/dashboard/billing?plan=${selectedPlanConfig.key}&billing=${selectedBilling}&autostart=1&source=signup`);
-        return;
-      }
-      router.push('/onboarding');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error con Google Sign-In');
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
-
-  const selectedPlan = selectedPlanFromUrl || fallbackSelection?.plan || null;
-  const selectedBilling = selectedBillingFromUrl || fallbackSelection?.billing || 'monthly';
-  const selectedPlanConfig = useMemo(
-    () => (selectedPlan ? BILLING_PLANS[selectedPlan] : null),
-    [selectedPlan]
-  );
+  }, [handleGoogleResponse]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -160,12 +165,17 @@ function SignupForm() {
       }
       localStorage.setItem('token', data.token);
       if (selectedPlanConfig && !data.user?.founderAccess) {
-        localStorage.setItem('nexoraSelectedPlan', JSON.stringify({
-          plan: selectedPlanConfig.key,
-          billing: selectedBilling,
-          savedAt: Date.now(),
-        }));
-        router.push(`/dashboard/billing?plan=${selectedPlanConfig.key}&billing=${selectedBilling}&autostart=1&source=signup`);
+        localStorage.setItem(
+          'nexoraSelectedPlan',
+          JSON.stringify({
+            plan: selectedPlanConfig.key,
+            billing: selectedBilling,
+            savedAt: Date.now(),
+          })
+        );
+        router.push(
+          `/dashboard/billing?plan=${selectedPlanConfig.key}&billing=${selectedBilling}&autostart=1&source=signup`
+        );
         return;
       }
       router.push('/onboarding');

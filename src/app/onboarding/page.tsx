@@ -201,7 +201,7 @@ export default function OnboardingPage() {
     }, 850);
 
     return () => window.clearTimeout(timer);
-  }, [buildingStep, launchReady, router]);
+  }, [BUILDING_MESSAGES.length, buildingStep, launchReady, router]);
 
   const progress = useMemo(() => {
     let completed = 0;
