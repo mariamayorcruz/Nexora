@@ -52,7 +52,7 @@ export async function PATCH(
     }
 
     const lead = await prisma.crmLead.update({
-      where: { id: params.leadId },
+      where: { id: params.leadId, userId },
       data: {
         name: body.name !== undefined ? String(body.name).trim() : undefined,
         email: body.email !== undefined ? body.email?.trim() || null : undefined,
