@@ -16,7 +16,7 @@ export default function LogoHero() {
 
   return (
     <section
-      className={`flex min-h-screen items-center justify-center bg-[#0B1020] transition-opacity duration-1000 ${
+      className={`flex min-h-screen items-center justify-center bg-black transition-opacity duration-1000 ${
         fadeOut ? 'pointer-events-none opacity-0' : 'opacity-100'
       }`}
     >

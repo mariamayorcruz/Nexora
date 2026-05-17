@@ -19,6 +19,7 @@ export default function Home() {
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       setIntroDone(true);
+      window.scrollTo(0, 0);
     }, 5500);
 
     return () => window.clearTimeout(timeout);
