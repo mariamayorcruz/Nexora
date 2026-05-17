@@ -22,9 +22,20 @@ const BUSINESS_TYPE_OPTIONS = [
 ] as const;
 
 const MAIN_GOAL_OPTIONS = [
-  { value: 'get_more_leads', labelEn: 'Get More Leads', labelEs: 'Conseguir Más Leads' },
-  { value: 'close_more_clients', labelEn: 'Close More Clients', labelEs: 'Cerrar Más Clientes' },
-  { value: 'automate_follow_up', labelEn: 'Automate Follow-Up', labelEs: 'Automatizar Seguimiento' },
+  { value: 'get_more_leads', labelEn: 'Get more leads', labelEs: 'Conseguir más leads' },
+  { value: 'close_more_clients', labelEn: 'Close more clients', labelEs: 'Cerrar más clientes' },
+  { value: 'automate_follow_up', labelEn: 'Automate follow-up', labelEs: 'Automatizar seguimiento' },
+  { value: 'manage_campaigns', labelEn: 'Manage campaigns', labelEs: 'Gestionar campañas' },
+  { value: 'respond_faster', labelEn: 'Respond faster to leads', labelEs: 'Responder más rápido a leads' },
+] as const;
+
+const HOW_THEY_GET_CLIENTS_OPTIONS = [
+  { value: 'referrals', labelEn: 'Referrals / word of mouth', labelEs: 'Referidos / boca a boca' },
+  { value: 'social_media', labelEn: 'Social media', labelEs: 'Redes sociales' },
+  { value: 'google', labelEn: 'Google / SEO', labelEs: 'Google / SEO' },
+  { value: 'cold_outreach', labelEn: 'Cold calls / outreach', labelEs: 'Llamadas en frío' },
+  { value: 'events', labelEn: 'Events / networking', labelEs: 'Eventos / networking' },
+  { value: 'just_starting', labelEn: 'Just getting started', labelEs: 'Recién empezando' },
 ] as const;
 
 const PREFERRED_CHANNEL_OPTIONS = [
@@ -86,10 +97,11 @@ export default function OnboardingPage() {
   });
   const [form, setForm] = useState({
     businessType: '',
-    mainGoal: '',
+    mainGoals: [] as string[],
     businessName: '',
     websiteUrl: '',
     businessDescription: '',
+    howTheyGetClients: [] as string[],
     preferredChannels: ['whatsapp'] as string[],
   });
   const { language } = useAppLanguage();
@@ -128,12 +140,23 @@ export default function OnboardingPage() {
         setPreviewModeAllowed(canPreview);
 
         if (onboardingData) {
+          const legacyMainGoal = String(onboardingData.mainGoal || '').trim();
+          const mainGoals = Array.isArray(onboardingData.mainGoals)
+            ? onboardingData.mainGoals.map((item) => String(item || '').trim()).filter(Boolean)
+            : legacyMainGoal
+              ? [legacyMainGoal]
+              : [];
+          const howTheyGetClients = Array.isArray(onboardingData.howTheyGetClients)
+            ? onboardingData.howTheyGetClients.map((item) => String(item || '').trim()).filter(Boolean)
+            : [];
+
           setForm((current) => ({
             businessType: String(onboardingData.businessType || current.businessType || ''),
-            mainGoal: String(onboardingData.mainGoal || current.mainGoal || ''),
+            mainGoals: mainGoals.length > 0 ? mainGoals : current.mainGoals,
             businessName: String(onboardingData.businessName || current.businessName || ''),
             websiteUrl: String(onboardingData.websiteUrl || current.websiteUrl || ''),
             businessDescription: String(onboardingData.businessDescription || current.businessDescription || ''),
+            howTheyGetClients: howTheyGetClients.length > 0 ? howTheyGetClients : current.howTheyGetClients,
             preferredChannels:
               Array.isArray(onboardingData.preferredChannels) && onboardingData.preferredChannels.length > 0
                 ? onboardingData.preferredChannels.map((item) => String(item || '').toLowerCase())
@@ -183,14 +206,17 @@ export default function OnboardingPage() {
   const progress = useMemo(() => {
     let completed = 0;
     if (form.businessType) completed += 1;
-    if (form.mainGoal) completed += 1;
+    if (form.mainGoals.length > 0) completed += 1;
+    if (form.howTheyGetClients.length > 0) completed += 1;
     if (form.businessName.trim()) completed += 1;
     if (form.preferredChannels.length > 0) completed += 1;
-    return Math.round((completed / 4) * 100);
+    return Math.round((completed / 5) * 100);
   }, [form]);
 
   const selectedBusinessType = BUSINESS_TYPE_OPTIONS.find((option) => option.value === form.businessType);
-  const selectedGoal = MAIN_GOAL_OPTIONS.find((option) => option.value === form.mainGoal);
+  const selectedGoalLabels = MAIN_GOAL_OPTIONS.filter((option) => form.mainGoals.includes(option.value)).map((option) =>
+    en ? option.labelEn : option.labelEs
+  );
   const selectedChannelLabels = PREFERRED_CHANNEL_OPTIONS
     .filter((option) => form.preferredChannels.includes(option.value))
     .map((option) => (en ? option.labelEn : option.labelEs));
@@ -269,7 +295,7 @@ export default function OnboardingPage() {
             {en ? "We're setting up your growth system" : 'Estamos configurando tu sistema de crecimiento'}
           </h1>
           <p className="mt-4 text-sm leading-7 text-slate-400">
-            {(selectedBusinessType ? (en ? selectedBusinessType.labelEn : selectedBusinessType.labelEs) : en ? 'Your business' : 'Tu negocio')} + {(selectedGoal ? (en ? selectedGoal.labelEn : selectedGoal.labelEs) : en ? 'your goal' : 'tu objetivo')} {en ? 'is enough for Nexora to create a strong first setup.' : 'es suficiente para que Nexora prepare una primera configuración sólida.'}
+            {(selectedBusinessType ? (en ? selectedBusinessType.labelEn : selectedBusinessType.labelEs) : en ? 'Your business' : 'Tu negocio')} + {(selectedGoalLabels.length > 0 ? selectedGoalLabels.join(', ') : en ? 'your goals' : 'tus objetivos')} {en ? 'is enough for Nexora to create a strong first setup.' : 'es suficiente para que Nexora prepare una primera configuración sólida.'}
           </p>
 
           <div className="mt-8 space-y-3">
@@ -334,6 +360,9 @@ export default function OnboardingPage() {
               : en
                 ? 'Answer these quick questions and Nexora will prepare your first growth system for you.'
                 : 'Responde estas preguntas rápidas y Nexora preparará tu primer sistema de crecimiento para ti.'}
+          </p>
+          <p className="mt-2 text-xs text-slate-600">
+            {en ? '⏱ Takes about 2 minutes' : '⏱ Toma menos de 2 minutos'}
           </p>
           {previewModeAllowed ? (
             <div className="mx-auto mt-5 max-w-2xl rounded-[22px] border border-amber-400/20 bg-amber-500/10 px-4 py-4 text-left sm:px-5">
@@ -415,22 +444,78 @@ export default function OnboardingPage() {
           <div className="space-y-3">
             <label className="flex items-center gap-2 text-sm font-semibold text-white">
               <Target className="h-4 w-4 text-cyan-300" />
-              {en ? 'What do you want Nexora to help with first?' : '¿Con qué quieres que Nexora te ayude primero?'}
+              {en ? 'What do you want to achieve with Nexora?' : '¿Qué quieres lograr con Nexora?'}
+              <span className="text-xs text-slate-500">{en ? '(select all that apply)' : '(puedes elegir varios)'}</span>
             </label>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               {MAIN_GOAL_OPTIONS.map((option) => {
-                const active = form.mainGoal === option.value;
+                const active = form.mainGoals.includes(option.value);
                 return (
                   <button
                     key={option.value}
                     type="button"
-                    onClick={() => setForm((current) => ({ ...current, mainGoal: option.value }))}
-                    className={`rounded-2xl border px-4 py-4 text-left text-sm transition ${
+                    onClick={() =>
+                      setForm((current) => ({
+                        ...current,
+                        mainGoals: active
+                          ? current.mainGoals.filter((item) => item !== option.value)
+                          : [...current.mainGoals, option.value],
+                      }))
+                    }
+                    className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-left text-sm transition ${
                       active
                         ? 'border-cyan-400 bg-cyan-500/20 text-white'
-                        : 'border-slate-600 bg-slate-800/50 text-slate-300 hover:border-slate-500 hover:bg-slate-800'
+                        : 'border-slate-600 bg-slate-800/50 text-slate-300 hover:border-slate-500'
                     }`}
                   >
+                    <span
+                      className={`flex h-4 w-4 items-center justify-center rounded border ${
+                        active ? 'border-cyan-400 bg-cyan-400' : 'border-slate-500'
+                      }`}
+                    >
+                      {active && <span className="text-[10px] text-white">✓</span>}
+                    </span>
+                    {en ? option.labelEn : option.labelEs}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <label className="flex items-center gap-2 text-sm font-semibold text-white">
+              <Sparkles className="h-4 w-4 text-cyan-300" />
+              {en ? 'How do you get clients today?' : '¿Cómo consigues clientes hoy?'}
+              <span className="text-xs text-slate-500">{en ? '(select all that apply)' : '(puedes elegir varios)'}</span>
+            </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {HOW_THEY_GET_CLIENTS_OPTIONS.map((option) => {
+                const active = form.howTheyGetClients.includes(option.value);
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() =>
+                      setForm((current) => ({
+                        ...current,
+                        howTheyGetClients: active
+                          ? current.howTheyGetClients.filter((item) => item !== option.value)
+                          : [...current.howTheyGetClients, option.value],
+                      }))
+                    }
+                    className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-left text-sm transition ${
+                      active
+                        ? 'border-cyan-400 bg-cyan-500/20 text-white'
+                        : 'border-slate-600 bg-slate-800/50 text-slate-300 hover:border-slate-500'
+                    }`}
+                  >
+                    <span
+                      className={`flex h-4 w-4 items-center justify-center rounded border ${
+                        active ? 'border-cyan-400 bg-cyan-400' : 'border-slate-500'
+                      }`}
+                    >
+                      {active && <span className="text-[10px] text-white">✓</span>}
+                    </span>
                     {en ? option.labelEn : option.labelEs}
                   </button>
                 );
@@ -467,9 +552,7 @@ export default function OnboardingPage() {
               maxLength={200}
             />
             <p className="text-xs text-slate-500">
-              {en
-                ? 'Nexora will use this to personalize your experience.'
-                : 'Nexora usará esto para personalizar tu experiencia.'}
+              {en ? 'Nexora will use this to personalize your experience.' : 'Nexora usará esto para personalizar tu experiencia.'}
             </p>
           </div>
 
@@ -523,7 +606,7 @@ export default function OnboardingPage() {
               disabled={saving}
               className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-500 to-cyan-400 px-5 py-3 text-sm font-bold text-slate-950 transition hover:brightness-110 disabled:opacity-60 sm:w-auto"
             >
-              {saving ? (en ? 'Saving your setup...' : 'Guardando...') : (en ? 'Build my growth system' : 'Construir mi sistema')}
+              {saving ? (en ? 'Saving your setup...' : 'Guardando...') : en ? 'Build my growth system' : 'Construir mi sistema'}
               {!saving && <ArrowRight className="h-4 w-4" />}
             </button>
           </div>
