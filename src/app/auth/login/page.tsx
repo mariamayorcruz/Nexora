@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -133,8 +134,15 @@ export default function Login() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-[#05080f] px-6 py-12">
       <div className="w-full max-w-md">
         <header className="text-center">
-          <div className="mx-auto mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-500 text-lg font-bold text-white">
-            NX
+          <div className="mx-auto mb-6 flex justify-center">
+            <Image
+              src="/LogoHorizontal.png"
+              alt="GotNexora"
+              width={160}
+              height={40}
+              className="h-10 w-auto"
+              priority
+            />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
             Bienvenido a Nexora

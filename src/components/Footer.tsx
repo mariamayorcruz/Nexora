@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useLang } from '@/context/LanguageContext';
 
@@ -72,9 +73,15 @@ export default function Footer() {
           {/* Brand */}
           <div className="col-span-2 lg:col-span-1">
             <Link href="/" className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-slate-900 text-sm font-bold">NX</div>
               <div>
-                <p className="font-bold text-white">Nexora</p>
+                <Image
+                  src="/LogoHorizontal.png"
+                  alt="GotNexora"
+                  width={160}
+                  height={40}
+                  className="h-10 w-auto"
+                  priority
+                />
                 <p className="text-xs text-slate-500">gotnexora.com</p>
               </div>
             </Link>

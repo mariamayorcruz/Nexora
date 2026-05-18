@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -91,12 +92,16 @@ export default function AdminLayout({
       >
         <div className="px-4 pb-4 pt-5">
           <Link href="/admin" className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/[0.04] text-sm font-semibold text-white">
-              AD
-            </div>
             <div>
               <div className="flex items-center gap-2">
-                <p className="text-sm font-semibold tracking-[-0.03em] text-white">Nexora Admin</p>
+                <Image
+                  src="/LogoHorizontal.png"
+                  alt="GotNexora"
+                  width={160}
+                  height={40}
+                  className="h-10 w-auto"
+                  priority
+                />
                 <span className="h-2.5 w-2.5 rounded-full bg-rose-400" />
               </div>
               <p className="mt-1 text-[10px] uppercase tracking-[0.2em] text-rose-300">Internal</p>

@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -255,14 +256,15 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       >
         <div className="px-4 pb-4 pt-5">
           <Link href="/dashboard" className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/[0.04] text-base font-semibold text-white">
-              NX
-            </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-semibold tracking-[-0.03em] text-white">Nexora</p>
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-              </div>
+              <Image
+                src="/LogoHorizontal.png"
+                alt="GotNexora"
+                width={160}
+                height={40}
+                className="h-10 w-auto"
+                priority
+              />
               <span className="mt-2 inline-flex rounded-full bg-cyan-500/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-cyan-300">
                 ✦ Plan {formatPlanLabel(user)}
               </span>

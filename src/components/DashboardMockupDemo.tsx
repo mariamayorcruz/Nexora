@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 
 const lines = [
@@ -62,8 +63,14 @@ export default function DashboardMockupDemo() {
       {/* Header */}
       <div className="flex items-center justify-between border-b border-white/6 px-4 py-3">
         <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-cyan-600 text-xs font-bold text-slate-900">NX</div>
-          <span className="text-sm font-semibold text-white">Nexora Studio</span>
+          <Image
+            src="/LogoHorizontal.png"
+            alt="GotNexora"
+            width={160}
+            height={40}
+            className="h-10 w-auto"
+            priority
+          />
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-slate-400">{credits.toLocaleString()} credits</span>
