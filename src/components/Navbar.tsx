@@ -35,9 +35,9 @@ export default function Navbar() {
           <Image
             src="/LogoHorizontal.png"
             alt="GotNexora"
-            width={200}
-            height={52}
-            className="h-12 w-auto"
+            width={280}
+            height={72}
+            className="h-16 w-auto"
             priority
           />
         </Link>
