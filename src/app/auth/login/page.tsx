@@ -138,9 +138,9 @@ export default function Login() {
             <Image
               src="/LogoHorizontal.png"
               alt="GotNexora"
-              width={160}
-              height={40}
-              className="h-10 w-auto"
+              width={280}
+              height={72}
+              className="h-16 w-auto"
               priority
             />
           </div>
