@@ -1,3 +1,5 @@
+import Image from 'next/image';
+
 export default function DashboardMockupHero() {
   const leads = [
     { name: 'Ana Torres', company: 'Florist Studio', status: 'New', statusColor: '#1e3a5f', statusText: '#60a5fa' },
@@ -17,8 +19,14 @@ export default function DashboardMockupHero() {
     <div className="overflow-hidden rounded-2xl border border-white/6 bg-[#080e1a]" style={{ fontFamily: 'system-ui, sans-serif' }}>
       <div className="flex items-center justify-between border-b border-white/6 px-4 py-3">
         <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-cyan-600 text-xs font-bold text-slate-900">NX</div>
-          <span className="text-sm font-semibold text-white">Nexora</span>
+          <Image
+            src="/LogoHorizontal.png"
+            alt="GotNexora"
+            width={160}
+            height={40}
+            className="h-8 w-auto"
+            priority
+          />
         </div>
         <div className="flex items-center gap-2">
           <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-400">● Live</span>
