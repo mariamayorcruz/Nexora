@@ -34,6 +34,7 @@ model User {
   campaigns         Campaign[]
   crmLeads          CrmLead[]
   crmSettings       CrmWorkspaceSettings?
+  automationConfig  TenantAutomationConfig?
   aiUsageBuckets    AiWorkspaceUsage[]
   aiJobs            AiWorkspaceJob[]
   videoProjects     AiVideoProject[]
@@ -166,6 +167,37 @@ model CrmWorkspaceSettings {
   defaultCadence         String   @default("48h")
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
+}
+
+model TenantAutomationConfig {
+  id                    String   @id @default(cuid())
+  userId                String   @unique @map("user_id")
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  whatsappPhoneNumberId String?  @map("whatsapp_phone_number_id")
+  whatsappAccessToken   String?  @map("whatsapp_access_token")
+  metaAdsAccountId      String?  @map("meta_ads_account_id")
+  metaAdsToken          String?  @map("meta_ads_token")
+  openPhoneApiKey       String?  @map("open_phone_api_key")
+  openPhoneNumberId     String?  @map("open_phone_number_id")
+  whatsappConnected     Boolean  @default(false) @map("whatsapp_connected")
+  metaConnected         Boolean  @default(false) @map("meta_connected")
+  openPhoneConnected    Boolean  @default(false) @map("open_phone_connected")
+  instagramConnected    Boolean  @default(false) @map("instagram_connected")
+  businessName          String?  @map("business_name")
+  welcomeMessage        String?  @map("welcome_message")
+  qualificationPrompt   String?  @map("qualification_prompt")
+  aiTone                String   @default("professional") @map("ai_tone")
+  language              String   @default("es")
+  hotLeadAction         String   @default("notify") @map("hot_lead_action")
+  warmLeadAction        String   @default("sequence") @map("warm_lead_action")
+  coldLeadAction        String   @default("sequence") @map("cold_lead_action")
+  followupDays          Int      @default(3) @map("followup_days")
+  automationActive      Boolean  @default(false) @map("automation_active")
+  n8nWebhookUrl         String?  @map("n8n_webhook_url")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@map("tenant_automation_configs")
 }
 
 model AiWorkspaceUsage {
