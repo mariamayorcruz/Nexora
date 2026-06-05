@@ -28,7 +28,7 @@ const booleanFields = [
 
 const aiTones = new Set(['professional', 'casual', 'aggressive']);
 const languages = new Set(['es', 'en', 'both']);
-const leadActions = new Set(['notify', 'close', 'escalate', 'sequence']);
+const leadActions = new Set(['notify', 'close', 'escalate', 'sequence', 'ignore']);
 
 async function resolveSupabaseUserId(token: string) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

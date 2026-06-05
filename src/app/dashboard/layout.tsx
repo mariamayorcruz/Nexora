@@ -15,6 +15,7 @@ import {
   Sparkles,
   SquareChartGantt,
   Workflow,
+  Zap,
 } from 'lucide-react';
 import DashboardChatbot from '@/components/DashboardChatbot';
 import { useAppLanguage } from '@/hooks/use-app-language';
@@ -53,6 +54,7 @@ const PATH_META: Record<string, { es: string; en: string }> = {
   dashboard: { es: 'Inicio', en: 'Home' },
   crm: { es: 'CRM & Leads', en: 'CRM & Leads' },
   conversaciones: { es: 'Conversaciones', en: 'Conversations' },
+  automations: { es: 'Automatizaciones', en: 'Automations' },
   studio: { es: 'Studio IA', en: 'AI Studio' },
   calendario: { es: 'Calendario', en: 'Calendar' },
   reportes: { es: 'Reportes', en: 'Reports' },
@@ -180,6 +182,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         badge: conversationCount,
         badgeTone: 'red',
       },
+      { href: '/dashboard/automations', labelEs: 'Automatizaciones', labelEn: 'Automations', icon: Zap },
       { href: '/dashboard/studio', labelEs: 'Studio IA', labelEn: 'AI Studio', icon: Sparkles },
       { href: '/dashboard/calendario', labelEs: 'Calendario', labelEn: 'Calendar', icon: CalendarDays },
       { href: '/dashboard/reportes', labelEs: 'Reportes', labelEn: 'Reports', icon: SquareChartGantt },
