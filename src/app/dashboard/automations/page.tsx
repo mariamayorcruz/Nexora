@@ -91,6 +91,18 @@ function statusBadge(connected: boolean) {
   );
 }
 
+function leadActionLabel(value: string) {
+  const labels: Record<string, string> = {
+    notify: 'Notificarme',
+    close: 'Cerrar solo',
+    escalate: 'Escalar',
+    sequence: 'Secuencia automática',
+    ignore: 'Ignorar',
+  };
+
+  return labels[value] || value;
+}
+
 export default function DashboardAutomationsPage() {
   const { language } = useAppLanguage();
   const en = language === 'en';
@@ -190,6 +202,18 @@ export default function DashboardAutomationsPage() {
     const saved = await saveConfig({ automationActive: nextValue });
     if (saved) {
       showToast(nextValue ? 'Automatización activada.' : 'Automatización pausada.');
+    }
+  };
+
+  const handleFinalSystemAction = async () => {
+    const nextValue = !form.automationActive;
+    const saved = await saveConfig({ automationActive: nextValue });
+    if (saved) {
+      showToast(
+        nextValue
+          ? '¡Sistema activado! GotNexora ya está monitoreando tus canales.'
+          : 'Sistema desactivado.'
+      );
     }
   };
 
@@ -517,7 +541,9 @@ export default function DashboardAutomationsPage() {
                   ['Idioma', form.language === 'both' ? 'Ambos' : form.language === 'en' ? 'Inglés' : 'Español'],
                   ['Tono AI', form.aiTone === 'aggressive' ? 'Agresivo en ventas' : form.aiTone === 'casual' ? 'Casual' : 'Profesional'],
                   ['Canales', [form.whatsappConnected && 'WhatsApp', form.openPhoneConnected && 'OpenPhone', form.instagramConnected && 'Instagram'].filter(Boolean).join(', ') || 'Sin canales conectados'],
-                  ['Lead caliente', form.hotLeadAction],
+                  ['Lead caliente', leadActionLabel(form.hotLeadAction)],
+                  ['Lead tibio', leadActionLabel(form.warmLeadAction)],
+                  ['Lead frío', leadActionLabel(form.coldLeadAction)],
                   ['Seguimiento', `${form.followupDays} días`],
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-[22px] bg-[#030610] p-4">
@@ -549,7 +575,7 @@ export default function DashboardAutomationsPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => showToast('Función disponible pronto')}
+                  onClick={() => showToast('Disponible cuando conectes al menos un canal.')}
                   className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-white/[0.04] px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.07] hover:text-white"
                 >
                   <Zap className="h-4 w-4 text-cyan-300" />
@@ -578,11 +604,17 @@ export default function DashboardAutomationsPage() {
           </div>
           <button
             type="button"
-            onClick={goNext}
-            disabled={activeStep === steps.length - 1 || saving}
-            className="rounded-2xl bg-cyan-500 px-5 py-3 text-sm font-semibold text-[#041018] transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-40"
+            onClick={activeStep === steps.length - 1 ? handleFinalSystemAction : goNext}
+            disabled={saving}
+            className={`rounded-2xl px-5 py-3 text-sm font-semibold text-[#041018] transition disabled:cursor-not-allowed disabled:opacity-40 ${
+              activeStep === steps.length - 1
+                ? form.automationActive
+                  ? 'bg-rose-500 text-white hover:bg-rose-400'
+                  : 'bg-emerald-400 hover:bg-emerald-300'
+                : 'bg-cyan-500 hover:bg-cyan-400'
+            }`}
           >
-            Siguiente
+            {activeStep === steps.length - 1 ? (form.automationActive ? 'Desactivar sistema' : 'Activar sistema') : 'Siguiente'}
           </button>
         </div>
       </section>
