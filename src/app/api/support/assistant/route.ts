@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       reply,
-      supportEmail: process.env.SUPPORT_EMAIL || 'support@nexora.com',
+      supportEmail: process.env.SUPPORT_EMAIL || 'support@gotnexora.com',
       ai: {
         providerUsed,
         byokActive: Boolean(byok),

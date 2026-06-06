@@ -12,8 +12,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 const ALLOWLIST_EMAILS = [
-  'info.emprendeelegante@gmail.com',
-  'mayorexcelsiorllc@gmail.com',
+  'maria.cruz@gotnexora.com',
 ].map((e) => e.trim().toLowerCase());
 
 function tryParseSentLogsCount(defaultCadence) {
@@ -239,8 +238,7 @@ async function main() {
   console.log(`   PaymentSettings               ${paymentSettingsCount} fila(s) — NO se borran`);
 
   console.log('\n4) CONFIRMACIÓN — estos emails NO se borran con el script:');
-  console.log('     ✓ info.emprendeelegante@gmail.com');
-  console.log('     ✓ mayorexcelsiorllc@gmail.com');
+  console.log('     ✓ maria.cruz@gotnexora.com');
   if (missingAdmins.length) {
     console.log('\n   ⚠ ADVERTENCIA: falta User en BD para:', missingAdmins.join(', '));
   }

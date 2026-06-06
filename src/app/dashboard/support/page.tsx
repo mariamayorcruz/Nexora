@@ -46,7 +46,7 @@ export default function SupportPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [message, setMessage] = useState('');
   const [reply, setReply] = useState<SupportReply | null>(null);
-  const [supportEmail, setSupportEmail] = useState('support@nexora.com');
+  const [supportEmail, setSupportEmail] = useState('support@gotnexora.com');
   const [loading, setLoading] = useState(false);
   const [aiProvider, setAiProvider] = useState<'auto' | 'heuristic' | 'claude' | 'gemini' | 'openrouter'>('auto');
   const [aiApiKey, setAiApiKey] = useState('');
@@ -95,7 +95,7 @@ export default function SupportPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'No pudimos responder.');
       setReply(data.reply);
-      setSupportEmail(data.supportEmail || 'support@nexora.com');
+      setSupportEmail(data.supportEmail || 'support@gotnexora.com');
       setProviderUsed(data?.ai?.providerUsed || 'heuristic');
       setAiStatus('');
     } catch (error) {

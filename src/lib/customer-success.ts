@@ -347,7 +347,7 @@ function includesAny(haystack: string, needles: string[]) {
 }
 
 export function buildLifecycleTemplates(supportEmail: string) {
-  const replyTo = supportEmail || process.env.SUPPORT_EMAIL || 'support@nexora.com';
+  const replyTo = supportEmail || process.env.SUPPORT_EMAIL || 'support@gotnexora.com';
 
   return [
     {

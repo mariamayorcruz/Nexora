@@ -5,7 +5,7 @@ loadEnvConfig(process.cwd());
 
 const prisma = new PrismaClient();
 
-const founderEmails = ['info.emprendeelegante@gmail.com', 'mayorexcelsiorllc@gmail.com'];
+const founderEmails = ['maria.cruz@gotnexora.com'];
 
 async function main() {
     const users = await prisma.user.findMany({

@@ -18,8 +18,7 @@ const prisma = new PrismaClient();
 
 /** Emails que deben seguir existiendo (acceso admin). Normalizados a minúsculas. */
 const ALLOWLIST_EMAILS = [
-  'info.emprendeelegante@gmail.com',
-  'mayorexcelsiorllc@gmail.com',
+  'maria.cruz@gotnexora.com',
 ].map((e) => e.trim().toLowerCase());
 
 async function main() {

@@ -395,7 +395,7 @@ Propietario - Nexora Inc.
 
 ## 💬 Soporte
 
-- Email: support@nexora.com
+- Email: support@gotnexora.com
 - Chat: Via dashboard
 - Docs: https://docs.nexora.ai
 

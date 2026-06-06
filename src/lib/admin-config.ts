@@ -214,7 +214,7 @@ export async function getAdminWorkspaceSnapshot(): Promise<AdminWorkspaceSnapsho
   const config = await prisma.adminWorkspaceConfig.findUnique({
     where: { key: 'main' },
   });
-  const fallbackReplyTo = process.env.SUPPORT_EMAIL || 'support@nexora.com';
+  const fallbackReplyTo = process.env.SUPPORT_EMAIL || 'support@gotnexora.com';
 
   return {
     funnel: sanitizeFunnelConfig(config?.funnelConfig),
@@ -251,7 +251,7 @@ export async function saveAdminWorkspacePartial(
       key: 'main',
       funnelConfig: toJson(partial.funnelConfig ?? DEFAULT_FUNNEL),
       emailTemplates: toJson(
-        partial.emailTemplates ?? buildLifecycleTemplates(process.env.SUPPORT_EMAIL || 'support@nexora.com')
+        partial.emailTemplates ?? buildLifecycleTemplates(process.env.SUPPORT_EMAIL || 'support@gotnexora.com')
       ),
       automationConfig: toJson(partial.automationConfig ?? DEFAULT_AUTOMATION),
       roadmapConfig: toJson(partial.roadmapConfig ?? DEFAULT_ROADMAP),

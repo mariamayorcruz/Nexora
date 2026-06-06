@@ -1,5 +1,5 @@
-const DEFAULT_ADMIN_EMAILS = ['info.emprendeelegante@gmail.com', 'admin@nexora.com'];
-const DEFAULT_FOUNDER_EMAILS = ['info.emprendeelegante@gmail.com', 'mayorexcelsiorllc@gmail.com'];
+const DEFAULT_ADMIN_EMAILS = ['maria.cruz@gotnexora.com'];
+const DEFAULT_FOUNDER_EMAILS = ['maria.cruz@gotnexora.com'];
 const INTERNAL_TEST_LOCAL_PART_PATTERN =
   /(^|[+._-])(test|prueba|demo|internal|sandbox|qa|nexora)([+._-]|\d|$)/i;
 
