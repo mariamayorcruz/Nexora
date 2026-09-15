@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { exchangeMetaCodeForToken, fetchMetaAdAccounts, resolveMetaClientId, resolveMetaClientSecret } from '@/lib/meta-ads';
+import { encryptSecret } from '@/lib/crypto';
 
 export const dynamic = 'force-dynamic';
 
@@ -149,13 +150,13 @@ export async function GET(request: NextRequest) {
           userId: state.userId,
           platform: state.platform,
           accountId,
-          accessToken: tokenData.accessToken,
+          accessToken: encryptSecret(tokenData.accessToken) || tokenData.accessToken,
           expiresAt: tokenData.expiresAt,
           accountName,
           connected: true,
         },
         update: {
-          accessToken: tokenData.accessToken,
+          accessToken: encryptSecret(tokenData.accessToken) || tokenData.accessToken,
           expiresAt: tokenData.expiresAt,
           accountName,
           connected: true,

@@ -9,8 +9,29 @@ function requireJwtSecret() {
   return secret;
 }
 
+/** Short-lived access token: sessions stay alive through /api/auth/refresh, which checks the session record. */
+const ACCESS_TOKEN_TTL = (process.env.ACCESS_TOKEN_TTL || '60m') as jwt.SignOptions['expiresIn'];
+
 export function signUserToken(payload: { userId: string; email?: string; sid?: string }) {
-  return jwt.sign(payload, requireJwtSecret(), { expiresIn: '7d' });
+  return jwt.sign(payload, requireJwtSecret(), { expiresIn: ACCESS_TOKEN_TTL });
+}
+
+/**
+ * Verifies signature but tolerates expiry. Only for the refresh endpoint, which additionally
+ * requires a live session record (revocation still works instantly).
+ */
+export function verifyUserTokenAllowExpired(
+  token: string
+): { userId: string; email?: string; sid?: string } | null {
+  try {
+    return jwt.verify(token, requireJwtSecret(), { ignoreExpiration: true }) as {
+      userId: string;
+      email?: string;
+      sid?: string;
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function verifyUserToken(token: string): { userId: string; email?: string; sid?: string } | null {

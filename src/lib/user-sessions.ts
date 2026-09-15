@@ -160,3 +160,21 @@ export async function closeOtherSessions(userId: string, currentSid?: string) {
   const result = await prisma.verificationToken.deleteMany({ where: whereBase });
   return result.count;
 }
+
+/** Returns the live session for a sid, or null when it was revoked or expired. */
+export async function getUserSession(sid: string) {
+  if (!sid) return null;
+
+  const record = await prisma.verificationToken.findUnique({ where: { token: sid } });
+  if (!record) return null;
+
+  if (record.expires.getTime() < Date.now()) {
+    await prisma.verificationToken.delete({ where: { token: sid } }).catch(() => null);
+    return null;
+  }
+
+  const parsed = parseIdentifier(record.identifier);
+  if (!parsed) return null;
+
+  return { sid, userId: parsed.userId, expiresAt: record.expires };
+}

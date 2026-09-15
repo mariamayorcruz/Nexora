@@ -1,5 +1,8 @@
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { decryptSecret } from '@/lib/crypto';
+import { notifyNewLeadOnWhatsApp } from '@/lib/whatsapp';
 
 export const dynamic = 'force-dynamic';
 
@@ -146,9 +149,34 @@ export async function GET(request: Request) {
   return new Response('Forbidden', { status: 403 });
 }
 
+/** Meta signs every webhook delivery; without this check anyone could POST fake leads. */
+function verifyMetaSignature(rawBody: string, signatureHeader: string | null): boolean {
+  const appSecret = process.env.META_APP_SECRET;
+  if (!appSecret || appSecret === 'placeholder') {
+    console.error('META_APP_SECRET is not configured; rejecting Meta webhook delivery');
+    return false;
+  }
+
+  if (!signatureHeader?.startsWith('sha256=')) return false;
+
+  const expected = createHmac('sha256', appSecret).update(rawBody, 'utf-8').digest('hex');
+  const received = signatureHeader.slice('sha256='.length);
+  const expectedBuffer = Buffer.from(expected, 'utf-8');
+  const receivedBuffer = Buffer.from(received, 'utf-8');
+
+  if (expectedBuffer.length !== receivedBuffer.length) return false;
+  return timingSafeEqual(expectedBuffer, receivedBuffer);
+}
+
 export async function POST(request: Request) {
   try {
-    const payload = await request.json();
+    const rawBody = await request.text();
+
+    if (!verifyMetaSignature(rawBody, request.headers.get('x-hub-signature-256'))) {
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+    }
+
+    const payload = JSON.parse(rawBody);
     const extractedLead = extractLeadFromPayload(payload);
     const adAccountId = extractedLead.adAccountId;
 
@@ -181,7 +209,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Tenant automation config not found' }, { status: 404 });
     }
 
-    const metaDetails = await fetchMetaLeadDetails(extractedLead.leadId, config.metaAdsToken || '');
+    const metaDetails = await fetchMetaLeadDetails(extractedLead.leadId, decryptSecret(config.metaAdsToken) || '');
     const lead = mergeLeadDetails(extractedLead, metaDetails);
     const leadName = lead.name || `Meta Lead ${lead.leadId}`;
 
@@ -226,8 +254,8 @@ export async function POST(request: Request) {
             warmLeadAction: config.warmLeadAction,
             coldLeadAction: config.coldLeadAction,
             whatsappPhoneNumberId: config.whatsappPhoneNumberId || '',
-            whatsappAccessToken: config.whatsappAccessToken || '',
-            openPhoneApiKey: config.openPhoneApiKey || '',
+            whatsappAccessToken: decryptSecret(config.whatsappAccessToken) || '',
+            openPhoneApiKey: decryptSecret(config.openPhoneApiKey) || '',
             channel,
           }),
         });
@@ -248,6 +276,22 @@ export async function POST(request: Request) {
           metaLeadId: lead.leadId,
           n8nWebhookUrl: config.n8nWebhookUrl,
           error: n8nError,
+        });
+      }
+    }
+
+    if (!config.n8nWebhookUrl && lead.phone) {
+      try {
+        await notifyNewLeadOnWhatsApp({
+          userId: config.userId,
+          leadId: crmLead.id,
+          leadName,
+          leadPhone: lead.phone,
+        });
+      } catch (whatsappError) {
+        console.error('WhatsApp welcome failed for Meta lead', {
+          crmLeadId: crmLead.id,
+          whatsappError,
         });
       }
     }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 import { fetchMetaAdVideos } from '@/lib/meta-ads';
 import { prisma } from '@/lib/prisma';
+import { decryptSecret } from '@/lib/crypto';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +25,9 @@ export async function GET(request: NextRequest) {
       orderBy: { updatedAt: 'desc' },
     });
 
-    if (!account || !account.accessToken || account.accessToken.startsWith('oauth-code:')) {
+    const metaAccessToken = decryptSecret(account?.accessToken) || '';
+
+    if (!account || !metaAccessToken || metaAccessToken.startsWith('oauth-code:')) {
       return NextResponse.json(
         {
           error: 'No hay una cuenta Meta conectada con token real. Reconecta Meta desde Command Center.',
@@ -34,7 +37,7 @@ export async function GET(request: NextRequest) {
     }
 
     const videos = await fetchMetaAdVideos({
-      accessToken: account.accessToken,
+      accessToken: metaAccessToken,
       accountId: account.accountId,
       limit,
     });

@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 import { publishToInstagram, publishToFacebook, fetchMetaPages } from '@/lib/meta-ads';
 import { prisma } from '@/lib/prisma';
+import { decryptSecret } from '@/lib/crypto';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,7 +39,9 @@ export async function POST(request: NextRequest) {
       orderBy: { updatedAt: 'desc' },
     });
 
-    if (!account || !account.accessToken || account.accessToken.startsWith('oauth-code:')) {
+    const metaAccessToken = decryptSecret(account?.accessToken) || '';
+
+    if (!account || !metaAccessToken || metaAccessToken.startsWith('oauth-code:')) {
       return NextResponse.json({
         staging: true,
         message: `Publicación simulada en ${platforms.join(', ')}. Conecta tu cuenta Meta en Ajustes → Integraciones para publicar de verdad.`,
@@ -53,7 +56,7 @@ export async function POST(request: NextRequest) {
     for (const platform of platforms) {
       try {
         if (platform === 'Instagram') {
-          const pages = await fetchMetaPages(account.accessToken);
+          const pages = await fetchMetaPages(metaAccessToken);
           const pageWithIg = pages.find((page) => page.igUserId);
 
           if (!pageWithIg?.igUserId) {
@@ -76,7 +79,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (platform === 'Facebook') {
-          const pages = await fetchMetaPages(account.accessToken);
+          const pages = await fetchMetaPages(metaAccessToken);
           const page = pages[0];
 
           if (!page) {

@@ -18,6 +18,7 @@ import {
   Zap,
 } from 'lucide-react';
 import DashboardChatbot from '@/components/DashboardChatbot';
+import SessionKeeper from '@/components/SessionKeeper';
 import { useAppLanguage } from '@/hooks/use-app-language';
 
 type DashboardUser = {
@@ -418,6 +419,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           onClick={() => setSidebarOpen(false)}
         />
       ) : null}
+      <SessionKeeper />
       <DashboardChatbot />
     </div>
   );

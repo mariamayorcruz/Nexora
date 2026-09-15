@@ -43,6 +43,7 @@ model User {
   leadCaptures      LeadCapture[]
   connectionRequests ConnectionRequest[]
   invoices          Invoice[]
+  roles             UserRole[]
 }
 
 model Subscription {
@@ -409,4 +410,16 @@ model AttributionEvent {
 
   @@index([attributionSessionId, eventTs])
   @@index([eventName, createdAt])
+}
+
+model UserRole {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, role])
+  @@index([role])
+  @@map("user_roles")
 }
