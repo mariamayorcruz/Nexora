@@ -3,6 +3,7 @@ import { isInternalOrTestEmail } from '@/lib/access';
 import { prisma } from '@/lib/prisma';
 import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 import { CRM_ALLOWED_STAGES } from '@/lib/sales-playbook';
+import { notifyNewLeadOnWhatsApp } from '@/lib/whatsapp';
 
 export const dynamic = 'force-dynamic';
 
@@ -91,7 +92,22 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ lead });
+    if (lead.phone) {
+      try {
+        await notifyNewLeadOnWhatsApp({
+          userId,
+          leadId: lead.id,
+          leadName: lead.name,
+          leadPhone: lead.phone,
+        });
+      } catch (whatsappError) {
+        console.error('WhatsApp welcome failed for manual lead', { leadId: lead.id, whatsappError });
+      }
+    }
+
+    const savedLead = await prisma.crmLead.findUnique({ where: { id: lead.id } });
+
+    return NextResponse.json({ lead: savedLead || lead });
   } catch (error) {
     console.error('Error creating CRM lead:', error);
     return NextResponse.json({ error: 'Error creating CRM lead' }, { status: 500 });

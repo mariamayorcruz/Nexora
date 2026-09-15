@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { isAdminEmail, isFounderEmail } from '@/lib/access';
 import { getBearerToken, verifyUserToken } from '@/lib/jwt';
+import { isAdminUser } from '@/lib/roles';
 
-// Middleware to check if user is admin
+// Middleware to check if user is admin (database roles are the source of truth)
 export async function verifyAdmin(request: NextRequest) {
   try {
     const token = getBearerToken(request.headers.get('authorization'));
@@ -24,7 +24,7 @@ export async function verifyAdmin(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const isAdmin = isAdminEmail(user.email) || isFounderEmail(user.email);
+    const isAdmin = await isAdminUser({ id: user.id, email: user.email });
 
     if (!isAdmin) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });

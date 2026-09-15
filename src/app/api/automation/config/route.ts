@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { prisma } from '@/lib/prisma';
 import { getBearerToken, verifyUserToken } from '@/lib/jwt';
+import { encryptSecret, maskSecret } from '@/lib/crypto';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +26,13 @@ const booleanFields = [
   'instagramConnected',
   'automationActive',
 ] as const;
+
+/** Provider credentials are stored encrypted at rest and never returned in clear text. */
+const secretFields = new Set<string>(['whatsappAccessToken', 'metaAdsToken', 'openPhoneApiKey']);
+
+function isMaskedValue(value: string) {
+  return value.startsWith('\u2022');
+}
 
 const aiTones = new Set(['professional', 'casual', 'aggressive']);
 const languages = new Set(['es', 'en', 'both']);
@@ -105,6 +113,12 @@ function sanitizeConfigPayload(body: Record<string, unknown>) {
     if (field in body) {
       const value = normalizeOptionalString(body[field]);
       if (value !== undefined) {
+        if (secretFields.has(field)) {
+          // Ignore the masked placeholder sent back by the UI: it would overwrite the real secret.
+          if (typeof value === 'string' && isMaskedValue(value)) continue;
+          data[field] = encryptSecret(value);
+          continue;
+        }
         data[field] = value;
       }
     }
@@ -143,6 +157,21 @@ function sanitizeConfigPayload(body: Record<string, unknown>) {
   return data;
 }
 
+type StoredConfig = Record<string, unknown> & {
+  whatsappAccessToken?: string | null;
+  metaAdsToken?: string | null;
+  openPhoneApiKey?: string | null;
+};
+
+function toPublicConfig<T extends StoredConfig>(config: T) {
+  return {
+    ...config,
+    whatsappAccessToken: maskSecret(config.whatsappAccessToken),
+    metaAdsToken: maskSecret(config.metaAdsToken),
+    openPhoneApiKey: maskSecret(config.openPhoneApiKey),
+  };
+}
+
 export async function GET(request: Request) {
   const userId = await getAuthenticatedUserId(request);
 
@@ -154,7 +183,7 @@ export async function GET(request: Request) {
     where: { userId },
   });
 
-  return NextResponse.json({ config });
+  return NextResponse.json({ config: config ? toPublicConfig(config) : config });
 }
 
 export async function POST(request: Request) {
@@ -181,5 +210,5 @@ export async function POST(request: Request) {
     update: data,
   });
 
-  return NextResponse.json({ config });
+  return NextResponse.json({ config: toPublicConfig(config) });
 }
