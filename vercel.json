@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/cleanup-incomplete-signups",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/lifecycle",
+      "schedule": "0 13 * * *"
     }
   ]
 }
