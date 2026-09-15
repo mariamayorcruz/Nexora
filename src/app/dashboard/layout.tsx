@@ -183,6 +183,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         badge: conversationCount,
         badgeTone: 'red',
       },
+      { href: '/dashboard/ventas', labelEs: 'Ventas WhatsApp', labelEn: 'WhatsApp Sales', icon: CreditCard },
       { href: '/dashboard/automations', labelEs: 'Automatizaciones', labelEn: 'Automations', icon: Zap },
       { href: '/dashboard/studio', labelEs: 'Studio IA', labelEn: 'AI Studio', icon: Sparkles },
       { href: '/dashboard/calendario', labelEs: 'Calendario', labelEn: 'Calendar', icon: CalendarDays },

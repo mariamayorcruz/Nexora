@@ -44,6 +44,14 @@ model User {
   connectionRequests ConnectionRequest[]
   invoices          Invoice[]
   roles             UserRole[]
+  products          Product[]
+  paymentAccounts   PaymentAccount[]
+  orders            Order[]
+  coupons           Coupon[]
+  waConversations   WaConversation[]
+  lifecycleRules    LifecycleRule[]
+  lifecycleSends    LifecycleSend[]
+  auditLogs         AuditLog[]
 }
 
 model Subscription {
@@ -149,6 +157,15 @@ model CrmLead {
   nextAction      String?
   notes           String?  @db.Text
   lastContactedAt DateTime?
+  birthDate       DateTime?
+  country         String?
+  locale          String?
+  optOut          Boolean  @default(false)
+  lifecyclePausedAt DateTime?
+  conversations   WaConversation[]
+  orders          Order[]
+  coupons         Coupon[]
+  lifecycleSends  LifecycleSend[]
   campaignId      String?
   campaign        Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   createdAt       DateTime @default(now())
@@ -195,6 +212,14 @@ model TenantAutomationConfig {
   followupDays          Int      @default(3) @map("followup_days")
   automationActive      Boolean  @default(false) @map("automation_active")
   n8nWebhookUrl         String?  @map("n8n_webhook_url")
+  country               String   @default("CL")
+  timezone              String   @default("America/Santiago")
+  currency              String   @default("CLP")
+  businessHoursStart    Int      @default(9) @map("business_hours_start")
+  businessHoursEnd      Int      @default(21) @map("business_hours_end")
+  aiAutoReply           Boolean  @default(true) @map("ai_auto_reply")
+  aiCanClose            Boolean  @default(true) @map("ai_can_close")
+  escalationKeywords    String?  @map("escalation_keywords")
   createdAt             DateTime @default(now()) @map("created_at")
   updatedAt             DateTime @updatedAt @map("updated_at")
 
@@ -422,4 +447,174 @@ model UserRole {
   @@unique([userId, role])
   @@index([role])
   @@map("user_roles")
+}
+
+
+model Product {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String?  @db.Text
+  price       Float
+  currency    String   @default("CLP")
+  active      Boolean  @default(true)
+  orders      Order[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, active])
+}
+
+model PaymentAccount {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider    String
+  /// Credenciales cifradas (AES-256-GCM). Nunca se devuelven en claro.
+  credentials Json
+  currency    String   @default("CLP")
+  country     String   @default("CL")
+  connected   Boolean  @default(false)
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, provider])
+  @@index([userId, connected])
+}
+
+model Order {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leadId      String?
+  lead        CrmLead? @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  couponId    String?
+  coupon      Coupon?  @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  provider    String
+  providerRef String?
+  reference   String   @unique
+  amount      Float
+  currency    String   @default("CLP")
+  status      String   @default("pending")
+  paymentUrl  String?  @db.Text
+  paidAt      DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([providerRef])
+}
+
+model Coupon {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leadId       String?
+  lead         CrmLead? @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  code         String   @unique
+  percentOff   Int      @default(10)
+  reason       String   @default("birthday")
+  expiresAt    DateTime
+  redeemedAt   DateTime?
+  orders       Order[]
+  createdAt    DateTime @default(now())
+
+  @@index([userId, reason])
+}
+
+model WaConversation {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leadId        String?
+  lead          CrmLead? @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  phone         String
+  state         String   @default("open")
+  aiPaused      Boolean  @default(false)
+  lastInboundAt DateTime?
+  lastOutboundAt DateTime?
+  messages      WaMessage[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, phone])
+  @@index([userId, state])
+}
+
+model WaMessage {
+  id             String   @id @default(cuid())
+  conversationId String
+  conversation   WaConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  direction      String
+  body           String   @db.Text
+  waMessageId    String?  @unique
+  createdAt      DateTime @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+model LifecycleRule {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// no_purchase | post_purchase | birthday
+  kind            String
+  enabled         Boolean  @default(true)
+  /// Días desde el último contacto antes del primer mensaje.
+  delayDays       Int      @default(3)
+  /// Cada cuántos días se repite después del primero (0 = no repite).
+  intervalDays    Int      @default(30)
+  maxSends        Int      @default(6)
+  template        String   @db.Text
+  discountPercent Int      @default(0)
+  couponValidDays Int      @default(7)
+  sendHour        Int      @default(10)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, kind])
+}
+
+model LifecycleSend {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leadId    String
+  lead      CrmLead  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  kind      String
+  /// Clave de idempotencia: un envío por lead, tipo y día.
+  sentOn    String
+  ok        Boolean  @default(true)
+  error     String?
+  createdAt DateTime @default(now())
+
+  @@unique([leadId, kind, sentOn])
+  @@index([userId, createdAt])
+}
+
+model JobLock {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  lockedUntil DateTime
+  updatedAt   DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  entity    String?
+  entityId  String?
+  ip        String?
+  userAgent String?  @db.Text
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
 }
