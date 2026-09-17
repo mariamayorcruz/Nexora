@@ -55,26 +55,51 @@ export default function SettingsPage() {
   };
 
   useEffect(() => {
-    const fetchIntegrationStatus = async () => {
+    const bootstrap = async () => {
       setLoadingIntegration(true);
       try {
-        // Admin-only endpoint; uses configured flags (no raw secrets). Non-admins get 401/403.
         const token = localStorage.getItem('token');
         if (!token) {
+          setUser(null);
+          setIsAdmin(false);
           setIntegrationStatus(null);
           return;
         }
-        const res = await fetch('/api/admin/settings', {
+
+        const response = await fetch('/api/users/me', {
           headers: { Authorization: `Bearer ${token}` },
           cache: 'no-store',
         });
-        if (!res.ok) {
+        const data = await response.json().catch(() => ({}));
+        const nextUser = data.user || null;
+        const adminAccess = Boolean(nextUser?.isAdmin);
+
+        setUser(nextUser);
+        setIsAdmin(adminAccess);
+        setProfileName(nextUser?.name || '');
+        setOffers(Boolean(nextUser?.marketingOptIn));
+        if (nextUser?.id) loadNotificationPreferences(nextUser.id);
+
+        // Platform settings are admin-only. Normal users must not call /api/admin/settings.
+        if (!adminAccess) {
           setIntegrationStatus(null);
           return;
         }
-        const data = await res.json();
-        const s = data.settings || {};
-        const metaConnected = Boolean(s.metaAppId && String(s.metaAppId).length > 10 && !String(s.metaAppId).includes('example'));
+
+        const settingsRes = await fetch('/api/admin/settings', {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        });
+        if (!settingsRes.ok) {
+          setIntegrationStatus(null);
+          return;
+        }
+
+        const settingsData = await settingsRes.json();
+        const s = settingsData.settings || {};
+        const metaConnected = Boolean(
+          s.metaAppId && String(s.metaAppId).length > 10 && !String(s.metaAppId).includes('example')
+        );
         let aiProvider = '';
         let aiConnected = false;
         if (s.anthropicApiKeyConfigured) {
@@ -87,33 +112,22 @@ export default function SettingsPage() {
           aiProvider = 'Gemini';
           aiConnected = true;
         }
-        setIntegrationStatus({ metaConnected, metaAppId: s.metaAppId || '', aiProvider, aiConnected });
-      } catch {
+        setIntegrationStatus({
+          metaConnected,
+          metaAppId: s.metaAppId || '',
+          aiProvider,
+          aiConnected,
+        });
+      } catch (error) {
+        console.error('Error bootstrapping settings page');
         setIntegrationStatus(null);
       } finally {
+        setLoading(false);
         setLoadingIntegration(false);
       }
     };
 
-    const fetchUser = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const response = await fetch('/api/users/me', { headers: { Authorization: `Bearer ${token}` } });
-        const data = await response.json();
-        setUser(data.user);
-        setIsAdmin(Boolean(data?.user?.isAdmin));
-        setProfileName(data.user?.name || '');
-        setOffers(Boolean(data.user?.marketingOptIn));
-        if (data.user?.id) loadNotificationPreferences(data.user.id);
-      } catch (error) {
-        console.error('Error fetching user:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void fetchIntegrationStatus();
-    void fetchUser();
+    void bootstrap();
   }, []);
 
   const showStatus = (message: string) => {
@@ -300,41 +314,54 @@ export default function SettingsPage() {
         </div>
       )}
 
-      <section className="rounded-[28px] bg-[#040810] p-6">
-        <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Integraciones</p>
-        <h2 className="mt-2 text-[18px] font-semibold tracking-[-0.02em] text-white">Conexiones activas</h2>
-        {loadingIntegration ? (
-          <p className="mt-4 text-sm text-slate-400">Cargando estado de integraciones...</p>
-        ) : !integrationStatus ? (
-          <p className="mt-4 text-sm text-rose-400">No se pudo obtener el estado de las integraciones.</p>
-        ) : (
-          <div className="mt-4 space-y-3">
-            <div className="flex items-center justify-between rounded-[22px] bg-[#030610] px-5 py-4">
-              <div>
-                <p className="text-sm font-medium text-white">Meta (Facebook / Instagram)</p>
-                {isAdmin && integrationStatus.metaAppId && (
-                  <p className="mt-0.5 text-xs text-slate-500">{integrationStatus.metaAppId}</p>
+      {isAdmin ? (
+        <section className="rounded-[28px] bg-[#040810] p-6">
+          <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Integraciones</p>
+          <h2 className="mt-2 text-[18px] font-semibold tracking-[-0.02em] text-white">
+            Configuración de plataforma
+          </h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Estado global de credenciales de plataforma (solo administradores).
+          </p>
+          {loadingIntegration ? (
+            <p className="mt-4 text-sm text-slate-400">Cargando estado de integraciones...</p>
+          ) : !integrationStatus ? (
+            <p className="mt-4 text-sm text-rose-400">No se pudo obtener el estado de las integraciones.</p>
+          ) : (
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center justify-between rounded-[22px] bg-[#030610] px-5 py-4">
+                <div>
+                  <p className="text-sm font-medium text-white">Meta (Facebook / Instagram)</p>
+                  {integrationStatus.metaAppId ? (
+                    <p className="mt-0.5 text-xs text-slate-500">{integrationStatus.metaAppId}</p>
+                  ) : null}
+                </div>
+                {integrationStatus.metaConnected ? (
+                  <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">
+                    Conectado
+                  </span>
+                ) : (
+                  <span className="rounded-full border border-rose-400/20 bg-rose-500/10 px-3 py-1 text-xs font-semibold text-rose-300">
+                    No conectado
+                  </span>
                 )}
               </div>
-              {integrationStatus.metaConnected ? (
-                <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">Conectado</span>
-              ) : (
-                <span className="rounded-full border border-rose-400/20 bg-rose-500/10 px-3 py-1 text-xs font-semibold text-rose-300">No conectado</span>
-              )}
-            </div>
-            {isAdmin && (
               <div className="flex items-center justify-between rounded-[22px] bg-[#030610] px-5 py-4">
                 <p className="text-sm font-medium text-white">Proveedor IA</p>
                 {integrationStatus.aiConnected ? (
-                  <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">{integrationStatus.aiProvider} conectado</span>
+                  <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">
+                    {integrationStatus.aiProvider} conectado
+                  </span>
                 ) : (
-                  <span className="rounded-full border border-rose-400/20 bg-rose-500/10 px-3 py-1 text-xs font-semibold text-rose-300">No conectado</span>
+                  <span className="rounded-full border border-rose-400/20 bg-rose-500/10 px-3 py-1 text-xs font-semibold text-rose-300">
+                    No conectado
+                  </span>
                 )}
               </div>
-            )}
-          </div>
-        )}
-      </section>
+            </div>
+          )}
+        </section>
+      ) : null}
 
       <section className="rounded-[28px] bg-[#040810] p-6">
         <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Perfil</p>
