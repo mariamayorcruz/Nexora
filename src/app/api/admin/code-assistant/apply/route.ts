@@ -3,6 +3,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { verifyAdmin } from '@/lib/admin';
 import {
+  assertSafeWorkspaceMutationPath,
   getAdminCodeApplyDisabledReason,
   isAdminCodeApplyEnabled,
   resolveSafeWorkspacePath,
@@ -17,7 +18,8 @@ type CodeFile = {
 };
 
 async function applyCodeFile(file: CodeFile) {
-  const targetPath = resolveSafeWorkspacePath(file.path);
+  // Filesystem-aware check immediately before each mutation (not lexical-only).
+  const targetPath = await assertSafeWorkspaceMutationPath(file.path);
   if (!targetPath) {
     throw new Error(`Ruta invalida: ${file.path}`);
   }
@@ -84,6 +86,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (body.dryRun) {
+      // Non-destructive: no create/write/delete. Still reject paths already proven unsafe
+      // via realpath (e.g. existing symlink ancestors that escape the workspace).
+      for (const file of sanitized) {
+        const safe = await assertSafeWorkspaceMutationPath(file.path);
+        if (!safe) {
+          return NextResponse.json({ error: `Ruta invalida: ${file.path}` }, { status: 400 });
+        }
+      }
       return NextResponse.json({
         ok: true,
         dryRun: true,
