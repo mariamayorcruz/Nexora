@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import {
+  buildMetaLeadIdNoteMarker,
+  buildMetaLeadN8nPayload,
+  getMetaWebhookAppSecret,
+  verifyMetaWebhookSignature,
+} from '@/lib/meta-webhook-security';
 
 export const dynamic = 'force-dynamic';
 
@@ -103,7 +109,6 @@ async function fetchMetaLeadDetails(leadId: string, accessToken: string): Promis
     console.error('Meta lead details fetch failed', {
       leadId,
       status: response.status,
-      payload,
     });
     return {};
   }
@@ -130,6 +135,23 @@ function mergeLeadDetails(lead: ExtractedMetaLead, details: Partial<ExtractedMet
   };
 }
 
+/**
+ * TEMPORARY: application-level duplicate detection without a schema migration.
+ * Looks for an existing CrmLead for this tenant whose notes contain the Meta lead id marker.
+ * Replace later with a unique externalLeadId column + index.
+ */
+async function findExistingMetaCrmLead(userId: string, metaLeadId: string) {
+  const marker = buildMetaLeadIdNoteMarker(metaLeadId);
+  return prisma.crmLead.findFirst({
+    where: {
+      userId,
+      source: 'meta_lead_ads',
+      notes: { contains: marker },
+    },
+    select: { id: true },
+  });
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const mode = url.searchParams.get('hub.mode');
@@ -148,15 +170,36 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const payload = await request.json();
+    const rawBody = await request.text();
+    const signatureHeader = request.headers.get('x-hub-signature-256');
+    const appSecret = getMetaWebhookAppSecret();
+    const signatureCheck = verifyMetaWebhookSignature({
+      rawBody,
+      signatureHeader,
+      appSecret,
+    });
+
+    if (!signatureCheck.ok) {
+      console.error('Meta lead webhook signature rejected', {
+        reason: signatureCheck.reason,
+      });
+      return NextResponse.json({ error: 'Unauthorized webhook' }, { status: 401 });
+    }
+
+    let payload: unknown;
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
+    }
+
     const extractedLead = extractLeadFromPayload(payload);
     const adAccountId = extractedLead.adAccountId;
 
     if (!extractedLead.leadId || !adAccountId) {
       console.error('Meta lead webhook missing required identifiers', {
-        leadId: extractedLead.leadId,
-        adAccountId,
-        payload,
+        hasLeadId: Boolean(extractedLead.leadId),
+        hasAdAccountId: Boolean(adAccountId),
       });
       return NextResponse.json({ error: 'Missing leadId or adAccountId' }, { status: 400 });
     }
@@ -181,9 +224,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Tenant automation config not found' }, { status: 404 });
     }
 
+    const existingLead = await findExistingMetaCrmLead(config.userId, extractedLead.leadId);
+    if (existingLead) {
+      console.info('Meta lead webhook duplicate suppressed', {
+        userId: config.userId,
+        metaLeadId: extractedLead.leadId,
+        crmLeadId: existingLead.id,
+      });
+      return NextResponse.json({
+        ok: true,
+        duplicate: true,
+        leadId: existingLead.id,
+      });
+    }
+
     const metaDetails = await fetchMetaLeadDetails(extractedLead.leadId, config.metaAdsToken || '');
     const lead = mergeLeadDetails(extractedLead, metaDetails);
     const leadName = lead.name || `Meta Lead ${lead.leadId}`;
+    const metaLeadNoteMarker = buildMetaLeadIdNoteMarker(lead.leadId);
 
     const crmLead = await prisma.crmLead.create({
       data: {
@@ -195,7 +253,7 @@ export async function POST(request: Request) {
         stage: 'lead',
         status: 'nuevo',
         notes: [
-          `Meta Lead ID: ${lead.leadId}`,
+          metaLeadNoteMarker,
           lead.formId ? `Meta Form ID: ${lead.formId}` : null,
           `Meta Ad Account ID: ${adAccountId}`,
         ]
@@ -205,31 +263,34 @@ export async function POST(request: Request) {
     });
 
     if (config.n8nWebhookUrl) {
-      const channel = config.whatsappConnected ? 'whatsapp' : 'openphone';
-
       try {
+        const n8nPayload = buildMetaLeadN8nPayload({
+          userId: config.userId,
+          crmLeadId: crmLead.id,
+          metaLeadId: lead.leadId,
+          metaFormId: lead.formId,
+          metaAdAccountId: adAccountId,
+          leadName,
+          leadPhone: lead.phone,
+          leadEmail: lead.email,
+          businessName: config.businessName,
+          welcomeMessage: config.welcomeMessage,
+          qualificationPrompt: config.qualificationPrompt,
+          aiTone: config.aiTone,
+          language: config.language,
+          hotLeadAction: config.hotLeadAction,
+          warmLeadAction: config.warmLeadAction,
+          coldLeadAction: config.coldLeadAction,
+          whatsappConnected: config.whatsappConnected,
+          openPhoneConnected: config.openPhoneConnected,
+          whatsappPhoneNumberId: config.whatsappPhoneNumberId,
+          openPhoneNumberId: config.openPhoneNumberId,
+        });
+
         const n8nResponse = await fetch(config.n8nWebhookUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: config.userId,
-            leadId: crmLead.id,
-            leadName,
-            leadPhone: lead.phone,
-            leadEmail: lead.email,
-            businessName: config.businessName || '',
-            welcomeMessage: config.welcomeMessage || '',
-            qualificationPrompt: config.qualificationPrompt || '',
-            aiTone: config.aiTone,
-            language: config.language,
-            hotLeadAction: config.hotLeadAction,
-            warmLeadAction: config.warmLeadAction,
-            coldLeadAction: config.coldLeadAction,
-            whatsappPhoneNumberId: config.whatsappPhoneNumberId || '',
-            whatsappAccessToken: config.whatsappAccessToken || '',
-            openPhoneApiKey: config.openPhoneApiKey || '',
-            channel,
-          }),
+          body: JSON.stringify(n8nPayload),
         });
 
         if (!n8nResponse.ok) {
@@ -237,7 +298,6 @@ export async function POST(request: Request) {
             userId: config.userId,
             crmLeadId: crmLead.id,
             metaLeadId: lead.leadId,
-            n8nWebhookUrl: config.n8nWebhookUrl,
             status: n8nResponse.status,
           });
         }
@@ -246,15 +306,16 @@ export async function POST(request: Request) {
           userId: config.userId,
           crmLeadId: crmLead.id,
           metaLeadId: lead.leadId,
-          n8nWebhookUrl: config.n8nWebhookUrl,
-          error: n8nError,
+          error: n8nError instanceof Error ? n8nError.message : 'unknown',
         });
       }
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, leadId: crmLead.id });
   } catch (error) {
-    console.error('Meta lead webhook failed', { error });
+    console.error('Meta lead webhook failed', {
+      error: error instanceof Error ? error.message : 'unknown',
+    });
     return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 });
   }
 }
