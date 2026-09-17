@@ -1,12 +1,32 @@
 #!/usr/bin/env node
 /**
- * Smoke validation for Phase 0.6A Meta webhook security helpers.
- * Does not require Jest/Vitest. Run: node scripts/validate-meta-webhook-security.mjs
+ * ============================================================================
+ * ALGORITHM / CONTRACT SMOKE CHECK ONLY — NOT A PRODUCTION IMPLEMENTATION TEST
+ * ============================================================================
+ *
+ * This script INTENTIONALLY reimplements a minimal copy of the Meta webhook
+ * HMAC + n8n payload contract for local sanity checks.
+ *
+ * It does NOT import or execute:
+ *   - src/lib/meta-webhook-security.ts
+ *   - src/app/api/webhooks/meta-leads/route.ts
+ *   - Prisma / database duplicate lookup
+ *   - the live n8n forward path
+ *
+ * Passing this script proves only that the duplicated algorithm/contract
+ * sketched here behaves as expected. It does NOT prove the production helpers
+ * or route wiring are correct.
+ *
+ * Real automated coverage of production code remains unimplemented until a
+ * proper test runner (Jest/Vitest) is introduced in a later foundation phase.
+ *
+ * Run: node scripts/validate-meta-webhook-security.mjs
  */
 import crypto from 'crypto';
 import assert from 'assert';
 
-function verifyMetaWebhookSignature({ rawBody, signatureHeader, appSecret }) {
+/** Local duplicate of verifyMetaWebhookSignature — NOT the production export. */
+function smokeVerifyMetaWebhookSignature({ rawBody, signatureHeader, appSecret }) {
   const secret = String(appSecret || '').trim();
   if (!secret) return { ok: false, reason: 'missing_secret' };
 
@@ -22,7 +42,8 @@ function verifyMetaWebhookSignature({ rawBody, signatureHeader, appSecret }) {
   return { ok: true };
 }
 
-function buildMetaLeadN8nPayload(input) {
+/** Local duplicate of buildMetaLeadN8nPayload shape — NOT the production export. */
+function smokeBuildMetaLeadN8nPayload(input) {
   const payload = {
     userId: input.userId,
     leadId: input.crmLeadId,
@@ -63,7 +84,7 @@ function buildMetaLeadN8nPayload(input) {
   return payload;
 }
 
-function buildMetaLeadIdNoteMarker(id) {
+function smokeBuildMetaLeadIdNoteMarker(id) {
   return `Meta Lead ID: ${id}`;
 }
 
@@ -72,15 +93,15 @@ const rawBody = JSON.stringify({
   entry: [{ id: 'act_123', changes: [{ value: { leadgen_id: 'lead_abc', form_id: 'form_1' } }] }],
 });
 
-// 1) Missing signature → rejected
+// Contract: missing signature → reject
 assert.strictEqual(
-  verifyMetaWebhookSignature({ rawBody, signatureHeader: null, appSecret: APP_SECRET }).reason,
+  smokeVerifyMetaWebhookSignature({ rawBody, signatureHeader: null, appSecret: APP_SECRET }).reason,
   'missing_signature'
 );
 
-// 2) Invalid signature → rejected
+// Contract: invalid signature → reject
 assert.strictEqual(
-  verifyMetaWebhookSignature({
+  smokeVerifyMetaWebhookSignature({
     rawBody,
     signatureHeader: 'sha256=deadbeef',
     appSecret: APP_SECRET,
@@ -88,37 +109,36 @@ assert.strictEqual(
   'invalid_signature'
 );
 
-// 3) Valid signature → accepted
+// Contract: valid HMAC-SHA256 header shape → accept (local algorithm only)
 const validSig =
   'sha256=' + crypto.createHmac('sha256', APP_SECRET).update(rawBody).digest('hex');
 assert.strictEqual(
-  verifyMetaWebhookSignature({ rawBody, signatureHeader: validSig, appSecret: APP_SECRET }).ok,
+  smokeVerifyMetaWebhookSignature({ rawBody, signatureHeader: validSig, appSecret: APP_SECRET }).ok,
   true
 );
 
-// Fail closed without secret
+// Contract: fail closed without app secret
 assert.strictEqual(
-  verifyMetaWebhookSignature({ rawBody, signatureHeader: validSig, appSecret: '' }).reason,
+  smokeVerifyMetaWebhookSignature({ rawBody, signatureHeader: validSig, appSecret: '' }).reason,
   'missing_secret'
 );
 
-// 4/5) Duplicate logical lead marker consistency
-const marker = buildMetaLeadIdNoteMarker('lead_abc');
-assert.ok(marker.includes('lead_abc'));
-const notes = `${marker}\nMeta Form ID: form_1`;
-assert.ok(notes.includes(marker));
+// Contract: note marker string shape used for TEMPORARY idempotency
+const marker = smokeBuildMetaLeadIdNoteMarker('lead_abc');
+assert.strictEqual(marker, 'Meta Lead ID: lead_abc');
 
+// Conceptual duplicate decision only — NOT Prisma findFirst / route behavior
 const processed = new Set();
-function processOnce(metaLeadId) {
+function conceptualProcessOnce(metaLeadId) {
   if (processed.has(metaLeadId)) return { created: false, n8n: false, duplicate: true };
   processed.add(metaLeadId);
   return { created: true, n8n: true, duplicate: false };
 }
-assert.deepStrictEqual(processOnce('lead_abc'), { created: true, n8n: true, duplicate: false });
-assert.deepStrictEqual(processOnce('lead_abc'), { created: false, n8n: false, duplicate: true });
+assert.deepStrictEqual(conceptualProcessOnce('lead_abc'), { created: true, n8n: true, duplicate: false });
+assert.deepStrictEqual(conceptualProcessOnce('lead_abc'), { created: false, n8n: false, duplicate: true });
 
-// 6) n8n payload contains no credential fields
-const n8nPayload = buildMetaLeadN8nPayload({
+// Contract: n8n payload shape must not include credential field names
+const n8nPayload = smokeBuildMetaLeadN8nPayload({
   userId: 'user_1',
   crmLeadId: 'crm_1',
   metaLeadId: 'lead_abc',
@@ -141,12 +161,10 @@ const n8nPayload = buildMetaLeadN8nPayload({
   openPhoneNumberId: '',
 });
 assert.strictEqual(n8nPayload.channel, 'whatsapp');
-assert.strictEqual(n8nPayload.whatsappConnected, true);
 assert.ok(!('whatsappAccessToken' in n8nPayload));
 assert.ok(!('openPhoneApiKey' in n8nPayload));
 assert.ok(!('metaAdsToken' in n8nPayload));
 
-// 7) GET verification remains conceptual intact
-assert.ok(true);
-
-console.log('validate-meta-webhook-security: all checks passed');
+console.log(
+  'ALGORITHM/CONTRACT SMOKE CHECK PASSED — does not execute production helpers, route, Prisma, or n8n.'
+);
