@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 import { resolveMetaClientId } from '@/lib/meta-ads';
+import { getOAuthStateSecret, signOAuthState } from '@/lib/oauth-state';
 import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
@@ -9,10 +10,6 @@ export const dynamic = 'force-dynamic';
 type Platform = 'instagram' | 'facebook' | 'google' | 'tiktok';
 
 const ALLOWED_PLATFORMS = new Set<Platform>(['instagram', 'facebook', 'google', 'tiktok']);
-
-function encodeState(payload: Record<string, string>) {
-  return Buffer.from(JSON.stringify(payload), 'utf-8').toString('base64url');
-}
 
 function isConfiguredValue(value: string | undefined) {
   const normalized = String(value || '').trim();
@@ -91,9 +88,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Plataforma invalida para OAuth.' }, { status: 400 });
     }
 
+    if (!getOAuthStateSecret()) {
+      return NextResponse.json(
+        { error: 'Falta OAUTH_STATE_SECRET en el servidor.' },
+        { status: 500 }
+      );
+    }
+
     const callbackBaseUrl = resolveCallbackBaseUrl(request);
     const redirectUri = `${callbackBaseUrl}/api/connect/oauth/callback`;
-    const state = encodeState({
+    const state = signOAuthState({
       userId,
       platform,
       nonce: randomUUID(),

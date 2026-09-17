@@ -6,6 +6,11 @@ import {
   getMetaWebhookAppSecret,
   verifyMetaWebhookSignature,
 } from '@/lib/meta-webhook-security';
+import {
+  metaAdAccountIdLookupValues,
+  normalizeMetaAdAccountId,
+  resolveUniqueMetaTenantFromCandidates,
+} from '@/lib/meta-tenant-resolve';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,12 +54,6 @@ function collectFieldData(value: Record<string, unknown>) {
   const candidates = [value.field_data, value.fieldData, value.fields];
   const fieldData = candidates.find(Array.isArray) as MetaFieldData[] | undefined;
   return fieldData || [];
-}
-
-function normalizeAdAccountId(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return '';
-  return trimmed.startsWith('act_') ? trimmed : `act_${trimmed}`;
 }
 
 function extractLeadFromPayload(payload: unknown): ExtractedMetaLead {
@@ -204,22 +203,61 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing leadId or adAccountId' }, { status: 400 });
     }
 
-    const normalizedAdAccountId = normalizeAdAccountId(adAccountId);
-    const config = await prisma.tenantAutomationConfig.findFirst({
+    const normalizedAdAccountId = normalizeMetaAdAccountId(adAccountId);
+    const lookupValues = metaAdAccountIdLookupValues(adAccountId);
+
+    const candidateConfigs = await prisma.tenantAutomationConfig.findMany({
       where: {
-        OR: [
-          { metaAdsAccountId: adAccountId },
-          { metaAdsAccountId: normalizedAdAccountId },
-          { metaAdsAccountId: adAccountId.replace(/^act_/, '') },
-        ],
+        metaAdsAccountId: { in: lookupValues },
+      },
+      select: {
+        id: true,
+        userId: true,
+        metaAdsAccountId: true,
+        metaAdsToken: true,
+        n8nWebhookUrl: true,
+        businessName: true,
+        welcomeMessage: true,
+        qualificationPrompt: true,
+        aiTone: true,
+        language: true,
+        hotLeadAction: true,
+        warmLeadAction: true,
+        coldLeadAction: true,
+        whatsappConnected: true,
+        openPhoneConnected: true,
+        whatsappPhoneNumberId: true,
+        openPhoneNumberId: true,
       },
     });
 
-    if (!config) {
+    const resolved = resolveUniqueMetaTenantFromCandidates(candidateConfigs, adAccountId);
+
+    if (resolved.status === 'not_found') {
       console.error('Meta lead webhook tenant config not found', {
         leadId: extractedLead.leadId,
-        adAccountId,
         normalizedAdAccountId,
+        candidateCount: candidateConfigs.length,
+      });
+      return NextResponse.json({ error: 'Tenant automation config not found' }, { status: 404 });
+    }
+
+    if (resolved.status === 'ambiguous') {
+      console.error('Meta lead webhook tenant resolution ambiguous — fail closed', {
+        leadId: extractedLead.leadId,
+        normalizedAdAccountId,
+        matchCount: resolved.matchCount,
+        configIds: resolved.configIds,
+      });
+      return NextResponse.json({ error: 'Ambiguous tenant configuration' }, { status: 409 });
+    }
+
+    const config = candidateConfigs.find((entry) => entry.id === resolved.config.id);
+    if (!config) {
+      console.error('Meta lead webhook tenant config missing after resolve', {
+        leadId: extractedLead.leadId,
+        normalizedAdAccountId,
+        configId: resolved.config.id,
       });
       return NextResponse.json({ error: 'Tenant automation config not found' }, { status: 404 });
     }
