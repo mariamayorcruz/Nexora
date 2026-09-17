@@ -58,15 +58,35 @@ export default function SettingsPage() {
     const fetchIntegrationStatus = async () => {
       setLoadingIntegration(true);
       try {
-        const res = await fetch('/api/admin/settings');
+        // Admin-only endpoint; uses configured flags (no raw secrets). Non-admins get 401/403.
+        const token = localStorage.getItem('token');
+        if (!token) {
+          setIntegrationStatus(null);
+          return;
+        }
+        const res = await fetch('/api/admin/settings', {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        });
+        if (!res.ok) {
+          setIntegrationStatus(null);
+          return;
+        }
         const data = await res.json();
         const s = data.settings || {};
-        const metaConnected = Boolean(s.metaAppId && s.metaAppId.length > 10 && !s.metaAppId.includes('example'));
+        const metaConnected = Boolean(s.metaAppId && String(s.metaAppId).length > 10 && !String(s.metaAppId).includes('example'));
         let aiProvider = '';
         let aiConnected = false;
-        if (s.anthropicApiKey && s.anthropicApiKey.length > 10) { aiProvider = 'Claude (Anthropic)'; aiConnected = true; }
-        else if (s.openRouterApiKey && s.openRouterApiKey.length > 10) { aiProvider = 'OpenRouter'; aiConnected = true; }
-        else if (s.geminiApiKey && s.geminiApiKey.length > 10) { aiProvider = 'Gemini'; aiConnected = true; }
+        if (s.anthropicApiKeyConfigured) {
+          aiProvider = 'Claude (Anthropic)';
+          aiConnected = true;
+        } else if (s.openRouterApiKeyConfigured) {
+          aiProvider = 'OpenRouter';
+          aiConnected = true;
+        } else if (s.geminiApiKeyConfigured) {
+          aiProvider = 'Gemini';
+          aiConnected = true;
+        }
         setIntegrationStatus({ metaConnected, metaAppId: s.metaAppId || '', aiProvider, aiConnected });
       } catch {
         setIntegrationStatus(null);

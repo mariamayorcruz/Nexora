@@ -13,6 +13,13 @@ type PlatformSettings = {
   termsUrl: string;
   privacyUrl: string;
   metaAppId: string;
+  metaAppSecretConfigured: boolean;
+  anthropicApiKeyConfigured: boolean;
+  openRouterApiKeyConfigured: boolean;
+  geminiApiKeyConfigured: boolean;
+};
+
+type SecretDrafts = {
   metaAppSecret: string;
   anthropicApiKey: string;
   openRouterApiKey: string;
@@ -26,8 +33,54 @@ type PaymentSettings = {
   minimumPayout: number;
 };
 
+const EMPTY_SECRET_DRAFTS: SecretDrafts = {
+  metaAppSecret: '',
+  anthropicApiKey: '',
+  openRouterApiKey: '',
+  geminiApiKey: '',
+};
+
+function SecretField({
+  label,
+  configured,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  configured: boolean;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 flex items-center justify-between gap-2 text-slate-400">
+        <span>{label}</span>
+        <span className={`text-[11px] uppercase tracking-wide ${configured ? 'text-emerald-400' : 'text-slate-500'}`}>
+          {configured ? 'Configured' : 'Not configured'}
+        </span>
+      </span>
+      <input
+        type="password"
+        autoComplete="new-password"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200"
+        placeholder={configured ? 'Leave blank to keep existing credential' : placeholder}
+      />
+      {configured ? (
+        <span className="mt-1 block text-[11px] text-slate-500">
+          Leaving this blank keeps the current credential. Enter a new value only to replace it.
+        </span>
+      ) : null}
+    </label>
+  );
+}
+
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<PlatformSettings | null>(null);
+  const [secretDrafts, setSecretDrafts] = useState<SecretDrafts>(EMPTY_SECRET_DRAFTS);
   const [payments, setPayments] = useState<PaymentSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -45,9 +98,10 @@ export default function AdminSettingsPage() {
         const settingsData = await settingsResponse.json();
         const paymentsData = await paymentsResponse.json();
         setSettings(settingsData.settings);
+        setSecretDrafts(EMPTY_SECRET_DRAFTS);
         setPayments(paymentsData.settings);
       } catch (error) {
-        console.error('Error loading admin settings:', error);
+        console.error('Error loading admin settings');
       } finally {
         setLoading(false);
       }
@@ -63,11 +117,29 @@ export default function AdminSettingsPage() {
 
     try {
       const token = localStorage.getItem('token');
+      const settingsPayload: Record<string, unknown> = {
+        maintenanceMode: settings.maintenanceMode,
+        allowNewRegistrations: settings.allowNewRegistrations,
+        defaultSubscriptionPrice: settings.defaultSubscriptionPrice,
+        supportEmail: settings.supportEmail,
+        platformName: settings.platformName,
+        platformDescription: settings.platformDescription,
+        termsUrl: settings.termsUrl,
+        privacyUrl: settings.privacyUrl,
+        metaAppId: settings.metaAppId,
+      };
+
+      // Only send secret fields when the admin typed a replacement value
+      if (secretDrafts.metaAppSecret.trim()) settingsPayload.metaAppSecret = secretDrafts.metaAppSecret.trim();
+      if (secretDrafts.anthropicApiKey.trim()) settingsPayload.anthropicApiKey = secretDrafts.anthropicApiKey.trim();
+      if (secretDrafts.openRouterApiKey.trim()) settingsPayload.openRouterApiKey = secretDrafts.openRouterApiKey.trim();
+      if (secretDrafts.geminiApiKey.trim()) settingsPayload.geminiApiKey = secretDrafts.geminiApiKey.trim();
+
       const [settingsResponse, paymentsResponse] = await Promise.all([
         fetch('/api/admin/settings', {
           method: 'PUT',
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ settings }),
+          body: JSON.stringify({ settings: settingsPayload }),
         }),
         fetch('/api/admin/payment-settings', {
           method: 'PUT',
@@ -80,9 +152,14 @@ export default function AdminSettingsPage() {
         throw new Error('No se pudo guardar la configuración consolidada.');
       }
 
+      const savedSettings = await settingsResponse.json();
+      if (savedSettings.settings) {
+        setSettings(savedSettings.settings);
+      }
+      setSecretDrafts(EMPTY_SECRET_DRAFTS);
       setMessage('Configuración guardada correctamente.');
     } catch (error) {
-      console.error('Error saving admin settings:', error);
+      console.error('Error saving admin settings');
       setMessage('No se pudo guardar la configuración.');
     } finally {
       setSaving(false);
@@ -188,7 +265,7 @@ export default function AdminSettingsPage() {
             <h2 className="font-semibold text-white">Integraciones (desde la web)</h2>
           </div>
           <p className="mt-2 text-xs text-slate-400">
-            Configura aquí Meta OAuth y proveedores IA para que todo funcione desde Nexora sin editar variables en código.
+            Configura aquí Meta OAuth y proveedores IA. Los secretos existentes no se muestran; deja el campo vacío para conservarlos.
           </p>
 
           <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -202,49 +279,39 @@ export default function AdminSettingsPage() {
               />
             </label>
 
-            <label className="block">
-              <span className="mb-2 block text-slate-400">Meta App Secret</span>
-              <input
-                type="password"
-                value={settings.metaAppSecret || ''}
-                onChange={(e) => setSettings({ ...settings, metaAppSecret: e.target.value })}
-                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200"
-                placeholder="Meta app secret"
-              />
-            </label>
+            <SecretField
+              label="Meta App Secret"
+              configured={Boolean(settings.metaAppSecretConfigured)}
+              value={secretDrafts.metaAppSecret}
+              onChange={(value) => setSecretDrafts({ ...secretDrafts, metaAppSecret: value })}
+              placeholder="Meta app secret"
+            />
 
-            <label className="block">
-              <span className="mb-2 block text-slate-400">Claude (Anthropic) API Key</span>
-              <input
-                type="password"
-                value={settings.anthropicApiKey || ''}
-                onChange={(e) => setSettings({ ...settings, anthropicApiKey: e.target.value })}
-                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200"
-                placeholder="sk-ant-..."
-              />
-            </label>
+            <SecretField
+              label="Claude (Anthropic) API Key"
+              configured={Boolean(settings.anthropicApiKeyConfigured)}
+              value={secretDrafts.anthropicApiKey}
+              onChange={(value) => setSecretDrafts({ ...secretDrafts, anthropicApiKey: value })}
+              placeholder="sk-ant-..."
+            />
 
-            <label className="block">
-              <span className="mb-2 block text-slate-400">OpenRouter API Key</span>
-              <input
-                type="password"
-                value={settings.openRouterApiKey || ''}
-                onChange={(e) => setSettings({ ...settings, openRouterApiKey: e.target.value })}
-                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200"
-                placeholder="sk-or-..."
-              />
-            </label>
+            <SecretField
+              label="OpenRouter API Key"
+              configured={Boolean(settings.openRouterApiKeyConfigured)}
+              value={secretDrafts.openRouterApiKey}
+              onChange={(value) => setSecretDrafts({ ...secretDrafts, openRouterApiKey: value })}
+              placeholder="sk-or-..."
+            />
 
-            <label className="block md:col-span-2">
-              <span className="mb-2 block text-slate-400">Gemini API Key</span>
-              <input
-                type="password"
-                value={settings.geminiApiKey || ''}
-                onChange={(e) => setSettings({ ...settings, geminiApiKey: e.target.value })}
-                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200"
+            <div className="md:col-span-2">
+              <SecretField
+                label="Gemini API Key"
+                configured={Boolean(settings.geminiApiKeyConfigured)}
+                value={secretDrafts.geminiApiKey}
+                onChange={(value) => setSecretDrafts({ ...secretDrafts, geminiApiKey: value })}
                 placeholder="AIza..."
               />
-            </label>
+            </div>
           </div>
         </div>
       </section>
