@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
 import { verifyAdmin } from '@/lib/admin';
+import {
+  assertSafeWorkspaceMutationPath,
+  getAdminCodeApplyDisabledReason,
+  isAdminCodeApplyEnabled,
+  resolveSafeWorkspacePath,
+} from '@/lib/admin-code-apply';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,18 +17,9 @@ type CodeFile = {
   code: string;
 };
 
-function resolveSafePath(relativePath: string) {
-  const root = process.cwd();
-  const cleaned = relativePath.replace(/^[\\/]+/, '').replace(/\.{2,}/g, '.');
-  const absolute = path.resolve(root, cleaned);
-  if (!absolute.startsWith(root)) {
-    return null;
-  }
-  return absolute;
-}
-
 async function applyCodeFile(file: CodeFile) {
-  const targetPath = resolveSafePath(file.path);
+  // Filesystem-aware check immediately before each mutation (not lexical-only).
+  const targetPath = await assertSafeWorkspaceMutationPath(file.path);
   if (!targetPath) {
     throw new Error(`Ruta invalida: ${file.path}`);
   }
@@ -35,6 +32,20 @@ async function applyCodeFile(file: CodeFile) {
   const dir = path.dirname(targetPath);
   await fs.mkdir(dir, { recursive: true });
   await fs.writeFile(targetPath, file.code || '', 'utf8');
+}
+
+export async function GET(request: NextRequest) {
+  const adminCheck = await verifyAdmin(request);
+  if (adminCheck instanceof NextResponse) return adminCheck;
+
+  const enabled = isAdminCodeApplyEnabled();
+  return NextResponse.json({
+    applyEnabled: enabled,
+    dryRunAllowed: true,
+    reason: enabled
+      ? 'Code apply enabled for non-production admin use.'
+      : getAdminCodeApplyDisabledReason(),
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -57,7 +68,10 @@ export async function POST(request: NextRequest) {
       .slice(0, 20)
       .map((file) => ({
         path: String(file.path).trim(),
-        action: file.action === 'create' || file.action === 'modify' || file.action === 'delete' ? file.action : 'modify',
+        action:
+          file.action === 'create' || file.action === 'modify' || file.action === 'delete'
+            ? file.action
+            : 'modify',
         code: typeof file.code === 'string' ? file.code : '',
       }));
 
@@ -65,12 +79,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No hay archivos validos para aplicar.' }, { status: 400 });
     }
 
+    for (const file of sanitized) {
+      if (!resolveSafeWorkspacePath(file.path)) {
+        return NextResponse.json({ error: `Ruta invalida: ${file.path}` }, { status: 400 });
+      }
+    }
+
     if (body.dryRun) {
+      // Non-destructive: no create/write/delete. Still reject paths already proven unsafe
+      // via realpath (e.g. existing symlink ancestors that escape the workspace).
+      for (const file of sanitized) {
+        const safe = await assertSafeWorkspaceMutationPath(file.path);
+        if (!safe) {
+          return NextResponse.json({ error: `Ruta invalida: ${file.path}` }, { status: 400 });
+        }
+      }
       return NextResponse.json({
         ok: true,
         dryRun: true,
+        applyEnabled: isAdminCodeApplyEnabled(),
         files: sanitized.map((file) => ({ path: file.path, action: file.action })),
       });
+    }
+
+    if (!isAdminCodeApplyEnabled()) {
+      return NextResponse.json(
+        {
+          error: getAdminCodeApplyDisabledReason(),
+          applyEnabled: false,
+        },
+        { status: 403 }
+      );
     }
 
     for (const file of sanitized) {
@@ -83,7 +122,7 @@ export async function POST(request: NextRequest) {
       files: sanitized.map((file) => ({ path: file.path, action: file.action })),
     });
   } catch (error) {
-    console.error('Admin code apply error:', error);
+    console.error('Admin code apply error:', error instanceof Error ? error.message : 'unknown');
     return NextResponse.json({ error: 'No se pudieron aplicar los cambios.' }, { status: 500 });
   }
 }

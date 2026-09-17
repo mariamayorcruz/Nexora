@@ -51,6 +51,7 @@ interface ApplyResponse {
   ok?: boolean;
   dryRun?: boolean;
   applied?: number;
+  applyEnabled?: boolean;
   files?: Array<{ path: string; action: 'create' | 'modify' | 'delete' }>;
   error?: string;
 }
@@ -84,6 +85,10 @@ export default function AdminCodeAssistantPage() {
   const [applying, setApplying] = useState(false);
   const [applyMessage, setApplyMessage] = useState('');
   const [applyError, setApplyError] = useState('');
+  const [applyEnabled, setApplyEnabled] = useState(false);
+  const [applyStatusReason, setApplyStatusReason] = useState(
+    'Checking whether filesystem apply is enabled in this environment...'
+  );
   const resultRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -99,20 +104,43 @@ export default function AdminCodeAssistantPage() {
   }, []);
 
   useEffect(() => {
-    const fetchTemplates = async () => {
+    const fetchTemplatesAndApplyStatus = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch('/api/admin/code-assistant/templates', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!response.ok) return;
-        const data = await response.json();
-        setTemplates(Array.isArray(data.templates) ? data.templates : []);
+        const headers = { Authorization: `Bearer ${token}` };
+        const [templatesResponse, applyStatusResponse] = await Promise.all([
+          fetch('/api/admin/code-assistant/templates', { headers }),
+          fetch('/api/admin/code-assistant/apply', { headers, cache: 'no-store' }),
+        ]);
+
+        if (templatesResponse.ok) {
+          const data = await templatesResponse.json();
+          setTemplates(Array.isArray(data.templates) ? data.templates : []);
+        }
+
+        if (applyStatusResponse.ok) {
+          const status = (await applyStatusResponse.json()) as {
+            applyEnabled?: boolean;
+            reason?: string;
+          };
+          setApplyEnabled(Boolean(status.applyEnabled));
+          setApplyStatusReason(
+            status.reason ||
+              (status.applyEnabled
+                ? 'Code apply enabled for this non-production environment.'
+                : 'Code apply is disabled in this environment.')
+          );
+        } else {
+          setApplyEnabled(false);
+          setApplyStatusReason('Code apply status unavailable; destructive apply remains disabled.');
+        }
       } catch {
         setTemplates([]);
+        setApplyEnabled(false);
+        setApplyStatusReason('Code apply status unavailable; destructive apply remains disabled.');
       }
     };
-    void fetchTemplates();
+    void fetchTemplatesAndApplyStatus();
   }, []);
 
   const persistHistory = (entries: HistoryEntry[]) => {
@@ -182,6 +210,11 @@ export default function AdminCodeAssistantPage() {
 
   const handleApplyCodeFiles = async (dryRun: boolean) => {
     if (!result?.codeFiles?.length) {
+      return;
+    }
+
+    if (!dryRun && !applyEnabled) {
+      setApplyError(applyStatusReason || 'Code apply is disabled in this environment.');
       return;
     }
 
@@ -442,21 +475,29 @@ export default function AdminCodeAssistantPage() {
                       <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Archivos de codigo</p>
                       <p className="mt-1 text-xs text-slate-500">Selecciona un archivo para ver el codigo y copiarlo o aplicarlo directo.</p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => void handleApplyCodeFiles(true)}
-                        disabled={applying}
-                        className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {applying ? 'Procesando...' : 'Dry Run'}
-                      </button>
-                      <button
-                        onClick={() => void handleApplyCodeFiles(false)}
-                        disabled={applying}
-                        className="rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {applying ? 'Aplicando...' : 'Aplicar Cambios'}
-                      </button>
+                    <div className="flex flex-col items-end gap-2">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => void handleApplyCodeFiles(true)}
+                          disabled={applying}
+                          className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {applying ? 'Procesando...' : 'Dry Run'}
+                        </button>
+                        <button
+                          onClick={() => void handleApplyCodeFiles(false)}
+                          disabled={applying || !applyEnabled}
+                          title={applyEnabled ? 'Apply generated files to the workspace' : applyStatusReason}
+                          className="rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {applying ? 'Aplicando...' : 'Aplicar Cambios'}
+                        </button>
+                      </div>
+                      {!applyEnabled ? (
+                        <p className="max-w-sm text-right text-[11px] leading-4 text-amber-700">
+                          {applyStatusReason}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
 
