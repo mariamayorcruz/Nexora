@@ -43,6 +43,56 @@ model User {
   leadCaptures      LeadCapture[]
   connectionRequests ConnectionRequest[]
   invoices          Invoice[]
+  /// Point 7 Slice 0: User is human identity; tenant boundary moves toward Organization via Membership.
+  memberships       Membership[]
+}
+
+/// Point 7 Slice 0 foundation: canonical future tenant boundary.
+/// Existing business tables still use userId ownership until later slices.
+/// Runtime organization-scoped authorization is NOT enforced yet.
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  REMOVED
+}
+
+model Organization {
+  id          String             @id @default(cuid())
+  name        String
+  slug        String             @unique
+  status      OrganizationStatus @default(ACTIVE)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  memberships Membership[]
+}
+
+model Membership {
+  id             String           @id @default(cuid())
+  organizationId String
+  userId         String
+  role           MembershipRole   @default(MEMBER)
+  status         MembershipStatus @default(ACTIVE)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId, status])
+  @@index([organizationId, status])
 }
 
 model Subscription {

@@ -13,7 +13,9 @@
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:seed": "node prisma/seed.js"
+    "db:seed": "node prisma/seed.js",
+    "tenancy:backfill-legacy-orgs": "tsx scripts/backfill-legacy-organizations.ts",
+    "tenancy:validate-legacy-orgs": "tsx scripts/validate-legacy-organization-backfill.ts"
   },
   "dependencies": {
     "@fal-ai/client": "^1.10.0",
