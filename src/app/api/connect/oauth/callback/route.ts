@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  clearConnectOAuthNonceCookie,
+  CONNECT_OAUTH_NONCE_COOKIE,
+  verifyConnectOAuthBrowserCorrelation,
+} from '@/lib/connect-oauth-correlation';
 import { prisma } from '@/lib/prisma';
 import { exchangeMetaCodeForToken, fetchMetaAdAccounts, resolveMetaClientId, resolveMetaClientSecret } from '@/lib/meta-ads';
+import { verifyOAuthState } from '@/lib/oauth-state';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,33 +19,48 @@ type OAuthState = {
   ts: string;
 };
 
-function decodeState(stateValue: string | null): OAuthState | null {
-  if (!stateValue) {
+const ALLOWED_PLATFORMS = new Set<Platform>(['instagram', 'facebook', 'google', 'tiktok']);
+
+function decodeConnectOAuthState(stateValue: string | null): OAuthState | null {
+  const verified = verifyOAuthState<OAuthState>(stateValue, {
+    requiredFields: ['userId', 'platform', 'nonce', 'ts'],
+  });
+
+  if (!verified.ok) {
+    console.error('Connect OAuth state rejected', { reason: verified.reason });
     return null;
   }
 
-  try {
-    const raw = Buffer.from(stateValue, 'base64url').toString('utf-8');
-    const parsed = JSON.parse(raw) as Partial<OAuthState>;
-
-    if (!parsed.userId || !parsed.platform || !parsed.nonce || !parsed.ts) {
-      return null;
-    }
-
-    if (!['instagram', 'facebook', 'google', 'tiktok'].includes(parsed.platform)) {
-      return null;
-    }
-
-    return parsed as OAuthState;
-  } catch {
+  const platform = String(verified.payload.platform || '').trim().toLowerCase() as Platform;
+  if (!ALLOWED_PLATFORMS.has(platform)) {
+    console.error('Connect OAuth state rejected', { reason: 'unsupported_platform' });
     return null;
   }
+
+  return {
+    userId: verified.payload.userId,
+    platform,
+    nonce: verified.payload.nonce,
+    ts: verified.payload.ts,
+  };
 }
 
 function buildRedirect(request: NextRequest, params: Record<string, string>) {
   const url = new URL('/dashboard/connect', request.nextUrl.origin);
   Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
   return NextResponse.redirect(url);
+}
+
+function invalidStateRedirect(request: NextRequest) {
+  const response = buildRedirect(request, { oauth: 'error', reason: 'invalid_state' });
+  clearConnectOAuthNonceCookie(response);
+  return response;
+}
+
+function redirectWithClearedNonce(request: NextRequest, params: Record<string, string>) {
+  const response = buildRedirect(request, params);
+  clearConnectOAuthNonceCookie(response);
+  return response;
 }
 
 function normalizeBaseUrl(value: string | undefined) {
@@ -70,10 +91,23 @@ async function resolveMetaCredentialsFromWorkspace() {
 }
 
 export async function GET(request: NextRequest) {
-  const state = decodeState(request.nextUrl.searchParams.get('state'));
+  const state = decodeConnectOAuthState(request.nextUrl.searchParams.get('state'));
   if (!state) {
-    return buildRedirect(request, { oauth: 'error', reason: 'invalid_state' });
+    return invalidStateRedirect(request);
   }
+
+  const correlation = verifyConnectOAuthBrowserCorrelation({
+    stateNonce: state.nonce,
+    cookieNonce: request.cookies.get(CONNECT_OAUTH_NONCE_COOKIE)?.value,
+  });
+
+  if (!correlation.ok) {
+    console.error('Connect OAuth browser correlation rejected', { reason: correlation.reason });
+    return invalidStateRedirect(request);
+  }
+
+  // Consume correlation immediately so the signed state cannot be replayed.
+  // All subsequent redirects clear the cookie.
 
   const error = request.nextUrl.searchParams.get('error');
   const code = request.nextUrl.searchParams.get('code');
@@ -90,7 +124,7 @@ export async function GET(request: NextRequest) {
         },
       });
 
-      return buildRedirect(request, {
+      return redirectWithClearedNonce(request, {
         oauth: 'error',
         platform: state.platform,
         reason: error || 'missing_code',
@@ -113,7 +147,7 @@ export async function GET(request: NextRequest) {
           },
         });
 
-        return buildRedirect(request, {
+        return redirectWithClearedNonce(request, {
           oauth: 'error',
           platform: state.platform,
           reason: 'meta_config_missing',
@@ -172,7 +206,7 @@ export async function GET(request: NextRequest) {
         },
       });
 
-      return buildRedirect(request, {
+      return redirectWithClearedNonce(request, {
         oauth: 'success',
         platform: state.platform,
       });
@@ -209,13 +243,13 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return buildRedirect(request, {
+    return redirectWithClearedNonce(request, {
       oauth: 'success',
       platform: state.platform,
     });
   } catch (dbError) {
-    console.error('OAuth callback error:', dbError);
-    return buildRedirect(request, {
+    console.error('OAuth callback error:', dbError instanceof Error ? dbError.message : 'unknown');
+    return redirectWithClearedNonce(request, {
       oauth: 'error',
       platform: state.platform,
       reason: 'callback_failed',
