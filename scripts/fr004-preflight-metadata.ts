@@ -2,26 +2,26 @@
 /**
  * FR-004 read-only metadata preflight (structure + migration inventory).
  *
- * Default: disposable/local URLs only.
- * Optional: --allow-hosted-readonly for a future least-privilege production
- * metadata inspection (still SELECT-only; no DDL/DML).
+ * Default: disposable/local URLs only (FR004_DATABASE_URL or DATABASE_URL).
+ * Production-oriented: --allow-hosted-readonly requires explicit FR004_DATABASE_URL
+ * (never falls back to DATABASE_URL). Prefer a least-privilege read-only credential.
  *
- * Never prints connection secrets.
+ * Never prints connection secrets. Never mutates the database.
  */
 
 import {
   BASELINE_NAME,
   EXPECTED_PRE_ORG_TABLES,
-  LEGACY_PRODUCTION_MIGRATION_NAMES,
   SLICE0_NAME,
   assertActiveMigrationSet,
-  assertDatabaseUrlPolicy,
+  assertLegacyProductionMigrationRows,
   assertSlice0Absent,
   enumExists,
   listActiveMigrationNames,
   prismaCliVersion,
   psql,
   readMigrationRows,
+  resolveFr004DatabaseUrl,
   sanitizeDbUrlForLog,
   tableExists,
 } from './fr004-lib'
@@ -29,9 +29,7 @@ import {
 function main(): void {
   const allowHosted = process.argv.includes('--allow-hosted-readonly')
   const expectBaselineApplied = process.argv.includes('--expect-baseline-applied')
-  const url = process.env.FR004_DATABASE_URL || process.env.DATABASE_URL
-  if (!url) throw new Error('Set FR004_DATABASE_URL or DATABASE_URL')
-  assertDatabaseUrlPolicy(url, { allowHostedReadonly: allowHosted })
+  const url = resolveFr004DatabaseUrl({ allowHostedReadonly: allowHosted })
 
   assertActiveMigrationSet()
   console.log(`[fr004-preflight] prisma=${prismaCliVersion()}`)
@@ -56,11 +54,10 @@ function main(): void {
   console.log(`[fr004-preflight] prisma_migrations_count=${rows.length}`)
   console.log(`[fr004-preflight] prisma_migrations_names=${names.join(',')}`)
 
-  for (const name of LEGACY_PRODUCTION_MIGRATION_NAMES) {
-    if (!names.includes(name)) {
-      console.log(`[fr004-preflight] WARN legacy_row_missing_in_this_db=${name}`)
-    }
-  }
+  // Production runbook: six legacy rows must be present, finished, not rolled back.
+  // applied_steps_count === 0 is accepted for historically reviewed anomaly cases.
+  assertLegacyProductionMigrationRows(rows)
+  console.log('[fr004-preflight] legacy_production_history=OK')
 
   if (expectBaselineApplied) {
     if (!names.includes(BASELINE_NAME)) {
@@ -81,7 +78,7 @@ function main(): void {
   }
 
   console.log('[fr004-preflight] PASS (read-only)')
-  console.log('[fr004-preflight] NOTE: BASELINE_REQUIRES_EXTERNAL_PRODUCTION_PARITY_REVIEW')
+  console.log('[fr004-preflight] baseline_parity_status=SEE_REVIEW_CHECKLIST')
 }
 
 try {

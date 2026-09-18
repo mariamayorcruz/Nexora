@@ -160,6 +160,58 @@ export function assertDisposableDatabaseUrl(url: string, label = 'DATABASE_URL')
   assertDatabaseUrlPolicy(url, { allowHostedReadonly: false }, label)
 }
 
+export type MigrationRow = {
+  migration_name: string
+  finished_at: string | null
+  rolled_back_at: string | null
+  applied_steps_count: number
+  logs_null: boolean
+}
+
+export function resolveFr004DatabaseUrl(options: {
+  allowHostedReadonly?: boolean
+  label?: string
+}): string {
+  const allowHostedReadonly = Boolean(options.allowHostedReadonly)
+  if (allowHostedReadonly) {
+    const url = process.env.FR004_DATABASE_URL
+    if (!url) {
+      throw new Error(
+        'When --allow-hosted-readonly is set, FR004_DATABASE_URL is required (do not fall back to DATABASE_URL). Use a least-privilege read-only credential when available.',
+      )
+    }
+    assertDatabaseUrlPolicy(url, { allowHostedReadonly: true }, 'FR004_DATABASE_URL')
+    return url
+  }
+
+  const url = process.env.FR004_DATABASE_URL || process.env.DATABASE_URL
+  if (!url) {
+    throw new Error('Set FR004_DATABASE_URL (preferred) or DATABASE_URL')
+  }
+  assertDatabaseUrlPolicy(url, { allowHostedReadonly: false }, options.label || 'DATABASE_URL')
+  return url
+}
+
+/**
+ * Fail closed: each expected production legacy migration row must exist,
+ * be finished, and not rolled back. Does NOT fail on applied_steps_count === 0.
+ */
+export function assertLegacyProductionMigrationRows(rows: MigrationRow[]): void {
+  const byName = new Map(rows.map((r) => [r.migration_name, r]))
+  for (const name of LEGACY_PRODUCTION_MIGRATION_NAMES) {
+    const row = byName.get(name)
+    if (!row) {
+      throw new Error(`Missing expected legacy production migration row: ${name}`)
+    }
+    if (!row.finished_at) {
+      throw new Error(`Legacy migration ${name} is missing finished_at`)
+    }
+    if (row.rolled_back_at) {
+      throw new Error(`Legacy migration ${name} has rolled_back_at set`)
+    }
+  }
+}
+
 export function sanitizeDbUrlForLog(url: string): string {
   try {
     const u = new URL(url.replace(/^postgresql:/i, 'http:').replace(/^postgres:/i, 'http:'))
@@ -206,14 +258,6 @@ export function psqlFile(databaseUrl: string, filePath: string): void {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   })
-}
-
-export type MigrationRow = {
-  migration_name: string
-  finished_at: string | null
-  rolled_back_at: string | null
-  applied_steps_count: number
-  logs_null: boolean
 }
 
 export function readMigrationRows(databaseUrl: string): MigrationRow[] {

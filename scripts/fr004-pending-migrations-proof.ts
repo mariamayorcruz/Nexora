@@ -9,6 +9,9 @@
  *   FR004_DATABASE_URL=postgresql://... npm run fr004:pending-proof -- --after-auth-a
  *   # future production metadata (read-only URL provided out-of-band):
  *   FR004_DATABASE_URL=... npm run fr004:pending-proof -- --after-auth-a --allow-hosted-readonly
+ *
+ * When --allow-hosted-readonly is set, FR004_DATABASE_URL is required
+ * (no fallback to DATABASE_URL). Prefer a least-privilege read-only credential.
  */
 
 import {
@@ -16,23 +19,16 @@ import {
   LEGACY_PRODUCTION_MIGRATION_NAMES,
   SLICE0_NAME,
   assertActiveMigrationSet,
-  assertDatabaseUrlPolicy,
+  assertLegacyProductionMigrationRows,
   assertPendingIsSlice0Only,
   assertSlice0Absent,
   derivePendingLocalActive,
   listActiveMigrationNames,
   prismaCliVersion,
   readMigrationRows,
+  resolveFr004DatabaseUrl,
   sanitizeDbUrlForLog,
 } from './fr004-lib'
-
-function resolveUrl(): string {
-  const url = process.env.FR004_DATABASE_URL || process.env.DATABASE_URL
-  if (!url) {
-    throw new Error('Set FR004_DATABASE_URL (preferred) or DATABASE_URL')
-  }
-  return url
-}
 
 function main(): void {
   const mode = process.argv.includes('--after-auth-a') ? 'after-auth-a' : 'informational'
@@ -40,14 +36,17 @@ function main(): void {
 
   assertActiveMigrationSet()
   const localActive = listActiveMigrationNames()
-  const url = resolveUrl()
-  assertDatabaseUrlPolicy(url, { allowHostedReadonly })
+  const url = resolveFr004DatabaseUrl({ allowHostedReadonly })
 
   console.log(`[fr004-pending-proof] prisma=${prismaCliVersion()} mode=${mode}`)
   console.log(`[fr004-pending-proof] target=${sanitizeDbUrlForLog(url)}`)
   console.log(`[fr004-pending-proof] local_active=${localActive.join(',')}`)
 
   const rows = readMigrationRows(url)
+  if (mode === 'after-auth-a' || allowHostedReadonly) {
+    assertLegacyProductionMigrationRows(rows)
+  }
+
   const applied = new Set(
     rows.filter((r) => r.finished_at && !r.rolled_back_at).map((r) => r.migration_name),
   )

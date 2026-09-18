@@ -1,6 +1,16 @@
 # FR-004 — Migration integrity runbook
 
-Repository-only remediation establishes a trusted Prisma baseline. **Production mutation is not authorized by merging the repository PR.**
+Repository-only remediation establishes a trusted Prisma baseline. **Production mutation is not authorized by merging the repository PR alone.**
+
+## External baseline parity
+
+**EXTERNAL_PRODUCTION_PARITY_REVIEW = PASS** for reviewed artifact/head:
+
+`f272004413bc165da740d11c3e67f31a03da6a08`
+
+Details: `docs/database/fr-004-baseline-review-checklist.md`.
+
+Parity PASS does **not** authorize Production Authorization A or B.
 
 ## Concepts
 
@@ -13,7 +23,7 @@ Repository-only remediation establishes a trusted Prisma baseline. **Production 
 - **Prisma migration history** = application schema
 - **Supabase migration history** = RLS / security-specific history
 
-`BASELINE_REQUIRES_EXTERNAL_PRODUCTION_PARITY_REVIEW` until production metadata is independently compared to the baseline artifact.
+Runtime tooling prints `baseline_parity_status=SEE_REVIEW_CHECKLIST` and does not certify parity itself.
 
 ## Active migrations
 
@@ -30,15 +40,25 @@ That is **informational** for intentional squash/baselining.
 
 ```bash
 FR004_DATABASE_URL=... npm run fr004:pending-proof -- --after-auth-a --allow-hosted-readonly
+FR004_DATABASE_URL=... npm run fr004:preflight -- --allow-hosted-readonly --expect-baseline-applied
 ```
 
-(plus `fr004:preflight` as appropriate).
+When `--allow-hosted-readonly` is set, **`FR004_DATABASE_URL` is required** (no fallback to `DATABASE_URL`). Prefer a least-privilege **read-only** credential for metadata inspection. Do not embed credentials in docs or scripts.
 
 ---
 
-## Production Authorization A (future only)
+## Production Authorization A
 
-**Allowed**
+**Status: BLOCKED** pending all of:
+
+1. merged repository PR
+2. backup / PITR verification (`VERIFY_BEFORE_EXECUTION`)
+3. fresh production preflight (fail-closed legacy history + schema checks)
+4. explicit authorization
+
+Parity PASS alone is insufficient.
+
+**Allowed (only after the above)**
 
 ```bash
 prisma migrate resolve --applied 20260918010000_baseline_production_pre_organization
@@ -54,16 +74,16 @@ prisma migrate resolve --applied 20260918010000_baseline_production_pre_organiza
 
 **Verification**
 
-1. Six legacy rows remain unchanged
+1. Six legacy rows remain unchanged (`finished_at` present, `rolled_back_at` null; `applied_steps_count = 0` on the first historical row is accepted)
 2. Baseline row added and finished
 3. Application schema unchanged (still no Organization / Membership / related enums)
 4. Custom pending proof: pending local-active == Slice 0 only
 
-**Backup / PITR:** `VERIFY_BEFORE_EXECUTION` — confirm recovery capability before Auth A.
-
 ---
 
-## Production Authorization B (future only)
+## Production Authorization B
+
+**Status: BLOCKED** separately until Authorization A is complete and verified, plus explicit DDL authorization.
 
 **Preconditions**
 
@@ -115,11 +135,11 @@ FR004_DATABASE_URL=postgresql://... npm run fr004:greenfield
 FR004_DATABASE_URL=postgresql://... npm run fr004:prodsim
 ```
 
-Scripts refuse obvious hosted/production URLs.
+Scripts refuse obvious hosted/production URLs unless `--allow-hosted-readonly` is explicitly used with `FR004_DATABASE_URL`.
 
 ## Stop conditions
 
-Stop closed if baseline ≠ production on material structure, Org/Membership already exist before Auth B, unexpected pending migrations, backup unavailable, or any command other than the authorized one would mutate production.
+Stop closed if baseline ≠ production on material structure, Org/Membership already exist before Auth B, unexpected pending migrations, missing/unfinished/rolled-back legacy history rows, backup unavailable, or any command other than the authorized one would mutate production.
 
 ## CI note
 
