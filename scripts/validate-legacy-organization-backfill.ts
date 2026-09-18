@@ -208,6 +208,67 @@ function run() {
       first.slug === again.slug
   );
 
+  // --- Ownership state cases when Organization already exists ---
+
+  // Test 1: foreign membership present, expected OWNER missing → conflict
+  const foreignMembershipConflict = planLegacyOrganizationBackfill({
+    userId: userA,
+    existingOrganization: {
+      id: buildLegacyOrganizationId(userA),
+      name: 'Legacy A',
+      slug: 'legacy-a',
+      status: 'ACTIVE',
+    },
+    existingMembership: null,
+    organizationMembershipCount: 1,
+  });
+  assert(
+    'foreign membership conflict',
+    foreignMembershipConflict.action === 'conflict' &&
+      foreignMembershipConflict.reason === 'organization_has_memberships_but_expected_owner_missing'
+  );
+
+  // Test 2: empty existing organization → recover by creating OWNER membership
+  const emptyOrgRecovery = planLegacyOrganizationBackfill({
+    userId: userA,
+    existingOrganization: {
+      id: buildLegacyOrganizationId(userA),
+      name: 'Legacy A',
+      slug: 'legacy-a',
+      status: 'ACTIVE',
+    },
+    existingMembership: null,
+    organizationMembershipCount: 0,
+  });
+  assert(
+    'empty Organization recovery',
+    emptyOrgRecovery.action === 'already_mapped' && emptyOrgRecovery.membershipAction === 'create'
+  );
+
+  // Test 3: expected OWNER present + additional member → already_mapped, no conflict
+  const multiUserCompatible = planLegacyOrganizationBackfill({
+    userId: userA,
+    existingOrganization: {
+      id: buildLegacyOrganizationId(userA),
+      name: 'Legacy A',
+      slug: 'legacy-a',
+      status: 'ACTIVE',
+    },
+    existingMembership: {
+      id: 'mem-owner-a',
+      organizationId: buildLegacyOrganizationId(userA),
+      userId: userA,
+      role: 'OWNER',
+      status: 'ACTIVE',
+    },
+    organizationMembershipCount: 2,
+  });
+  assert(
+    'expected OWNER + additional member already mapped',
+    multiUserCompatible.action === 'already_mapped' &&
+      multiUserCompatible.membershipAction === 'already_present'
+  );
+
   // --- Batch preflight ---
   const validBatch = validateLegacyBackfillBatch([
     createPlan({

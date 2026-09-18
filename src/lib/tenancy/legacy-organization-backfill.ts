@@ -269,6 +269,11 @@ export function validateLegacyBackfillBatch(plans: LegacyBackfillPlan[]): BatchP
 /**
  * Plan one User → legacy Organization → OWNER Membership without writing.
  * Fail-closed on incompatible existing rows.
+ *
+ * When the deterministic Organization already exists:
+ * - CASE A: expected User has OWNER/ACTIVE → already_mapped (extra members OK)
+ * - CASE B: expected Membership missing + org has zero Memberships → create OWNER
+ * - CASE C: expected Membership missing + org already has Memberships → conflict
  */
 export function planLegacyOrganizationBackfill(params: {
   userId: string;
@@ -276,6 +281,8 @@ export function planLegacyOrganizationBackfill(params: {
   automationBusinessName?: string | null;
   existingOrganization?: ExistingOrganizationSnapshot | null;
   existingMembership?: ExistingMembershipSnapshot | null;
+  /** Total Membership rows on the deterministic Organization (ids/roles only needed for expected pair). */
+  organizationMembershipCount?: number;
 }): LegacyBackfillPlan {
   const userId = String(params.userId || '').trim();
   if (!userId) {
@@ -331,6 +338,7 @@ export function planLegacyOrganizationBackfill(params: {
           reason: 'existing_membership_role_or_status_incompatible',
         };
       }
+      // CASE A: expected OWNER/ACTIVE exists. Additional members are allowed.
       return {
         action: 'already_mapped',
         userId,
@@ -344,6 +352,27 @@ export function planLegacyOrganizationBackfill(params: {
       };
     }
 
+    const membershipCount = Number(params.organizationMembershipCount ?? 0);
+    if (!Number.isFinite(membershipCount) || membershipCount < 0) {
+      return {
+        action: 'conflict',
+        userId,
+        organizationId,
+        reason: 'invalid_organization_membership_count',
+      };
+    }
+
+    if (membershipCount > 0) {
+      // CASE C: org already has memberships, but expected OWNER mapping is missing.
+      return {
+        action: 'conflict',
+        userId,
+        organizationId,
+        reason: 'organization_has_memberships_but_expected_owner_missing',
+      };
+    }
+
+    // CASE B: org exists with zero memberships — safe to create expected OWNER.
     return {
       action: 'already_mapped',
       userId,

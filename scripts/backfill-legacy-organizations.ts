@@ -147,12 +147,21 @@ async function main() {
         }),
       ]);
 
+      // Count only when the deterministic Organization already exists.
+      // Used to distinguish empty-org recovery vs foreign-membership conflict.
+      const organizationMembershipCount = existingOrganization
+        ? await prisma.membership.count({
+            where: { organizationId },
+          })
+        : 0;
+
       let plan = planLegacyOrganizationBackfill({
         userId: user.id,
         onboardingData: user.onboardingData,
         automationBusinessName: user.automationConfig?.businessName,
         existingOrganization,
         existingMembership,
+        organizationMembershipCount,
       });
 
       if (plan.action === 'create') {
