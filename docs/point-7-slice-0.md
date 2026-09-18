@@ -29,14 +29,21 @@ See:
 - `docs/database/fr-004-migration-integrity-runbook.md`
 - `docs/database/fr-004-baseline-review-checklist.md`
 
-**Production** `migrate resolve` / `migrate deploy` / backfill remain **BLOCKED** until:
+**EXTERNAL_PRODUCTION_PARITY_REVIEW = PASS**
 
-1. external production parity review of the baseline (`BASELINE_REQUIRES_EXTERNAL_PRODUCTION_PARITY_REVIEW`)
-2. explicit Production Authorization A (resolve baseline only)
-3. explicit Production Authorization B (deploy Slice 0 only)
-4. separate later authorization for backfill
+The reviewed baseline artifact was independently validated against production metadata (structure only). That PASS does **not** authorize any production mutation.
 
-Do **not** merge FR-004 repository work as permission to mutate production.
+Production remains gated as follows:
+
+- **Production Authorization A** (`migrate resolve --applied` baseline only) remains **BLOCKED** pending:
+  - merged repository PR
+  - backup / PITR verification
+  - fresh production preflight
+  - explicit authorization
+- **Production Authorization B** (`migrate deploy` Slice 0 only) remains separately **BLOCKED**
+- **Backfill** remains separately **BLOCKED**
+
+Do **not** treat FR-004 repository merge (or parity PASS) as permission to mutate production.
 
 ## Legacy mapping
 
