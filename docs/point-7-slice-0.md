@@ -15,23 +15,35 @@
 - Does **not** implement TenantContext, org switching, SEC-07, SEC-08, or RLS
 - Does **not** claim full multi-tenant isolation yet
 
-## Migration baseline (FR-004) — BLOCKED for production deploy
+## Migration baseline (FR-004)
 
-The repository’s historical Prisma migration chain does **not** contain a complete initial schema baseline (early migrations `ALTER` existing tables rather than creating the original core schema). This is the pre-existing **FR-004** migration-integrity issue.
+Repository remediation establishes an active Prisma history of:
 
-PR #7 may introduce the additive Slice 0 migration file, but **production migration execution remains BLOCKED** until FR-004 migration baseline integrity is separately resolved or an explicitly reviewed production migration procedure is approved.
+1. `20260918010000_baseline_production_pre_organization`
+2. `20260918020000_add_organization_membership` (this Slice 0 migration)
 
-Do **not** treat this PR as ready for standard `prisma migrate deploy` in production.
+Legacy ALTER-first migrations are frozen under `prisma/migrations-legacy-pre-baseline/`.
 
-This PR does **not**:
+See:
 
-- create a fake initial migration
-- rewrite old migrations
-- mark migrations applied
-- run migrate resolve
-- reset any database
-- run db push
-- inspect/execute production migration state
+- `docs/database/fr-004-migration-integrity-runbook.md`
+- `docs/database/fr-004-baseline-review-checklist.md`
+
+**EXTERNAL_PRODUCTION_PARITY_REVIEW = PASS**
+
+The reviewed baseline artifact was independently validated against production metadata (structure only). That PASS does **not** authorize any production mutation.
+
+Production remains gated as follows:
+
+- **Production Authorization A** (`migrate resolve --applied` baseline only) remains **BLOCKED** pending:
+  - merged repository PR
+  - backup / PITR verification
+  - fresh production preflight
+  - explicit authorization
+- **Production Authorization B** (`migrate deploy` Slice 0 only) remains separately **BLOCKED**
+- **Backfill** remains separately **BLOCKED**
+
+Do **not** treat FR-004 repository merge (or parity PASS) as permission to mutate production.
 
 ## Legacy mapping
 
