@@ -177,6 +177,95 @@ export type LegacyBackfillPlan =
       reason: string;
     };
 
+export type BatchCollision = {
+  reason:
+    | 'duplicate_planned_organization_id'
+    | 'duplicate_planned_slug'
+    | 'duplicate_planned_membership_key';
+  key: string;
+  userIds: string[];
+};
+
+export type BatchPreflightResult =
+  | { ok: true }
+  | { ok: false; collisions: BatchCollision[] };
+
+function membershipKey(organizationId: string, userId: string) {
+  return `${organizationId}::${userId}`;
+}
+
+/**
+ * Pure in-batch collision detection for planned creates.
+ * Detects duplicate organizationId / slug / membership keys among NEW writes
+ * before any transaction starts.
+ */
+export function validateLegacyBackfillBatch(plans: LegacyBackfillPlan[]): BatchPreflightResult {
+  const orgIdOwners = new Map<string, string[]>();
+  const slugOwners = new Map<string, string[]>();
+  const membershipOwners = new Map<string, string[]>();
+
+  for (const plan of plans) {
+    if (plan.action === 'conflict') {
+      continue;
+    }
+
+    if (plan.action === 'create') {
+      const orgOwners = orgIdOwners.get(plan.organizationId) || [];
+      orgOwners.push(plan.userId);
+      orgIdOwners.set(plan.organizationId, orgOwners);
+
+      const slugList = slugOwners.get(plan.slug) || [];
+      slugList.push(plan.userId);
+      slugOwners.set(plan.slug, slugList);
+    }
+
+    if (plan.membershipAction === 'create') {
+      const key = membershipKey(plan.organizationId, plan.userId);
+      const owners = membershipOwners.get(key) || [];
+      owners.push(plan.userId);
+      membershipOwners.set(key, owners);
+    }
+  }
+
+  const collisions: BatchCollision[] = [];
+
+  for (const [organizationId, userIds] of orgIdOwners.entries()) {
+    if (userIds.length > 1) {
+      collisions.push({
+        reason: 'duplicate_planned_organization_id',
+        key: organizationId,
+        userIds: Array.from(new Set(userIds)),
+      });
+    }
+  }
+
+  for (const [slug, userIds] of slugOwners.entries()) {
+    if (userIds.length > 1) {
+      collisions.push({
+        reason: 'duplicate_planned_slug',
+        key: slug,
+        userIds: Array.from(new Set(userIds)),
+      });
+    }
+  }
+
+  for (const [key, userIds] of membershipOwners.entries()) {
+    if (userIds.length > 1) {
+      collisions.push({
+        reason: 'duplicate_planned_membership_key',
+        key,
+        userIds: Array.from(new Set(userIds)),
+      });
+    }
+  }
+
+  if (collisions.length > 0) {
+    return { ok: false, collisions };
+  }
+
+  return { ok: true };
+}
+
 /**
  * Plan one User → legacy Organization → OWNER Membership without writing.
  * Fail-closed on incompatible existing rows.

@@ -6,6 +6,11 @@
  *
  * DO NOT run --apply against production without explicit authorization.
  *
+ * Apply semantics:
+ * - planning / batch conflict -> zero writes
+ * - transaction failure -> full rollback (no committed partial batch)
+ * - successful apply -> all intended creates committed atomically
+ *
  * Transitional note (new Users after historical backfill, before Slice cutover):
  * Registration/auth is intentionally unchanged in Slice 0. Existing APIs remain
  * userId-scoped. A later slice must ensure each User obtains a legacy Organization
@@ -18,6 +23,7 @@ import { PrismaClient } from '@prisma/client';
 import {
   buildLegacyOrganizationId,
   planLegacyOrganizationBackfill,
+  validateLegacyBackfillBatch,
   type LegacyBackfillPlan,
 } from '../src/lib/tenancy/legacy-organization-backfill';
 
@@ -29,6 +35,7 @@ type Summary = {
   membershipsAlreadyPresent: number;
   namingConflicts: number;
   conflicts: number;
+  batchCollisions: number;
   appliedOrganizationsCreated: number;
   appliedMembershipsCreated: number;
 };
@@ -48,6 +55,7 @@ function emptySummary(): Summary {
     membershipsAlreadyPresent: 0,
     namingConflicts: 0,
     conflicts: 0,
+    batchCollisions: 0,
     appliedOrganizationsCreated: 0,
     appliedMembershipsCreated: 0,
   };
@@ -65,11 +73,10 @@ function recordPlan(summary: Summary, plan: LegacyBackfillPlan) {
 
   if (plan.action === 'create') {
     summary.organizationsWouldCreate += 1;
-    summary.membershipsWouldCreate += 1;
-    return;
+  } else {
+    summary.organizationsAlreadyMapped += 1;
   }
 
-  summary.organizationsAlreadyMapped += 1;
   if (plan.membershipAction === 'create') {
     summary.membershipsWouldCreate += 1;
   } else {
@@ -84,6 +91,9 @@ async function main() {
   console.log(`[point7-slice0] mode=${mode}`);
   console.log(
     '[point7-slice0] Production execution requires separate explicit authorization after PR review.'
+  );
+  console.log(
+    '[point7-slice0] Production migrate deploy remains BLOCKED until FR-004 migration baseline integrity is resolved.'
   );
 
   if (!process.env.DATABASE_URL) {
@@ -182,11 +192,12 @@ async function main() {
     }
 
     if (conflictDetails.length > 0) {
-      console.error('[point7-slice0] conflicts detected — fail closed. No writes performed.');
+      console.error('[point7-slice0] planning_conflict — fail closed. No writes performed.');
       console.error(
         JSON.stringify(
           {
             mode,
+            outcome: 'planning_conflict_no_writes',
             conflicts: conflictDetails,
             summary,
           },
@@ -198,37 +209,104 @@ async function main() {
       return;
     }
 
-    // Phase 2: apply only when explicitly requested and planning succeeded.
+    // Phase 1b: pure in-batch collision preflight (before any transaction).
+    const batchCheck = validateLegacyBackfillBatch(plans);
+    if (!batchCheck.ok) {
+      summary.batchCollisions = batchCheck.collisions.length;
+      console.error('[point7-slice0] batch_preflight_conflict — fail closed. No writes performed.');
+      console.error(
+        JSON.stringify(
+          {
+            mode,
+            outcome: 'batch_preflight_conflict_no_writes',
+            collisions: batchCheck.collisions,
+            summary,
+          },
+          null,
+          2
+        )
+      );
+      process.exitCode = 2;
+      return;
+    }
+
+    // Phase 2: atomic apply — all creates in one transaction, or full rollback.
     if (apply) {
-      for (const plan of plans) {
-        if (plan.action === 'conflict') {
-          // Unreachable when conflictDetails is empty; keep fail-closed guard.
-          throw new Error('Unexpected conflict during apply phase');
-        }
+      try {
+        const applyResult = await prisma.$transaction(async (tx) => {
+          let organizationsCreated = 0;
+          let membershipsCreated = 0;
 
-        if (plan.action === 'create') {
-          await prisma.organization.create({
-            data: {
-              id: plan.organizationId,
-              name: plan.name,
-              slug: plan.slug,
-              status: 'ACTIVE',
-            },
-          });
-          summary.appliedOrganizationsCreated += 1;
-        }
+          for (const plan of plans) {
+            if (plan.action === 'conflict') {
+              throw new Error('Unexpected conflict during apply phase');
+            }
 
-        if (plan.membershipAction === 'create') {
-          await prisma.membership.create({
-            data: {
-              organizationId: plan.organizationId,
-              userId: plan.userId,
-              role: 'OWNER',
-              status: 'ACTIVE',
+            if (plan.action === 'create') {
+              // No skipDuplicates — unique constraint violations fail the whole transaction.
+              await tx.organization.create({
+                data: {
+                  id: plan.organizationId,
+                  name: plan.name,
+                  slug: plan.slug,
+                  status: 'ACTIVE',
+                },
+              });
+              organizationsCreated += 1;
+            }
+
+            if (plan.membershipAction === 'create') {
+              await tx.membership.create({
+                data: {
+                  organizationId: plan.organizationId,
+                  userId: plan.userId,
+                  role: 'OWNER',
+                  status: 'ACTIVE',
+                },
+              });
+              membershipsCreated += 1;
+            }
+          }
+
+          return { organizationsCreated, membershipsCreated };
+        });
+
+        summary.appliedOrganizationsCreated = applyResult.organizationsCreated;
+        summary.appliedMembershipsCreated = applyResult.membershipsCreated;
+
+        console.log(
+          JSON.stringify(
+            {
+              mode,
+              outcome: 'apply_committed',
+              summary,
+              conflicts: conflictDetails,
             },
-          });
-          summary.appliedMembershipsCreated += 1;
-        }
+            null,
+            2
+          )
+        );
+        return;
+      } catch (error) {
+        console.error('[point7-slice0] transaction_failure — rollback. No committed partial batch.');
+        console.error(
+          JSON.stringify(
+            {
+              mode,
+              outcome: 'transaction_rollback_no_partial_writes',
+              error: error instanceof Error ? error.message : 'unknown',
+              summary: {
+                ...summary,
+                appliedOrganizationsCreated: 0,
+                appliedMembershipsCreated: 0,
+              },
+            },
+            null,
+            2
+          )
+        );
+        process.exitCode = 3;
+        return;
       }
     }
 
@@ -236,6 +314,7 @@ async function main() {
       JSON.stringify(
         {
           mode,
+          outcome: 'dry_run_no_writes',
           summary,
           conflicts: conflictDetails,
         },

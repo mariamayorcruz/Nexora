@@ -9,6 +9,8 @@ import {
   parseLegacyOrganizationUserId,
   planLegacyOrganizationBackfill,
   resolveLegacyOrganizationName,
+  validateLegacyBackfillBatch,
+  type LegacyBackfillPlan,
 } from '../src/lib/tenancy/legacy-organization-backfill';
 
 type Case = [string, boolean];
@@ -16,6 +18,38 @@ const cases: Case[] = [];
 
 function assert(name: string, condition: boolean) {
   cases.push([name, condition]);
+}
+
+function createPlan(params: {
+  userId: string;
+  organizationId: string;
+  slug: string;
+  membershipAction?: 'create' | 'already_present';
+  action?: 'create' | 'already_mapped';
+}): LegacyBackfillPlan {
+  if (params.action === 'already_mapped') {
+    return {
+      action: 'already_mapped',
+      userId: params.userId,
+      organizationId: params.organizationId,
+      name: 'Existing',
+      slug: params.slug,
+      nameSource: 'fallback',
+      nameConflict: false,
+      membershipAction: params.membershipAction || 'already_present',
+    };
+  }
+
+  return {
+    action: 'create',
+    userId: params.userId,
+    organizationId: params.organizationId,
+    name: 'Planned',
+    slug: params.slug,
+    nameSource: 'fallback',
+    nameConflict: false,
+    membershipAction: 'create',
+  };
 }
 
 function run() {
@@ -107,7 +141,6 @@ function run() {
   assert('name conflict prefers onboarding', conflictName.name === 'Onboarding Co');
   assert('name conflict still one ownership path', conflictName.source === 'onboardingData.businessName');
 
-  // Conflicting pre-existing deterministic Organization mapping
   const incompatible = planLegacyOrganizationBackfill({
     userId: userA,
     existingOrganization: {
@@ -141,40 +174,28 @@ function run() {
     membershipWithoutOrg.action === 'conflict'
   );
 
-  // Organization id exists but parse maps to different user (simulated incompatible id)
   const wrongMapping = planLegacyOrganizationBackfill({
     userId: userA,
     existingOrganization: {
-      // Force an id that does not match legacy_org_<userA>
       id: 'legacy_org_someone_else',
       name: 'Other',
       slug: 'other',
       status: 'ACTIVE',
     },
   });
-  // plan looks up by expected id in real script; helper checks existingOrganization.id mapping
   assert(
     'org id for different mapping fails closed',
     wrongMapping.action === 'conflict' &&
       wrongMapping.reason === 'organization_id_exists_for_different_mapping'
   );
 
-  // Parse helper
   assert(
     'parse legacy org user id',
     parseLegacyOrganizationUserId(buildLegacyOrganizationId(userA)) === userA
   );
 
-  // Dry-run semantics are CLI-default; helpers themselves never write.
   assert('helpers are pure / dry-run safe', true);
 
-  let failed = 0;
-  for (const [name, ok] of cases) {
-    console.log(`${ok ? 'PASS' : 'FAIL'} ${name}`);
-    if (!ok) failed += 1;
-  }
-
-  // Extra: first vs second deterministic equality
   const again = planLegacyOrganizationBackfill({
     userId: userA,
     onboardingData: { businessName: 'Acme Cleaning' },
@@ -187,10 +208,81 @@ function run() {
       first.slug === again.slug
   );
 
-  // re-print last assert
-  const last = cases[cases.length - 1];
-  console.log(`${last[1] ? 'PASS' : 'FAIL'} ${last[0]}`);
-  if (!last[1]) failed += 1;
+  // --- Batch preflight ---
+  const validBatch = validateLegacyBackfillBatch([
+    createPlan({
+      userId: userA,
+      organizationId: buildLegacyOrganizationId(userA),
+      slug: 'acme-aaaa',
+    }),
+    createPlan({
+      userId: userB,
+      organizationId: buildLegacyOrganizationId(userB),
+      slug: 'acme-bbbb',
+    }),
+  ]);
+  assert('valid independent plans accepted', validBatch.ok === true);
+
+  const duplicateSlug = validateLegacyBackfillBatch([
+    createPlan({
+      userId: userA,
+      organizationId: buildLegacyOrganizationId(userA),
+      slug: 'same-slug',
+    }),
+    createPlan({
+      userId: userB,
+      organizationId: buildLegacyOrganizationId(userB),
+      slug: 'same-slug',
+    }),
+  ]);
+  assert(
+    'duplicate planned slug between two users -> conflict',
+    duplicateSlug.ok === false &&
+      duplicateSlug.collisions.some((c) => c.reason === 'duplicate_planned_slug')
+  );
+
+  const duplicateOrgId = validateLegacyBackfillBatch([
+    createPlan({
+      userId: userA,
+      organizationId: 'legacy_org_shared',
+      slug: 'slug-a',
+    }),
+    createPlan({
+      userId: userB,
+      organizationId: 'legacy_org_shared',
+      slug: 'slug-b',
+    }),
+  ]);
+  assert(
+    'duplicate organizationId -> conflict',
+    duplicateOrgId.ok === false &&
+      duplicateOrgId.collisions.some((c) => c.reason === 'duplicate_planned_organization_id')
+  );
+
+  const duplicateMembership = validateLegacyBackfillBatch([
+    createPlan({
+      userId: userA,
+      organizationId: buildLegacyOrganizationId(userA),
+      slug: 'slug-a1',
+    }),
+    createPlan({
+      userId: userA,
+      organizationId: buildLegacyOrganizationId(userA),
+      slug: 'slug-a2',
+    }),
+  ]);
+  assert(
+    'duplicate membership key -> conflict',
+    duplicateMembership.ok === false &&
+      (duplicateMembership.collisions.some((c) => c.reason === 'duplicate_planned_membership_key') ||
+        duplicateMembership.collisions.some((c) => c.reason === 'duplicate_planned_organization_id'))
+  );
+
+  let failed = 0;
+  for (const [name, ok] of cases) {
+    console.log(`${ok ? 'PASS' : 'FAIL'} ${name}`);
+    if (!ok) failed += 1;
+  }
 
   if (failed) {
     process.exit(1);
