@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { hashPassword } from '../src/lib/auth';
+import { ensureUserOrganization } from '../src/lib/tenancy/ensure-user-organization';
 
 const prisma = new PrismaClient();
 
@@ -14,23 +15,42 @@ async function main() {
 
   const hashedPassword = await hashPassword(password);
 
-  const user = await prisma.user.upsert({
-    where: { email },
-    update: {
-      name,
-      password: hashedPassword,
-      onboardingCompletedAt: null,
-      onboardingData: null,
-      onboardingStartedAt: null,
-      subscription: {
-        upsert: {
-          update: {
-            plan: 'professional',
-            status: 'active',
-            currentPeriodStart,
-            currentPeriodEnd,
-            cancelAtPeriodEnd: false,
+  const user = await prisma.$transaction(async (tx) => {
+    const upserted = await tx.user.upsert({
+      where: { email },
+      update: {
+        name,
+        password: hashedPassword,
+        onboardingCompletedAt: null,
+        onboardingData: null,
+        onboardingStartedAt: null,
+        subscription: {
+          upsert: {
+            update: {
+              plan: 'professional',
+              status: 'active',
+              currentPeriodStart,
+              currentPeriodEnd,
+              cancelAtPeriodEnd: false,
+            },
+            create: {
+              plan: 'professional',
+              status: 'active',
+              currentPeriodStart,
+              currentPeriodEnd,
+              cancelAtPeriodEnd: false,
+            },
           },
+        },
+      },
+      create: {
+        email,
+        name,
+        password: hashedPassword,
+        onboardingCompletedAt: null,
+        onboardingData: null,
+        onboardingStartedAt: null,
+        subscription: {
           create: {
             plan: 'professional',
             status: 'active',
@@ -40,27 +60,17 @@ async function main() {
           },
         },
       },
-    },
-    create: {
-      email,
-      name,
-      password: hashedPassword,
-      onboardingCompletedAt: null,
-      onboardingData: null,
-      onboardingStartedAt: null,
-      subscription: {
-        create: {
-          plan: 'professional',
-          status: 'active',
-          currentPeriodStart,
-          currentPeriodEnd,
-          cancelAtPeriodEnd: false,
-        },
+      include: {
+        subscription: true,
       },
-    },
-    include: {
-      subscription: true,
-    },
+    });
+
+    await ensureUserOrganization(tx, {
+      userId: upserted.id,
+      onboardingData: upserted.onboardingData,
+    });
+
+    return upserted;
   });
 
   console.log('Demo user ready:', {

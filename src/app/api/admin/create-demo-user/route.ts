@@ -1,7 +1,7 @@
-import { Prisma } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { hashPassword } from '@/lib/auth';
+import { ensureUserOrganization } from '@/lib/tenancy/ensure-user-organization';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,29 +34,48 @@ export async function POST(request: NextRequest) {
     currentPeriodEnd.setDate(currentPeriodEnd.getDate() + 30);
 
     const hashedPassword = await hashPassword(password);
+    const onboardingData = {
+      businessName: 'Mayor Excelsior Cleaning',
+      industries: ['Limpieza comercial', 'Servicios para oficinas'],
+      targetAudience: 'Gerentes de oficinas y administradores de edificios en Miami',
+      mainGoal: 'Conseguir contratos mensuales de limpieza sin compromisos largos',
+      location: 'Miami, Florida',
+    };
 
-    const user = await prisma.user.upsert({
-      where: { email },
-      update: {
-        name,
-        password: hashedPassword,
-        onboardingCompletedAt: new Date(),
-        onboardingData: {
-          businessName: 'Mayor Excelsior Cleaning',
-          industries: ['Limpieza comercial', 'Servicios para oficinas'],
-          targetAudience: 'Gerentes de oficinas y administradores de edificios en Miami',
-          mainGoal: 'Conseguir contratos mensuales de limpieza sin compromisos largos',
-          location: 'Miami, Florida',
-        },
-        subscription: {
-          upsert: {
-            update: {
-              plan: 'professional',
-              status: 'active',
-              currentPeriodStart,
-              currentPeriodEnd,
-              cancelAtPeriodEnd: false,
+    const user = await prisma.$transaction(async (tx) => {
+      const upserted = await tx.user.upsert({
+        where: { email },
+        update: {
+          name,
+          password: hashedPassword,
+          onboardingCompletedAt: new Date(),
+          onboardingData,
+          subscription: {
+            upsert: {
+              update: {
+                plan: 'professional',
+                status: 'active',
+                currentPeriodStart,
+                currentPeriodEnd,
+                cancelAtPeriodEnd: false,
+              },
+              create: {
+                plan: 'professional',
+                status: 'active',
+                currentPeriodStart,
+                currentPeriodEnd,
+                cancelAtPeriodEnd: false,
+              },
             },
+          },
+        },
+        create: {
+          email,
+          name,
+          password: hashedPassword,
+          onboardingCompletedAt: new Date(),
+          onboardingData,
+          subscription: {
             create: {
               plan: 'professional',
               status: 'active',
@@ -66,32 +85,17 @@ export async function POST(request: NextRequest) {
             },
           },
         },
-      },
-      create: {
-        email,
-        name,
-        password: hashedPassword,
-        onboardingCompletedAt: new Date(),
-        onboardingData: {
-          businessName: 'Mayor Excelsior Cleaning',
-          industries: ['Limpieza comercial', 'Servicios para oficinas'],
-          targetAudience: 'Gerentes de oficinas y administradores de edificios en Miami',
-          mainGoal: 'Conseguir contratos mensuales de limpieza sin compromisos largos',
-          location: 'Miami, Florida',
+        include: {
+          subscription: true,
         },
-        subscription: {
-          create: {
-            plan: 'professional',
-            status: 'active',
-            currentPeriodStart,
-            currentPeriodEnd,
-            cancelAtPeriodEnd: false,
-          },
-        },
-      },
-      include: {
-        subscription: true,
-      },
+      });
+
+      await ensureUserOrganization(tx, {
+        userId: upserted.id,
+        onboardingData: upserted.onboardingData,
+      });
+
+      return upserted;
     });
 
     return NextResponse.json({

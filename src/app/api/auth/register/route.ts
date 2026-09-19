@@ -13,6 +13,7 @@ import { signUserToken } from '@/lib/jwt';
 import { dispatchOnboardingSequence } from '@/lib/crm-sequences';
 import { sendRegistrationTeamWelcome, isEmailDeliveryConfigured } from '@/lib/mailer';
 import { createSessionId, upsertUserSession } from '@/lib/user-sessions';
+import { ensureUserOrganization } from '@/lib/tenancy/ensure-user-organization';
 
 export const dynamic = 'force-dynamic';
 
@@ -84,6 +85,12 @@ export async function POST(request: NextRequest) {
             currentPeriodStart: new Date(),
             currentPeriodEnd: trialEndDate,
           },
+        });
+
+        // Point 7 Slice 1A: Organization + OWNER Membership in the same txn.
+        await ensureUserOrganization(tx, {
+          userId: createdUser.id,
+          onboardingData: createdUser.onboardingData,
         });
 
         return createdUser;
