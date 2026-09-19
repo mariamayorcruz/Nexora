@@ -1,4 +1,7 @@
 // prisma/seed.js
+// Point 7 Slice 1A note: this development seed does NOT call ensureUserOrganization.
+// Prefer scripts/create-demo-user.ts or runtime registration paths for tenant lifecycle.
+// Do not use this seed against production.
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 
