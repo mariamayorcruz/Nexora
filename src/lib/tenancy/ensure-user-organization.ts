@@ -4,6 +4,9 @@
  *
  * Uses Slice 0 pure planners from legacy-organization-backfill.ts.
  * Fail closed on incompatible state. Never attaches a User to another tenant.
+ *
+ * P2002 unique races: fail closed immediately (do NOT reconcile on a failed
+ * PostgreSQL transaction client). Outer caller transaction must roll back.
  */
 
 import {
@@ -66,6 +69,14 @@ export async function ensureUserOrganization(
     where: { id: organizationId },
     select: { id: true, name: true, slug: true, status: true },
   });
+
+  // Align with TenantContext: never accept or extend inactive Organizations.
+  if (existingOrganization && existingOrganization.status !== OrganizationStatus.ACTIVE) {
+    throw new TenantLifecycleError(
+      'organization_inactive',
+      `Deterministic Organization is ${existingOrganization.status}; lifecycle ensure fails closed`
+    );
+  }
 
   const existingMembership = await db.membership.findUnique({
     where: {
@@ -168,48 +179,15 @@ export async function ensureUserOrganization(
       createdMembership,
     };
   } catch (error) {
+    if (error instanceof TenantLifecycleError) {
+      throw error;
+    }
     if (isUniqueViolation(error)) {
-      // Race: re-read and require a clean already_mapped outcome (no silent rewrite).
-      const org = await db.organization.findUnique({
-        where: { id: organizationId },
-        select: { id: true, name: true, slug: true, status: true },
-      });
-      const membership = await db.membership.findUnique({
-        where: { organizationId_userId: { organizationId, userId } },
-        select: {
-          id: true,
-          organizationId: true,
-          userId: true,
-          role: true,
-          status: true,
-        },
-      });
-      const count = org ? await db.membership.count({ where: { organizationId } }) : 0;
-      const retryPlan = planLegacyOrganizationBackfill({
-        userId,
-        onboardingData: params.onboardingData,
-        automationBusinessName: params.automationBusinessName,
-        existingOrganization: org,
-        existingMembership: membership,
-        organizationMembershipCount: count,
-      });
-
-      if (
-        retryPlan.action === 'already_mapped' &&
-        retryPlan.membershipAction === 'already_present' &&
-        retryPlan.membershipId
-      ) {
-        return {
-          organizationId: retryPlan.organizationId,
-          membershipId: retryPlan.membershipId,
-          createdOrganization: false,
-          createdMembership: false,
-        };
-      }
-
+      // PostgreSQL aborts the current transaction after P2002.
+      // Do NOT re-query/reconcile on the same failed TransactionClient.
       throw new TenantLifecycleError(
         'unique_constraint_race',
-        'Concurrent tenant creation conflict; retry failed closed'
+        'Concurrent tenant creation unique conflict; fail closed (transaction must roll back)'
       );
     }
     throw error;

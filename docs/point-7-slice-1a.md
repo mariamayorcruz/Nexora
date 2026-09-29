@@ -38,11 +38,27 @@ Behavior (fail closed):
 | Case | Result |
 |------|--------|
 | A Org + Membership absent | Create both |
-| B Expected org + OWNER/ACTIVE present | Idempotent success |
-| C Expected org exists, zero memberships | Create OWNER/ACTIVE Membership |
+| B Expected **ACTIVE** org + OWNER/ACTIVE Membership present | Idempotent success |
+| C Expected **ACTIVE** org exists, zero memberships | Create OWNER/ACTIVE Membership |
 | D Org has memberships but expected owner missing | Fail closed |
 | E Incompatible membership role/status/ids | Fail closed |
 | F Deterministic slug owned by another Organization | Fail closed |
+| G Deterministic Organization `SUSPENDED` / `DEACTIVATED` | Fail closed (`organization_inactive`) — **no** auto-reactivation, **no** rewrite |
+| H Prisma `P2002` during lifecycle writes | Fail closed (`unique_constraint_race`) — **no** reconcile/re-read on the failed transaction client; outer transaction must roll back |
+
+### P2002 / transaction race policy
+
+On PostgreSQL, a unique violation aborts the current transaction until rollback.
+
+Slice 1A therefore **does not** attempt to re-query Organization/Membership on the same `TransactionClient` after `P2002`.
+
+`ensureUserOrganization` maps `P2002` → `TenantLifecycleError('unique_constraint_race')` and lets the caller transaction roll back. Retry after rollback is allowed for callers but is **not** implemented inside the helper.
+
+### Inactive Organization policy
+
+If the deterministic Organization already exists and `status !== ACTIVE`, lifecycle ensure fails closed with `organization_inactive`.
+
+This matches TenantContext (inactive orgs never resolve as a usable tenant).
 
 User creation paths wire this helper **inside the same Prisma transaction** as User create (where applicable) so tenant failure rolls back the User.
 
@@ -137,7 +153,17 @@ Does **not** migrate other APIs onto TenantContext in this slice.
 FR004_DATABASE_URL=postgresql://... npm run tenancy:validate-slice1a
 ```
 
-Covers TenantContext selection cases 1–9 and lifecycle cases 10–17 on disposable Postgres only.
+Disposable Postgres only. Current suite: **20** assertions.
+
+| # | Coverage |
+|---|----------|
+| 1–9 | TenantContext selection / deny rules |
+| 10–11 | Lifecycle create + idempotent rerun |
+| 12 | **Pure planner invariant** (`planLegacyOrganizationBackfill` mismatched snapshot) — not an `ensureUserOrganization` DB integration path |
+| 13–16 | Incompatible membership, slug collision, empty org membership create, foreign membership fail-closed |
+| 17 | User+ensure txn rollback on slug conflict (no partial User) |
+| 18–19 | Lifecycle ensure fails on SUSPENDED / DEACTIVATED org (no reactivation / rewrite) |
+| 20 | Concurrent `ensureUserOrganization` race → `unique_constraint_race` fail-closed; single org/membership remains |
 
 ## User-creation path audit
 

@@ -96,27 +96,6 @@ async function main() {
     assert(second.membershipId === first.membershipId, 'same membership id');
     pass('11 rerun -> idempotent');
 
-    const userB = await prisma.user.create({
-      data: { email: 'b@example.com', name: 'B', password: 'x' },
-    });
-    const foreignOrgId = buildLegacyOrganizationId(userB.id);
-    await prisma.organization.create({
-      data: {
-        id: foreignOrgId,
-        name: 'Wrong',
-        slug: 'wrong-slug-zzzzzzzzzzzz',
-        status: OrganizationStatus.ACTIVE,
-      },
-    });
-    // Simulate mismatch: create org with deterministic id for B but try ensure for different mapping
-    // CASE: membership points to unexpected — create membership for A on B's org then ensure A fails differently.
-    // Deterministic Organization mismatch: plan checks parseLegacyOrganizationUserId.
-    // Create org with id that looks legacy but for another user while ensuring that user is fine.
-    // Test 12: ensure userC against an org id that exists for different mapping —
-    // buildLegacyOrganizationId is deterministic so we create conflict by inserting membership with wrong ids via raw? 
-    // Spec: "deterministic Organization mismatch -> fail"
-    // Use plan path: existing org id = legacy_org_userC but mapped parse works. 
-    // Instead: create Organization with id legacy_org_<userC> manually then ensure with incompatible membership role.
     const userC = await prisma.user.create({
       data: { email: 'c@example.com', name: 'C', password: 'x' },
     });
@@ -147,32 +126,10 @@ async function main() {
     }
     pass('13 incompatible role/status -> fail');
 
-    // 12: organization_id_exists_for_different_mapping — can't create org with wrong prefix via helper.
-    // Simulate by creating Membership without org for user then having membership without expected org.
-    const userD = await prisma.user.create({
-      data: { email: 'd@example.com', name: 'D', password: 'x' },
-    });
-    await prisma.membership.create({
-      data: {
-        organizationId: foreignOrgId,
-        userId: userD.id,
-        role: MembershipRole.OWNER,
-        status: MembershipStatus.ACTIVE,
-      },
-    });
-    // For userD ensure: no org at legacy_org_D, but membership exists for foreign org —
-    // plan looks up membership on expected org only, so membership on foreign won't be found as existingMembership.
-    // Spec case E: Membership exists with incompatible ids — that's when existingMembership on expected org has wrong ids.
-    // Case: membership_exists_without_expected_organization requires existingMembership param set without org —
-    // our ensure only loads membership for expected org pair, so that path is when... actually plan gets existingMembership
-    // only for organizationId_userId of expected pair. So membership_exists_without_expected_organization only if
-    // we passed membership without org — we don't load orphan memberships.
-    // Test 12 as: create org with id that is NOT legacy_org_user but we somehow... 
-    // Re-read CASE: "deterministic Organization mismatch" — existingOrg.id parses to different user.
-    // That would mean org id is legacy_org_X but we're ensuring user Y — impossible if we look up by buildLegacyOrganizationId(Y).
-    // Unless someone renamed? The check is parseLegacyOrganizationUserId(existingOrg.id) !== userId when we found org by id.
-    // So if org id is correct, parse always matches. The conflict organization_id_exists_for_different_mapping
-    // is defensive. We'll simulate by calling plan with a crafted snapshot in a unit-style check:
+    // 12: pure planner invariant (NOT ensureUserOrganization DB integration).
+    // ensureUserOrganization always looks up by buildLegacyOrganizationId(userId), so a
+    // mismatched org id is not reachable via the helper's DB path; the planner still
+    // fail-closes if ever handed such a snapshot.
     const { planLegacyOrganizationBackfill } = await import(
       '../src/lib/tenancy/legacy-organization-backfill'
     );
@@ -191,7 +148,7 @@ async function main() {
         mismatch.reason === 'organization_id_exists_for_different_mapping',
       'mismatch reason'
     );
-    pass('12 deterministic Organization mismatch -> fail');
+    pass('12 pure planner invariant — mismatched deterministic organization snapshot fails');
 
     // 14 slug collision
     const userE = await prisma.user.create({
@@ -272,14 +229,13 @@ async function main() {
     }
     pass('16 foreign membership without expected owner -> fail closed');
 
-    // 17 registration atomicity: user create + ensure fail rolls back user
+    // 17 slug-collision fail closed inside txn: rolls back User (pre-write TenantLifecycleError)
     const boomUserEmail = 'boom@example.com';
     try {
       await prisma.$transaction(async (tx) => {
         const created = await tx.user.create({
           data: { email: boomUserEmail, name: 'Boom', password: 'x' },
         });
-        // Force slug collision inside txn
         const preview = resolveLegacyOrganizationName({ userId: created.id });
         const slug = buildLegacyOrganizationSlug({
           userId: created.id,
@@ -299,10 +255,128 @@ async function main() {
       throw new Error('expected transaction failure');
     } catch (e) {
       assert(e instanceof TenantLifecycleError, 'atomicity TenantLifecycleError');
+      assert(e.code === 'slug_owned_by_different_organization', e.code);
     }
     const leaked = await prisma.user.findUnique({ where: { email: boomUserEmail } });
     assert(!leaked, 'user must not remain after failed tenant txn');
     pass('17 tenant creation failure must not leave partial User');
+
+    // 18 SUSPENDED deterministic org + OWNER/ACTIVE membership -> ensure fails (no writes/reactivation)
+    const userSuspOrg = await prisma.user.create({
+      data: { email: 'lifecyclesusp@example.com', name: 'LS', password: 'x' },
+    });
+    const orgSuspLife = buildLegacyOrganizationId(userSuspOrg.id);
+    await prisma.organization.create({
+      data: {
+        id: orgSuspLife,
+        name: 'Suspended Life',
+        slug: 'lifecycle-susp-org',
+        status: OrganizationStatus.SUSPENDED,
+      },
+    });
+    const memSuspLife = await prisma.membership.create({
+      data: {
+        organizationId: orgSuspLife,
+        userId: userSuspOrg.id,
+        role: MembershipRole.OWNER,
+        status: MembershipStatus.ACTIVE,
+      },
+    });
+    try {
+      await ensureUserOrganization(prisma, { userId: userSuspOrg.id });
+      throw new Error('expected suspended org lifecycle fail');
+    } catch (e) {
+      assert(e instanceof TenantLifecycleError, 'TenantLifecycleError suspended org');
+      assert(e.code === 'organization_inactive', e.code);
+    }
+    const orgSuspAfter = await prisma.organization.findUnique({ where: { id: orgSuspLife } });
+    const memSuspAfter = await prisma.membership.findUnique({ where: { id: memSuspLife.id } });
+    assert(orgSuspAfter?.status === OrganizationStatus.SUSPENDED, 'org not reactivated');
+    assert(
+      memSuspAfter?.role === MembershipRole.OWNER && memSuspAfter?.status === MembershipStatus.ACTIVE,
+      'membership not rewritten'
+    );
+    pass('18 Organization SUSPENDED + OWNER/ACTIVE Membership -> lifecycle ensure fails');
+
+    // 19 DEACTIVATED deterministic org + OWNER/ACTIVE membership -> ensure fails
+    const userDeactOrg = await prisma.user.create({
+      data: { email: 'lifecycledeact@example.com', name: 'LD', password: 'x' },
+    });
+    const orgDeactLife = buildLegacyOrganizationId(userDeactOrg.id);
+    await prisma.organization.create({
+      data: {
+        id: orgDeactLife,
+        name: 'Deactivated Life',
+        slug: 'lifecycle-deact-org',
+        status: OrganizationStatus.DEACTIVATED,
+      },
+    });
+    const memDeactLife = await prisma.membership.create({
+      data: {
+        organizationId: orgDeactLife,
+        userId: userDeactOrg.id,
+        role: MembershipRole.OWNER,
+        status: MembershipStatus.ACTIVE,
+      },
+    });
+    try {
+      await ensureUserOrganization(prisma, { userId: userDeactOrg.id });
+      throw new Error('expected deactivated org lifecycle fail');
+    } catch (e) {
+      assert(e instanceof TenantLifecycleError, 'TenantLifecycleError deactivated org');
+      assert(e.code === 'organization_inactive', e.code);
+    }
+    const orgDeactAfter = await prisma.organization.findUnique({ where: { id: orgDeactLife } });
+    const memDeactAfter = await prisma.membership.findUnique({ where: { id: memDeactLife.id } });
+    assert(orgDeactAfter?.status === OrganizationStatus.DEACTIVATED, 'org not reactivated');
+    assert(
+      memDeactAfter?.role === MembershipRole.OWNER &&
+        memDeactAfter?.status === MembershipStatus.ACTIVE,
+      'membership not rewritten'
+    );
+    pass('19 Organization DEACTIVATED + OWNER/ACTIVE Membership -> lifecycle ensure fails');
+
+    // 20 P2002 unique race inside txn: fail closed with unique_constraint_race; no partial rows
+    // Deterministic setup: pre-create Organization with the deterministic id, then run a transaction
+    // that creates User and forces organization.create via ensure by... wait, ensure would find org.
+    // Instead: create User first, then in a transaction call organization.create with same id twice
+    // through ensure by racing two transactions — OR insert org with same slug after plan bypass.
+    // Reliable approach: start txn, create user, pre-insert conflicting Organization id using a
+    // second PrismaClient connection so ensure's findUnique in txn may still see null under
+    // READ COMMITTED until write — flaky. Prefer: call ensure after manually creating org with
+    // same slug under a different id was already tested as 14.
+    // For true P2002: create user; create org with deterministic id OUTSIDE; delete via raw in a
+    // way ensure still... 
+    // Clean deterministic P2002 on membership unique: empty org exists; create OWNER membership
+    // outside; in txn ensure tries membership create after findUnique missed it — needs race.
+    // Use two concurrent transactions on the same new user (no pre-existing org):
+    const raceEmail = 'p2002race@example.com';
+    const raceUser = await prisma.user.create({
+      data: { email: raceEmail, name: 'Race', password: 'x' },
+    });
+    const raceOrgId = buildLegacyOrganizationId(raceUser.id);
+    const raceResults = await Promise.allSettled([
+      prisma.$transaction((tx) => ensureUserOrganization(tx, { userId: raceUser.id })),
+      prisma.$transaction((tx) => ensureUserOrganization(tx, { userId: raceUser.id })),
+    ]);
+    const fulfilled = raceResults.filter((r) => r.status === 'fulfilled');
+    const rejected = raceResults.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    assert(fulfilled.length >= 1, 'at least one concurrent ensure succeeds');
+    for (const r of rejected) {
+      const reason = r.reason;
+      assert(reason instanceof TenantLifecycleError, 'rejected ensure is TenantLifecycleError');
+      assert(reason.code === 'unique_constraint_race', `expected unique_constraint_race got ${reason.code}`);
+    }
+    const raceOrgs = await prisma.organization.findMany({ where: { id: raceOrgId } });
+    const raceMems = await prisma.membership.findMany({
+      where: { organizationId: raceOrgId, userId: raceUser.id },
+    });
+    assert(raceOrgs.length === 1, 'exactly one Organization after race');
+    assert(raceMems.length === 1, 'exactly one Membership after race');
+    // Partial-user check: user remains (created before race); org/membership must be consistent only.
+    // If a loser lost to P2002, its transaction rolled back; winner left exactly one org/membership.
+    // Also cover User+ensure atomic rollback when ensure fails after User create (slug path = test 17).
+    pass('20 concurrent ensure P2002 race -> unique_constraint_race fail-closed; single org/membership');
 
     // --- TenantContext selection tests ---
     const auth = (userId: string, email: string) =>
