@@ -47,6 +47,25 @@ function isUniqueViolation(error: unknown): boolean {
 }
 
 /**
+ * Map lifecycle write failures to TenantLifecycleError when applicable.
+ * Returns null when the caller should rethrow the original error unchanged.
+ *
+ * P2002 → unique_constraint_race (fail closed; do not reconcile on aborted txn).
+ */
+export function mapEnsureWriteError(error: unknown): TenantLifecycleError | null {
+  if (error instanceof TenantLifecycleError) {
+    return error;
+  }
+  if (isUniqueViolation(error)) {
+    return new TenantLifecycleError(
+      'unique_constraint_race',
+      'Concurrent tenant creation unique conflict; fail closed (transaction must roll back)'
+    );
+  }
+  return null;
+}
+
+/**
  * Idempotent ensure of legacy_org_<userId> + OWNER/ACTIVE Membership.
  * Prefer calling inside the same Prisma transaction that creates the User.
  */
@@ -179,17 +198,10 @@ export async function ensureUserOrganization(
       createdMembership,
     };
   } catch (error) {
-    if (error instanceof TenantLifecycleError) {
-      throw error;
-    }
-    if (isUniqueViolation(error)) {
-      // PostgreSQL aborts the current transaction after P2002.
-      // Do NOT re-query/reconcile on the same failed TransactionClient.
-      throw new TenantLifecycleError(
-        'unique_constraint_race',
-        'Concurrent tenant creation unique conflict; fail closed (transaction must roll back)'
-      );
-    }
+    // PostgreSQL aborts the current transaction after P2002.
+    // Do NOT re-query/reconcile on the same failed TransactionClient.
+    const mapped = mapEnsureWriteError(error);
+    if (mapped) throw mapped;
     throw error;
   }
 }

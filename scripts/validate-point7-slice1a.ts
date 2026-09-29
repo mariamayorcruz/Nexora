@@ -14,11 +14,13 @@ import {
   MembershipRole,
   MembershipStatus,
   OrganizationStatus,
+  Prisma,
   PrismaClient,
 } from '@prisma/client';
 import { signUserToken } from '../src/lib/jwt';
 import {
   ensureUserOrganization,
+  mapEnsureWriteError,
   TenantLifecycleError,
 } from '../src/lib/tenancy/ensure-user-organization';
 import {
@@ -336,20 +338,10 @@ async function main() {
     );
     pass('19 Organization DEACTIVATED + OWNER/ACTIVE Membership -> lifecycle ensure fails');
 
-    // 20 P2002 unique race inside txn: fail closed with unique_constraint_race; no partial rows
-    // Deterministic setup: pre-create Organization with the deterministic id, then run a transaction
-    // that creates User and forces organization.create via ensure by... wait, ensure would find org.
-    // Instead: create User first, then in a transaction call organization.create with same id twice
-    // through ensure by racing two transactions — OR insert org with same slug after plan bypass.
-    // Reliable approach: start txn, create user, pre-insert conflicting Organization id using a
-    // second PrismaClient connection so ensure's findUnique in txn may still see null under
-    // READ COMMITTED until write — flaky. Prefer: call ensure after manually creating org with
-    // same slug under a different id was already tested as 14.
-    // For true P2002: create user; create org with deterministic id OUTSIDE; delete via raw in a
-    // way ensure still... 
-    // Clean deterministic P2002 on membership unique: empty org exists; create OWNER membership
-    // outside; in txn ensure tries membership create after findUnique missed it — needs race.
-    // Use two concurrent transactions on the same new user (no pre-existing org):
+    // 20 DB concurrency race-safety (does NOT claim deterministic P2002 observation).
+    // Concurrent ensures on the same user must leave exactly one Organization and one Membership.
+    // If a loser hits P2002, it may reject with unique_constraint_race — but fulfilled=2/rejected=0
+    // is also a valid serial execution and still passes this invariant.
     const raceEmail = 'p2002race@example.com';
     const raceUser = await prisma.user.create({
       data: { email: raceEmail, name: 'Race', password: 'x' },
@@ -365,18 +357,42 @@ async function main() {
     for (const r of rejected) {
       const reason = r.reason;
       assert(reason instanceof TenantLifecycleError, 'rejected ensure is TenantLifecycleError');
-      assert(reason.code === 'unique_constraint_race', `expected unique_constraint_race got ${reason.code}`);
+      assert(
+        reason.code === 'unique_constraint_race',
+        `if rejected, expected unique_constraint_race got ${reason.code}`
+      );
     }
     const raceOrgs = await prisma.organization.findMany({ where: { id: raceOrgId } });
     const raceMems = await prisma.membership.findMany({
       where: { organizationId: raceOrgId, userId: raceUser.id },
     });
-    assert(raceOrgs.length === 1, 'exactly one Organization after race');
-    assert(raceMems.length === 1, 'exactly one Membership after race');
-    // Partial-user check: user remains (created before race); org/membership must be consistent only.
-    // If a loser lost to P2002, its transaction rolled back; winner left exactly one org/membership.
-    // Also cover User+ensure atomic rollback when ensure fails after User create (slug path = test 17).
-    pass('20 concurrent ensure P2002 race -> unique_constraint_race fail-closed; single org/membership');
+    assert(raceOrgs.length === 1, 'exactly one Organization after concurrent ensures');
+    assert(raceMems.length === 1, 'exactly one Membership after concurrent ensures');
+    pass(
+      '20 concurrent ensure race-safety — exactly one Organization and one Membership (P2002 not required)'
+    );
+
+    // 21 Unit-level error mapping: Prisma P2002 → TenantLifecycleError('unique_constraint_race')
+    // This is what proveably covers the mapping branch; it does not require a DB race.
+    const p2002 = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+      code: 'P2002',
+      clientVersion: 'test',
+      meta: { target: ['id'] },
+    });
+    const mappedP2002 = mapEnsureWriteError(p2002);
+    assert(mappedP2002 instanceof TenantLifecycleError, 'P2002 maps to TenantLifecycleError');
+    assert(mappedP2002!.code === 'unique_constraint_race', mappedP2002!.code);
+    const mappedOther = mapEnsureWriteError(new Error('not unique'));
+    assert(mappedOther === null, 'non-P2002 errors are not remapped');
+    const mappedLifecycle = mapEnsureWriteError(
+      new TenantLifecycleError('organization_inactive', 'x')
+    );
+    assert(
+      mappedLifecycle instanceof TenantLifecycleError &&
+        mappedLifecycle.code === 'organization_inactive',
+      'TenantLifecycleError passthrough'
+    );
+    pass('21 unit mapEnsureWriteError — P2002 → unique_constraint_race');
 
     // --- TenantContext selection tests ---
     const auth = (userId: string, email: string) =>

@@ -52,7 +52,7 @@ On PostgreSQL, a unique violation aborts the current transaction until rollback.
 
 Slice 1A therefore **does not** attempt to re-query Organization/Membership on the same `TransactionClient` after `P2002`.
 
-`ensureUserOrganization` maps `P2002` → `TenantLifecycleError('unique_constraint_race')` and lets the caller transaction roll back. Retry after rollback is allowed for callers but is **not** implemented inside the helper.
+`ensureUserOrganization` maps write failures through `mapEnsureWriteError`: `P2002` → `TenantLifecycleError('unique_constraint_race')`, then lets the caller transaction roll back. Retry after rollback is allowed for callers but is **not** implemented inside the helper.
 
 ### Inactive Organization policy
 
@@ -153,7 +153,7 @@ Does **not** migrate other APIs onto TenantContext in this slice.
 FR004_DATABASE_URL=postgresql://... npm run tenancy:validate-slice1a
 ```
 
-Disposable Postgres only. Current suite: **20** assertions.
+Disposable Postgres only. Current suite: **21** assertions.
 
 | # | Coverage |
 |---|----------|
@@ -163,7 +163,10 @@ Disposable Postgres only. Current suite: **20** assertions.
 | 13–16 | Incompatible membership, slug collision, empty org membership create, foreign membership fail-closed |
 | 17 | User+ensure txn rollback on slug conflict (no partial User) |
 | 18–19 | Lifecycle ensure fails on SUSPENDED / DEACTIVATED org (no reactivation / rewrite) |
-| 20 | Concurrent `ensureUserOrganization` race → `unique_constraint_race` fail-closed; single org/membership remains |
+| 20 | **DB concurrency race-safety only** — concurrent `ensureUserOrganization` leaves exactly one Organization and one Membership. Does **not** claim P2002 was observed (`fulfilled=2` is allowed) |
+| 21 | **Unit error-mapping** — `mapEnsureWriteError(P2002)` → `TenantLifecycleError('unique_constraint_race')` (deterministic; no DB race required) |
+
+P2002 runtime policy remains fail-closed in production code; test **21** proves the mapping, test **20** proves concurrency invariants without overstating P2002 observation.
 
 ## User-creation path audit
 
