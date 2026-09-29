@@ -3,6 +3,7 @@ import { hashPassword } from '@/lib/auth';
 import { signUserToken } from '@/lib/jwt';
 import { prisma } from '@/lib/prisma';
 import { createSessionId, upsertUserSession } from '@/lib/user-sessions';
+import { ensureUserOrganization } from '@/lib/tenancy/ensure-user-organization';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,13 +55,29 @@ export async function POST(request: NextRequest) {
     let user = await prisma.user.findUnique({ where: { email } });
 
     if (!user) {
-      user = await prisma.user.create({
-        data: {
-          email,
-          name: name || email.split('@')[0],
-          password: await hashPassword(`google_${googleId || email}`),
-          onboardingCompletedAt: null,
-        },
+      const hashedPassword = await hashPassword(`google_${googleId || email}`);
+      user = await prisma.$transaction(async (tx) => {
+        const createdUser = await tx.user.create({
+          data: {
+            email,
+            name: name || email.split('@')[0],
+            password: hashedPassword,
+            onboardingCompletedAt: null,
+          },
+        });
+        await ensureUserOrganization(tx, {
+          userId: createdUser.id,
+          onboardingData: createdUser.onboardingData,
+        });
+        return createdUser;
+      });
+    } else {
+      // Existing identity: idempotent ensure only (fail closed on incompatible tenant state).
+      await prisma.$transaction(async (tx) => {
+        await ensureUserOrganization(tx, {
+          userId: user!.id,
+          onboardingData: user!.onboardingData,
+        });
       });
     }
 

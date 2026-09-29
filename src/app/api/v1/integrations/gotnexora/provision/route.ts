@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { hashPassword, validateEmail } from '@/lib/auth';
 import { isEmailDeliveryConfigured, sendTransactionalEmail } from '@/lib/mailer';
+import { ensureUserOrganization } from '@/lib/tenancy/ensure-user-organization';
 
 export const dynamic = 'force-dynamic';
 
@@ -205,6 +206,11 @@ export async function POST(request: NextRequest) {
           currentPeriodStart: periodStart,
           currentPeriodEnd: periodEnd,
         },
+      });
+
+      await ensureUserOrganization(tx, {
+        userId: user.id,
+        onboardingData: user.onboardingData,
       });
 
       return { user, subscription, existed: Boolean(existing) };

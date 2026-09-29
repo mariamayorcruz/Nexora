@@ -12,7 +12,8 @@
 
 - Does **not** add `organizationId` to CRM / campaigns / billing / automation / AI tables
 - Does **not** change runtime API authorization (still `userId`)
-- Does **not** implement TenantContext, org switching, SEC-07, SEC-08, or RLS
+- Does **not** implement TenantContext (see Slice 1A: `docs/point-7-slice-1a.md`)
+- Does **not** implement org switching, SEC-07, SEC-08, or RLS
 - Does **not** claim full multi-tenant isolation yet
 
 ## Migration baseline (FR-004)
