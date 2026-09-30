@@ -136,4 +136,16 @@ FR004_DATABASE_URL=postgresql://... npm run fr004:prodsim
 
 Production migration remains **separately blocked** pending architectural review and explicit authorization.
 
+Current read-only production gate (when a read-only URL is authorized later):
+
+```bash
+FR004_DATABASE_URL=... npm run fr004:pending-proof -- --before-point8b1 --allow-hosted-readonly
+```
+
+Expected pending: **exactly** `20260930011200_add_crmlead_organization_tenancy_foundation`.
+
+Historical `--after-auth-a` is **not** the current Point 8B-1 gate (Point 7 Auth A/B are completed).
+
+See `docs/database/fr-004-migration-integrity-runbook.md` → **POINT 8B-1 PRODUCTION MIGRATION GATE**.
+
 **8B-2 cannot begin** until the physical production column/indexes/FK are verified after that authorized migration.

@@ -1,10 +1,10 @@
 #!/usr/bin/env tsx
 /**
- * FR-004 Test A — Greenfield validation.
+ * FR-004 Test A — Greenfield validation (current active migration chain).
  *
  * EMPTY disposable PostgreSQL
  *   → prisma migrate deploy
- *   → baseline + Slice 0 apply
+ *   → baseline + Slice 0 + Point 8B-1 apply
  *   → structural checks vs expected tables/enums
  *
  * Requires:

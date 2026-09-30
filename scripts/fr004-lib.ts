@@ -315,20 +315,37 @@ export function derivePendingLocalActive(
   return localActive.filter((name) => !appliedNames.has(name))
 }
 
-/**
- * After Authorization A (baseline applied, Slice 0 not yet applied), the local
- * active chain now also includes Point 8B-1. Pending is therefore Slice 0 then 8B-1.
- */
-export function assertPendingIsSlice0Only(pending: string[]): void {
-  const expected = [SLICE0_NAME, POINT8B1_NAME]
+/** Fail closed unless pending local-active migrations match `expected` exactly (order + membership). */
+export function assertPendingExactly(pending: string[], expected: readonly string[]): void {
   if (
     pending.length !== expected.length ||
     expected.some((name, index) => pending[index] !== name)
   ) {
     throw new Error(
-      `Expected pending local-active migrations to be exactly [${expected.join(', ')}]; got [${pending.join(', ')}]`,
+      `Expected pending local-active migrations to be exactly [${expected.join(', ')}]; got [${pending.join(', ') || '(none)'}]`,
     )
   }
+}
+
+/**
+ * HISTORICAL — after Authorization A, before Authorization B.
+ * With Point 8B-1 in the active chain, pending is Slice 0 then Point 8B-1.
+ * Not the current production Point 8B-1 gate.
+ */
+export const PENDING_AFTER_AUTH_A_HISTORICAL = [SLICE0_NAME, POINT8B1_NAME] as const
+
+/** CURRENT production gate before authorized Point 8B-1 apply: only Point 8B-1 pending. */
+export const PENDING_BEFORE_POINT8B1 = [POINT8B1_NAME] as const
+
+export function columnExists(databaseUrl: string, table: string, column: string): boolean {
+  const safeTable = table.replace(/'/g, "''")
+  const safeColumn = column.replace(/'/g, "''")
+  const r = psql(
+    databaseUrl,
+    `SELECT COUNT(*)::text FROM information_schema.columns
+     WHERE table_schema='public' AND table_name='${safeTable}' AND column_name='${safeColumn}';`,
+  )
+  return r === '1'
 }
 
 export function assertPreOrgTablesPresent(databaseUrl: string): void {

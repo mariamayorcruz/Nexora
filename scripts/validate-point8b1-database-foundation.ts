@@ -4,10 +4,12 @@
  * Validates the additive migration only:
  *   - nullable organizationId column
  *   - approved indexes
- *   - FK → Organization ON DELETE RESTRICT
+ *   - FK → Organization ON DELETE RESTRICT (confdeltype exactly 'r')
  *   - no backfill side effects
  *   - existing synthetic rows keep organizationId NULL
  *   - userId remains NOT NULL / cascade unchanged
+ *   - CURRENT production pending gate `--before-point8b1` on a synthetic
+ *     baseline+Slice0 (Point8B1 absent) database
  *
  * Does NOT modify runtime application code paths.
  * Does NOT touch production.
@@ -18,18 +20,25 @@
  *   FR004_DATABASE_URL=postgresql://... npm run tenancy:validate-point8b1
  */
 
+import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   BASELINE_NAME,
+  LEGACY_PRODUCTION_MIGRATION_NAMES,
   POINT8B1_NAME,
   SLICE0_NAME,
   assertActiveMigrationSet,
   assertDisposableDatabaseUrl,
   assertPreOrgTablesPresent,
   assertSlice0Present,
+  columnExists,
   prismaCliVersion,
   psql,
+  psqlFile,
   readMigrationRows,
+  repoRoot,
   runPrisma,
   sanitizeDbUrlForLog,
 } from './fr004-lib';
@@ -136,9 +145,22 @@ function main(): void {
   );
   assert(indexExists(url, 'CrmLead_userId_idx'), 'missing index CrmLead_userId_idx');
 
-  // PostgreSQL confdeltype: a=NO ACTION, r=RESTRICT, c=CASCADE, n=SET NULL, d=SET DEFAULT
+  // Frozen design: ON DELETE RESTRICT → PostgreSQL confdeltype 'r' (not NO ACTION 'a')
   const del = fkDeleteRule(url, 'CrmLead_organizationId_fkey');
-  assert(del === 'r' || del === 'a', `expected RESTRICT/NO ACTION delete rule, got '${del}'`);
+  assert(del === 'r', `expected ON DELETE RESTRICT (confdeltype=r), got '${del}'`);
+
+  const upd = psql(
+    url,
+    `SELECT r.confupdtype
+     FROM pg_constraint r
+     JOIN pg_class c ON c.oid = r.conrelid
+     JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE n.nspname='public'
+       AND c.relname='CrmLead'
+       AND r.contype='f'
+       AND r.conname='CrmLead_organizationId_fkey';`
+  );
+  assert(upd === 'c', `expected ON UPDATE CASCADE (confupdtype=c), got '${upd}'`);
 
   // Synthetic data — raw SQL so active Prisma Client (without organizationId) is not required.
   const userId = `user_${randomUUID().replace(/-/g, '').slice(0, 16)}`;
@@ -244,6 +266,68 @@ function main(): void {
   assert(noBackfill === 'NULL', 'migration must not backfill organizationId');
 
   console.log('[point8b1] PASS column/nullability/indexes/fk/restrict/cascade/no-backfill/idempotent');
+
+  // --- CURRENT production gate simulation: baseline + Slice0 applied, Point8B1 absent ---
+  console.log('[point8b1] building synthetic pre-Point8B1 DB for --before-point8b1 gate');
+  resetPublic(url);
+  const baselineSql = path.join(repoRoot(), 'prisma', 'migrations', BASELINE_NAME, 'migration.sql');
+  const slice0Sql = path.join(repoRoot(), 'prisma', 'migrations', SLICE0_NAME, 'migration.sql');
+  assert(fs.existsSync(baselineSql), 'baseline SQL missing');
+  assert(fs.existsSync(slice0Sql), 'slice0 SQL missing');
+  psqlFile(url, baselineSql);
+  psqlFile(url, slice0Sql);
+  assertPreOrgTablesPresent(url);
+  assertSlice0Present(url);
+  assert(!columnExists(url, 'CrmLead', 'organizationId'), 'organizationId must be absent pre-8B-1');
+
+  psql(
+    url,
+    `CREATE TABLE IF NOT EXISTS "_prisma_migrations" (
+      "id" VARCHAR(36) PRIMARY KEY,
+      "checksum" VARCHAR(64) NOT NULL,
+      "finished_at" TIMESTAMPTZ,
+      "migration_name" VARCHAR(255) NOT NULL,
+      "logs" TEXT,
+      "rolled_back_at" TIMESTAMPTZ,
+      "started_at" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "applied_steps_count" INTEGER NOT NULL DEFAULT 0
+    );`
+  );
+  LEGACY_PRODUCTION_MIGRATION_NAMES.forEach((name, idx) => {
+    const id = `00000000-0000-4000-8000-${String(idx + 1).padStart(12, '0')}`;
+    psql(
+      url,
+      `INSERT INTO "_prisma_migrations"
+        (id, checksum, finished_at, migration_name, logs, rolled_back_at, started_at, applied_steps_count)
+       VALUES
+        ('${id}', '${'b'.repeat(64)}', now(), '${name}', NULL, NULL, now(), 1);`
+    );
+  });
+  psql(
+    url,
+    `INSERT INTO "_prisma_migrations"
+      (id, checksum, finished_at, migration_name, logs, rolled_back_at, started_at, applied_steps_count)
+     VALUES
+      ('00000000-0000-4000-8000-000000000100', '${'c'.repeat(64)}', now(), '${BASELINE_NAME}', NULL, NULL, now(), 1),
+      ('00000000-0000-4000-8000-000000000200', '${'d'.repeat(64)}', now(), '${SLICE0_NAME}', NULL, NULL, now(), 1);`
+  );
+
+  const preRows = readMigrationRows(url).map((r) => r.migration_name);
+  assert(preRows.includes(BASELINE_NAME) && preRows.includes(SLICE0_NAME), 'pre-8B1 rows incomplete');
+  assert(!preRows.includes(POINT8B1_NAME), 'Point8B1 must not be recorded in synthetic pre-8B1 DB');
+
+  const proofBin = path.join(repoRoot(), 'node_modules', '.bin', 'tsx');
+  const proofScript = path.join(repoRoot(), 'scripts', 'fr004-pending-migrations-proof.ts');
+  const proofOut = execFileSync(proofBin, [proofScript, '--before-point8b1'], {
+    cwd: repoRoot(),
+    env: { ...process.env, FR004_DATABASE_URL: url, DATABASE_URL: url },
+    encoding: 'utf8',
+  });
+  console.log(proofOut);
+  assert(proofOut.includes('pending=Point8B1 only') || proofOut.includes(POINT8B1_NAME), 'pending proof output missing Point8B1');
+  assert(proofOut.includes('[fr004-pending-proof] PASS'), 'before-point8b1 proof did not PASS');
+
+  console.log('[point8b1] PASS --before-point8b1 pending==Point8B1 only');
   console.log('[point8b1] ALL_PASS');
 }
 
