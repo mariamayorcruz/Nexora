@@ -17,6 +17,7 @@
 import {
   BASELINE_NAME,
   EXPECTED_PRE_ORG_TABLES,
+  POINT8B1_NAME,
   SLICE0_NAME,
   assertActiveMigrationSet,
   assertDisposableDatabaseUrl,
@@ -62,13 +63,22 @@ function main(): void {
   const deployOut = runPrisma(['migrate', 'deploy'], env)
   console.log(deployOut)
 
-  if (!deployOut.includes(BASELINE_NAME) || !deployOut.includes(SLICE0_NAME)) {
-    throw new Error('migrate deploy output did not mention both baseline and Slice 0')
+  if (
+    !deployOut.includes(BASELINE_NAME) ||
+    !deployOut.includes(SLICE0_NAME) ||
+    !deployOut.includes(POINT8B1_NAME)
+  ) {
+    throw new Error('migrate deploy output did not mention baseline, Slice 0, and Point 8B-1')
   }
 
   const rows = readMigrationRows(url)
   const names = rows.map((r) => r.migration_name)
-  if (names.length !== 2 || names[0] !== BASELINE_NAME || names[1] !== SLICE0_NAME) {
+  if (
+    names.length !== 3 ||
+    names[0] !== BASELINE_NAME ||
+    names[1] !== SLICE0_NAME ||
+    names[2] !== POINT8B1_NAME
+  ) {
     throw new Error(`Unexpected _prisma_migrations after greenfield: ${names.join(',')}`)
   }
 

@@ -5,8 +5,8 @@
  * 1. Apply baseline SQL to create PRE-ORG schema (without recording Slice 0)
  * 2. Simulate six historical `_prisma_migrations` rows
  * 3. `prisma migrate resolve --applied` baseline
- * 4. Custom pending-state proof → Slice 0 only
- * 5. `prisma migrate deploy` → ONLY Slice 0
+ * 4. Custom pending-state proof → Slice 0 + Point 8B-1
+ * 5. `prisma migrate deploy` → Slice 0 then Point 8B-1 (baseline already resolved)
  *
  * Never uses production URLs.
  */
@@ -16,6 +16,7 @@ import path from 'node:path'
 import {
   BASELINE_NAME,
   LEGACY_PRODUCTION_MIGRATION_NAMES,
+  POINT8B1_NAME,
   SLICE0_NAME,
   assertActiveMigrationSet,
   assertDisposableDatabaseUrl,
@@ -149,11 +150,16 @@ function main(): void {
   for (const name of LEGACY_PRODUCTION_MIGRATION_NAMES) {
     if (!finalNames.includes(name)) throw new Error(`Legacy row missing after deploy: ${name}`)
   }
-  if (!finalNames.includes(BASELINE_NAME) || !finalNames.includes(SLICE0_NAME)) {
+  if (
+    !finalNames.includes(BASELINE_NAME) ||
+    !finalNames.includes(SLICE0_NAME) ||
+    !finalNames.includes(POINT8B1_NAME)
+  ) {
     throw new Error(`Final migration set incomplete: ${finalNames.join(',')}`)
   }
-  if (finalNames.length !== 8) {
-    throw new Error(`Expected 8 migration rows after deploy; got ${finalNames.length}`)
+  // six legacy + baseline + Slice 0 + Point 8B-1
+  if (finalNames.length !== 9) {
+    throw new Error(`Expected 9 migration rows after deploy; got ${finalNames.length}`)
   }
 
   assertSlice0Present(url)

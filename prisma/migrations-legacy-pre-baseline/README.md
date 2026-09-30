@@ -8,6 +8,7 @@ Active history lives only under `prisma/migrations/` and currently contains:
 
 1. `20260918010000_baseline_production_pre_organization`
 2. `20260918020000_add_organization_membership`
+3. `20260930011200_add_crmlead_organization_tenancy_foundation`
 
 ## Do not reactivate blindly
 

@@ -29,6 +29,7 @@ Runtime tooling prints `baseline_parity_status=SEE_REVIEW_CHECKLIST` and does no
 
 1. `20260918010000_baseline_production_pre_organization`
 2. `20260918020000_add_organization_membership`
+3. `20260930011200_add_crmlead_organization_tenancy_foundation` (Point 8B-1 — additive nullable `CrmLead.organizationId`; no backfill; production apply separately authorized)
 
 ## `prisma migrate status` after squash
 

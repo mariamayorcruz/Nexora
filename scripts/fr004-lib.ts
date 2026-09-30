@@ -9,6 +9,8 @@ import path from 'node:path'
 
 export const BASELINE_NAME = '20260918010000_baseline_production_pre_organization'
 export const SLICE0_NAME = '20260918020000_add_organization_membership'
+/** Point 8B-1 additive CrmLead.organizationId foundation (nullable; no backfill). */
+export const POINT8B1_NAME = '20260930011200_add_crmlead_organization_tenancy_foundation'
 
 export const LEGACY_PRODUCTION_MIGRATION_NAMES = [
   '20260215120000_lead_capture_paid_flags',
@@ -74,7 +76,7 @@ export function listActiveMigrationNames(): string[] {
 
 export function assertActiveMigrationSet(): void {
   const names = listActiveMigrationNames()
-  const expected = [BASELINE_NAME, SLICE0_NAME]
+  const expected = [BASELINE_NAME, SLICE0_NAME, POINT8B1_NAME]
   if (names.length !== expected.length || expected.some((n, i) => names[i] !== n)) {
     throw new Error(
       `Active prisma/migrations must be exactly [${expected.join(', ')}]; found [${names.join(', ')}]`,
@@ -313,10 +315,18 @@ export function derivePendingLocalActive(
   return localActive.filter((name) => !appliedNames.has(name))
 }
 
+/**
+ * After Authorization A (baseline applied, Slice 0 not yet applied), the local
+ * active chain now also includes Point 8B-1. Pending is therefore Slice 0 then 8B-1.
+ */
 export function assertPendingIsSlice0Only(pending: string[]): void {
-  if (pending.length !== 1 || pending[0] !== SLICE0_NAME) {
+  const expected = [SLICE0_NAME, POINT8B1_NAME]
+  if (
+    pending.length !== expected.length ||
+    expected.some((name, index) => pending[index] !== name)
+  ) {
     throw new Error(
-      `Expected pending local-active migrations to be exactly [${SLICE0_NAME}]; got [${pending.join(', ')}]`,
+      `Expected pending local-active migrations to be exactly [${expected.join(', ')}]; got [${pending.join(', ')}]`,
     )
   }
 }
