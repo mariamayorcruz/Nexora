@@ -3,6 +3,12 @@ import { isInternalOrTestEmail } from '@/lib/access';
 import { prisma, withPrismaRetry } from '@/lib/prisma';
 import { validateEmail } from '@/lib/auth';
 import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
+import {
+  legacyCrmWriteClientMessage,
+  legacyCrmWriteHttpStatus,
+  NEXORA_ORGANIZATION_HEADER,
+  resolveLegacyCrmWriteOrganization,
+} from '@/lib/tenancy/resolve-legacy-crm-write-organization';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,9 +56,22 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = getUserIdFromAuthorizationHeader(request.headers.get('authorization'));
+    const authorizationHeader = request.headers.get('authorization');
+    const userId = getUserIdFromAuthorizationHeader(authorizationHeader);
     if (!userId) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    const writeOrg = await resolveLegacyCrmWriteOrganization({
+      userId,
+      authorizationHeader,
+      organizationIdHeader: request.headers.get(NEXORA_ORGANIZATION_HEADER),
+    });
+    if (!writeOrg.ok) {
+      return NextResponse.json(
+        { error: legacyCrmWriteClientMessage(writeOrg.code), code: writeOrg.code },
+        { status: legacyCrmWriteHttpStatus(writeOrg.code) }
+      );
     }
 
     let body: Record<string, unknown>;
@@ -96,10 +115,12 @@ export async function POST(request: NextRequest) {
       resolvedCampaignId = owned.id;
     }
 
+    // Never trust body.organizationId — ownership is server-assigned only.
     const lead = await withPrismaRetry(() =>
       prisma.crmLead.create({
         data: {
           userId,
+          organizationId: writeOrg.organizationId,
           name,
           email,
           source: 'manual',

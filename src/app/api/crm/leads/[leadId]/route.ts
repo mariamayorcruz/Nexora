@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 import { CRM_ALLOWED_STAGES } from '@/lib/sales-playbook';
+import {
+  legacyCrmWriteClientMessage,
+  legacyCrmWriteHttpStatus,
+  NEXORA_ORGANIZATION_HEADER,
+  omitCrmLeadOrganizationId,
+  resolveLegacyCrmWriteOrganization,
+} from '@/lib/tenancy/resolve-legacy-crm-write-organization';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,9 +36,23 @@ export async function PATCH(
   { params }: { params: { leadId: string } }
 ) {
   try {
-    const userId = getUserIdFromAuthorizationHeader(request.headers.get('authorization'));
+    const authorizationHeader = request.headers.get('authorization');
+    const userId = getUserIdFromAuthorizationHeader(authorizationHeader);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Transitional write guard: reject non-legacy org selection. Do NOT set organizationId (no partial backfill).
+    const writeOrg = await resolveLegacyCrmWriteOrganization({
+      userId,
+      authorizationHeader,
+      organizationIdHeader: request.headers.get(NEXORA_ORGANIZATION_HEADER),
+    });
+    if (!writeOrg.ok) {
+      return NextResponse.json(
+        { error: legacyCrmWriteClientMessage(writeOrg.code), code: writeOrg.code },
+        { status: legacyCrmWriteHttpStatus(writeOrg.code) }
+      );
     }
 
     const body = await request.json();
@@ -43,6 +64,7 @@ export async function PATCH(
       }
     }
 
+    // Locate by userId during 8B-2 (reads still userId-scoped).
     const existing = await prisma.crmLead.findFirst({
       where: { id: params.leadId, userId },
     });
@@ -71,7 +93,7 @@ export async function PATCH(
       },
     });
 
-    return NextResponse.json({ lead });
+    return NextResponse.json({ lead: omitCrmLeadOrganizationId(lead) });
   } catch (error) {
     console.error('Error updating CRM lead:', error);
     return NextResponse.json({ error: 'Error updating CRM lead' }, { status: 500 });

@@ -3,6 +3,13 @@ import { isInternalOrTestEmail } from '@/lib/access';
 import { prisma } from '@/lib/prisma';
 import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 import { CRM_ALLOWED_STAGES } from '@/lib/sales-playbook';
+import {
+  legacyCrmWriteClientMessage,
+  legacyCrmWriteHttpStatus,
+  NEXORA_ORGANIZATION_HEADER,
+  omitCrmLeadOrganizationId,
+  resolveLegacyCrmWriteOrganization,
+} from '@/lib/tenancy/resolve-legacy-crm-write-organization';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,6 +42,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Point 8B-2: reads remain userId-scoped (no organizationId filter).
     const rawLeads = await prisma.crmLead.findMany({
       where: { userId },
       orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
@@ -42,10 +50,13 @@ export async function GET(request: NextRequest) {
     const leads = rawLeads.filter((lead) => !isInternalOrTestEmail(lead.email));
 
     return NextResponse.json({
-      leads: leads.map((lead) => ({
-        ...lead,
-        stage: CRM_ALLOWED_STAGES.has(lead.stage) ? lead.stage : 'lead',
-      })),
+      leads: leads.map((lead) => {
+        const publicLead = omitCrmLeadOrganizationId(lead);
+        return {
+          ...publicLead,
+          stage: CRM_ALLOWED_STAGES.has(lead.stage) ? lead.stage : 'lead',
+        };
+      }),
     });
   } catch (error) {
     console.error('Error fetching CRM leads:', error);
@@ -55,9 +66,22 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = getUserIdFromAuthorizationHeader(request.headers.get('authorization'));
+    const authorizationHeader = request.headers.get('authorization');
+    const userId = getUserIdFromAuthorizationHeader(authorizationHeader);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const writeOrg = await resolveLegacyCrmWriteOrganization({
+      userId,
+      authorizationHeader,
+      organizationIdHeader: request.headers.get(NEXORA_ORGANIZATION_HEADER),
+    });
+    if (!writeOrg.ok) {
+      return NextResponse.json(
+        { error: legacyCrmWriteClientMessage(writeOrg.code), code: writeOrg.code },
+        { status: legacyCrmWriteHttpStatus(writeOrg.code) }
+      );
     }
 
     const body = await request.json();
@@ -74,9 +98,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Never trust body.organizationId — ownership is server-assigned only.
     const lead = await prisma.crmLead.create({
       data: {
         userId,
+        organizationId: writeOrg.organizationId,
         name,
         email: cleanEmail,
         phone: body.phone?.trim() || null,
@@ -91,7 +117,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ lead });
+    return NextResponse.json({ lead: omitCrmLeadOrganizationId(lead) });
   } catch (error) {
     console.error('Error creating CRM lead:', error);
     return NextResponse.json({ error: 'Error creating CRM lead' }, { status: 500 });

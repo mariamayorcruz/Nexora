@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
+import {
+  legacyCrmWriteClientMessage,
+  legacyCrmWriteHttpStatus,
+  NEXORA_ORGANIZATION_HEADER,
+  resolveLegacyCrmWriteOrganization,
+} from '@/lib/tenancy/resolve-legacy-crm-write-organization';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,9 +15,23 @@ export async function POST(
   { params }: { params: { leadId: string } }
 ) {
   try {
-    const userId = getUserIdFromAuthorizationHeader(request.headers.get('authorization'));
+    const authorizationHeader = request.headers.get('authorization');
+    const userId = getUserIdFromAuthorizationHeader(authorizationHeader);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Transitional write guard only — do not set organizationId on existing rows.
+    const writeOrg = await resolveLegacyCrmWriteOrganization({
+      userId,
+      authorizationHeader,
+      organizationIdHeader: request.headers.get(NEXORA_ORGANIZATION_HEADER),
+    });
+    if (!writeOrg.ok) {
+      return NextResponse.json(
+        { error: legacyCrmWriteClientMessage(writeOrg.code), code: writeOrg.code },
+        { status: legacyCrmWriteHttpStatus(writeOrg.code) }
+      );
     }
 
     const lead = await prisma.crmLead.findFirst({

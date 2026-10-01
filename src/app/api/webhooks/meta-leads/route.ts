@@ -11,6 +11,11 @@ import {
   normalizeMetaAdAccountId,
   resolveUniqueMetaTenantFromCandidates,
 } from '@/lib/meta-tenant-resolve';
+import {
+  legacyCrmWriteClientMessage,
+  legacyCrmWriteHttpStatus,
+  resolveLegacyCrmWriteOrganization,
+} from '@/lib/tenancy/resolve-legacy-crm-write-organization';
 
 export const dynamic = 'force-dynamic';
 
@@ -276,6 +281,23 @@ export async function POST(request: Request) {
       });
     }
 
+    // Point 8B-2: dual-write organizationId from config.userId -> deterministic legacy org.
+    // No browser TenantContext/header. Do not invent multi-org Meta ownership here.
+    const writeOrg = await resolveLegacyCrmWriteOrganization({
+      userId: config.userId,
+    });
+    if (!writeOrg.ok) {
+      console.error('Meta lead webhook legacy CRM write organization failed', {
+        userId: config.userId,
+        code: writeOrg.code,
+        leadId: extractedLead.leadId,
+      });
+      return NextResponse.json(
+        { error: legacyCrmWriteClientMessage(writeOrg.code), code: writeOrg.code },
+        { status: legacyCrmWriteHttpStatus(writeOrg.code) }
+      );
+    }
+
     const metaDetails = await fetchMetaLeadDetails(extractedLead.leadId, config.metaAdsToken || '');
     const lead = mergeLeadDetails(extractedLead, metaDetails);
     const leadName = lead.name || `Meta Lead ${lead.leadId}`;
@@ -284,6 +306,7 @@ export async function POST(request: Request) {
     const crmLead = await prisma.crmLead.create({
       data: {
         userId: config.userId,
+        organizationId: writeOrg.organizationId,
         name: leadName,
         email: lead.email || null,
         phone: lead.phone || null,

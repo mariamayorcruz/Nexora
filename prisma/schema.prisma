@@ -77,6 +77,8 @@ model Organization {
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
   memberships Membership[]
+  /// Point 8B-1 physical column; Point 8B-2 dual-write only (reads remain userId-scoped).
+  crmLeads    CrmLead[]
 }
 
 model Membership {
@@ -186,6 +188,10 @@ model CrmLead {
   id              String   @id @default(cuid())
   userId          String
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Point 8B-1 nullable tenancy column. Point 8B-2 writes deterministic legacy org on CREATE only.
+  /// Reads remain userId-scoped until Point 8B-4. Historical nulls left for Point 8B-3 backfill.
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   name            String
   email           String?
   phone           String?
@@ -202,6 +208,10 @@ model CrmLead {
   campaign        Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@index([organizationId, updatedAt])
+  @@index([organizationId, stage])
+  @@index([userId])
 }
 
 model CrmWorkspaceSettings {
