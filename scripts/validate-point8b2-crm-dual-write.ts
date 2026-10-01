@@ -273,18 +273,10 @@ async function main() {
     }
     pass('20 PATCH/message/update routes do not set organizationId');
 
-    // 21 reads remain userId-only (spot-check key routes)
-    const readFiles = [
-      'src/app/api/crm/leads/route.ts',
-      'src/app/api/leads/route.ts',
-      'src/app/api/leads/[id]/route.ts',
-    ];
-    for (const file of readFiles) {
-      const src = readFile(file);
-      assert(/where:\s*\{[^}]*userId/.test(src), `${file} reads must remain userId-scoped`);
-      assert(!/where:\s*\{\s*organizationId/.test(src), `${file} must not cut over reads to organizationId`);
-    }
-    pass('21 CRM reads remain userId-only');
+    // 21 (temporal Point 8B-2 assertion retired by Point 8B-4):
+    // CRM reads are organizationId-scoped after 8B-4. Enduring 8B-2 WRITE invariants below remain.
+    // See scripts/validate-point8b4-crm-read-cutover.ts for read-cutover coverage.
+    pass('21 superseded userId-only read assertion retired (covered by Point 8B-4 validator)');
 
     // 22–24 process invariants
     assert(!fs.existsSync(path.join(process.cwd(), 'scripts', 'backfill-crmlead-organization.ts')), 'no new backfill script');

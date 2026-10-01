@@ -141,14 +141,15 @@ function mergeLeadDetails(lead: ExtractedMetaLead, details: Partial<ExtractedMet
 
 /**
  * TEMPORARY: application-level duplicate detection without a schema migration.
- * Looks for an existing CrmLead for this tenant whose notes contain the Meta lead id marker.
+ * Looks for an existing CrmLead for this organization whose notes contain the Meta lead id marker.
+ * Point 8B-4: duplicate detection is organizationId-scoped.
  * Replace later with a unique externalLeadId column + index.
  */
-async function findExistingMetaCrmLead(userId: string, metaLeadId: string) {
+async function findExistingMetaCrmLead(organizationId: string, metaLeadId: string) {
   const marker = buildMetaLeadIdNoteMarker(metaLeadId);
   return prisma.crmLead.findFirst({
     where: {
-      userId,
+      organizationId,
       source: 'meta_lead_ads',
       notes: { contains: marker },
     },
@@ -267,22 +268,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Tenant automation config not found' }, { status: 404 });
     }
 
-    const existingLead = await findExistingMetaCrmLead(config.userId, extractedLead.leadId);
-    if (existingLead) {
-      console.info('Meta lead webhook duplicate suppressed', {
-        userId: config.userId,
-        metaLeadId: extractedLead.leadId,
-        crmLeadId: existingLead.id,
-      });
-      return NextResponse.json({
-        ok: true,
-        duplicate: true,
-        leadId: existingLead.id,
-      });
-    }
-
-    // Point 8B-2: dual-write organizationId from config.userId -> deterministic legacy org.
-    // No browser TenantContext/header. Do not invent multi-org Meta ownership here.
+    // Point 8B-2/8B-4: config.userId -> deterministic legacy org (no browser TenantContext/header).
+    // Resolve writeOrg before duplicate lookup so reads are organizationId-scoped.
     const writeOrg = await resolveLegacyCrmWriteOrganization({
       userId: config.userId,
     });
@@ -296,6 +283,20 @@ export async function POST(request: Request) {
         { error: legacyCrmWriteClientMessage(writeOrg.code), code: writeOrg.code },
         { status: legacyCrmWriteHttpStatus(writeOrg.code) }
       );
+    }
+
+    const existingLead = await findExistingMetaCrmLead(writeOrg.organizationId, extractedLead.leadId);
+    if (existingLead) {
+      console.info('Meta lead webhook duplicate suppressed', {
+        userId: config.userId,
+        metaLeadId: extractedLead.leadId,
+        crmLeadId: existingLead.id,
+      });
+      return NextResponse.json({
+        ok: true,
+        duplicate: true,
+        leadId: existingLead.id,
+      });
     }
 
     const metaDetails = await fetchMetaLeadDetails(extractedLead.leadId, config.metaAdsToken || '');

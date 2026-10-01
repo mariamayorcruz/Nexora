@@ -103,14 +103,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No tienes permiso para mover este lead.' }, { status: 403 });
     }
 
-    // Existing-lead match remains userId-scoped; do NOT backfill organizationId on reuse (8B-3).
+    // Point 8B-4: existing CRM reuse is organization-scoped. Do NOT backfill/mutate ownership.
+    // LeadCapture remains userId-owned.
     const mergeOr: Array<{ id: string } | { email: string }> = [];
     if (capture.crmLeadId) mergeOr.push({ id: capture.crmLeadId });
     if (capture.email) mergeOr.push({ email: capture.email });
     const existingLead =
       mergeOr.length > 0
         ? await prisma.crmLead.findFirst({
-            where: { userId: auth.user.id, OR: mergeOr },
+            where: { organizationId: writeOrg.organizationId, OR: mergeOr },
           })
         : null;
 

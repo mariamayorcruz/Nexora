@@ -4,9 +4,13 @@ import { prisma } from '@/lib/prisma';
 import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 import { CRM_ALLOWED_STAGES } from '@/lib/sales-playbook';
 import {
+  crmReadErrorResponse,
+  NEXORA_ORGANIZATION_HEADER,
+  resolveCrmReadOrganization,
+} from '@/lib/tenancy/resolve-crm-read-organization';
+import {
   legacyCrmWriteClientMessage,
   legacyCrmWriteHttpStatus,
-  NEXORA_ORGANIZATION_HEADER,
   omitCrmLeadOrganizationId,
   resolveLegacyCrmWriteOrganization,
 } from '@/lib/tenancy/resolve-legacy-crm-write-organization';
@@ -37,14 +41,18 @@ function toLastContactedAtOrNull(raw: unknown): Date | null {
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = getUserIdFromAuthorizationHeader(request.headers.get('authorization'));
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const authorizationHeader = request.headers.get('authorization');
+    const readOrg = await resolveCrmReadOrganization({
+      authorizationHeader,
+      organizationIdHeader: request.headers.get(NEXORA_ORGANIZATION_HEADER),
+    });
+    if (!readOrg.ok) {
+      return crmReadErrorResponse(readOrg);
     }
 
-    // Point 8B-2: reads remain userId-scoped (no organizationId filter).
+    // Point 8B-4: CrmLead reads authorize by organizationId only (no userId fallback).
     const rawLeads = await prisma.crmLead.findMany({
-      where: { userId },
+      where: { organizationId: readOrg.context.organizationId },
       orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
     });
     const leads = rawLeads.filter((lead) => !isInternalOrTestEmail(lead.email));
