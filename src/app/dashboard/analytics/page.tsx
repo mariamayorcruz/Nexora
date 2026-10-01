@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import { useTenantOrganization } from '@/components/TenantOrganizationProvider';
 
 interface AnalyticsCampaign {
   id: string;
@@ -43,6 +44,8 @@ interface AnalyticsUser {
 }
 
 export default function AnalyticsPage() {
+  const { selectionReady, selectedOrganizationId, getTenantHeaders, handleTenantResponse } =
+    useTenantOrganization();
   const [campaigns, setCampaigns] = useState<AnalyticsCampaign[]>([]);
   const [captures, setCaptures] = useState<LeadCapture[]>([]);
   const [crmLeads, setCrmLeads] = useState<CrmLead[]>([]);
@@ -50,27 +53,36 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!selectionReady || !selectedOrganizationId) return;
+
     const fetchData = async () => {
+      const headers = getTenantHeaders();
+      const token = localStorage.getItem('token');
+      if (!headers || !token) return;
+      setLoading(true);
+      setCrmLeads([]);
       try {
-        const token = localStorage.getItem('token');
         const [userResponse, capturesResponse, crmResponse] = await Promise.all([
           fetch('/api/users/me', {
-            headers: { Authorization: `Bearer ${token}` },
+            headers,
             cache: 'no-store',
           }),
+          // LeadCapture list remains user-owned (no org header required).
           fetch('/api/business/leads', {
             headers: { Authorization: `Bearer ${token}` },
             cache: 'no-store',
           }),
           fetch('/api/crm/leads', {
-            headers: { Authorization: `Bearer ${token}` },
+            headers,
             cache: 'no-store',
           }),
         ]);
 
-        const userData = await userResponse.json();
+        const userData = await userResponse.json().catch(() => ({}));
+        if (handleTenantResponse(userResponse.status, userData)) return;
         const capturesData = capturesResponse.ok ? await capturesResponse.json() : { captures: [] };
-        const crmData = crmResponse.ok ? await crmResponse.json() : { leads: [] };
+        const crmData = await crmResponse.json().catch(() => ({ leads: [] }));
+        if (handleTenantResponse(crmResponse.status, crmData)) return;
 
         setCampaigns(userData.campaigns || []);
         setUser(userData.user);
@@ -84,7 +96,7 @@ export default function AnalyticsPage() {
     };
 
     void fetchData();
-  }, []);
+  }, [selectionReady, selectedOrganizationId, getTenantHeaders, handleTenantResponse]);
 
   const metrics = useMemo(() => {
     const totals = campaigns.reduce(

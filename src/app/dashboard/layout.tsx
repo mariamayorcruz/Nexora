@@ -18,6 +18,13 @@ import {
   Zap,
 } from 'lucide-react';
 import DashboardChatbot from '@/components/DashboardChatbot';
+import {
+  NoOrganizationState,
+  OrganizationChooserPanel,
+  OrganizationSelector,
+  TenantOrganizationProvider,
+  useTenantOrganization,
+} from '@/components/TenantOrganizationProvider';
 import { useAppLanguage } from '@/hooks/use-app-language';
 
 type DashboardUser = {
@@ -80,9 +87,26 @@ function formatPlanLabel(user: DashboardUser | null) {
 }
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
+  return (
+    <TenantOrganizationProvider>
+      <DashboardShell>{children}</DashboardShell>
+    </TenantOrganizationProvider>
+  );
+}
+
+function DashboardShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { language, setLanguage } = useAppLanguage();
+  const {
+    status: tenantStatus,
+    selectionReady,
+    selectedOrganizationId,
+    organizationEpoch,
+    getTenantHeaders,
+    handleTenantResponse,
+    clearOrganizationPreferenceOnLogout,
+  } = useTenantOrganization();
   const [user, setUser] = useState<DashboardUser | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -97,25 +121,68 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       return;
     }
 
+    if (tenantStatus === 'loading') {
+      setLoading(true);
+      return;
+    }
+
+    if (tenantStatus === 'unauthenticated') {
+      localStorage.removeItem('token');
+      clearOrganizationPreferenceOnLogout();
+      router.push('/auth/login');
+      return;
+    }
+
+    // Multi-org / zero-org: do not call tenant-scoped /users/me yet.
+    if (tenantStatus === 'selection_required' || tenantStatus === 'no_organization') {
+      setUser(null);
+      setCrmCount(0);
+      setConversationCount(0);
+      setLoading(false);
+      return;
+    }
+
+    if (!selectionReady) {
+      setLoading(true);
+      return;
+    }
+
     const fetchData = async () => {
+      setLoading(true);
       try {
+        const headers = getTenantHeaders();
+        if (!headers) {
+          setLoading(false);
+          return;
+        }
+
         const meUrl =
           pathname === '/dashboard/billing'
             ? '/api/users/me?allowIncomplete=1'
             : '/api/users/me';
 
         const response = await fetch(meUrl, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers,
           cache: 'no-store',
         });
 
         if (!response.ok) {
           const payload = await response.json().catch(() => null);
+          if (handleTenantResponse(response.status, payload)) {
+            setLoading(false);
+            return;
+          }
           if (response.status === 403 && payload?.code === 'SUBSCRIPTION_REQUIRED') {
             if (!hasRedirected.current) {
               hasRedirected.current = true;
               router.push('/#pricing');
             }
+            return;
+          }
+          if (response.status === 401) {
+            localStorage.removeItem('token');
+            clearOrganizationPreferenceOnLogout();
+            router.push('/auth/login');
             return;
           }
           throw new Error('Failed to fetch user');
@@ -138,10 +205,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
         try {
           const leadsResponse = await fetch('/api/crm/leads', {
-            headers: { Authorization: `Bearer ${token}` },
+            headers,
             cache: 'no-store',
           });
           const leadsData = await leadsResponse.json().catch(() => ({ leads: [] }));
+          if (handleTenantResponse(leadsResponse.status, leadsData)) {
+            return;
+          }
           const leads = Array.isArray(leadsData?.leads) ? leadsData.leads : [];
           const activeConversations = leads.filter(
             (lead: Record<string, unknown>) =>
@@ -154,6 +224,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       } catch (error) {
         console.error('Error fetching dashboard shell:', error);
         localStorage.removeItem('token');
+        clearOrganizationPreferenceOnLogout();
         router.push('/auth/login');
       } finally {
         setLoading(false);
@@ -161,7 +232,17 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     };
 
     void fetchData();
-  }, [pathname, router]);
+  }, [
+    pathname,
+    router,
+    tenantStatus,
+    selectionReady,
+    selectedOrganizationId,
+    organizationEpoch,
+    getTenantHeaders,
+    handleTenantResponse,
+    clearOrganizationPreferenceOnLogout,
+  ]);
 
   const menu = useMemo<MenuItem[]>(() => {
     return [
@@ -236,10 +317,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    clearOrganizationPreferenceOnLogout();
     router.push('/');
   };
 
-  if (loading) {
+  if (tenantStatus === 'loading' || (loading && tenantStatus === 'ready')) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#05080f]">
         <div className="text-center">
@@ -248,6 +330,18 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </div>
       </div>
     );
+  }
+
+  if (tenantStatus === 'no_organization') {
+    return <NoOrganizationState language={language} />;
+  }
+
+  if (tenantStatus === 'selection_required') {
+    return <OrganizationChooserPanel language={language} />;
+  }
+
+  if (tenantStatus === 'error') {
+    return <NoOrganizationState language={language} />;
   }
 
   return (
@@ -387,6 +481,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2">
+            <OrganizationSelector language={language} compact />
             {topbarActions.map((action) => (
               <Link
                 key={action.href}
@@ -407,7 +502,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 px-4 py-4 sm:px-5 lg:px-6 lg:py-5">{children}</main>
+        <main className="flex-1 px-4 py-4 sm:px-5 lg:px-6 lg:py-5">
+          <div key={selectedOrganizationId || `epoch-${organizationEpoch}`}>{children}</div>
+        </main>
       </div>
 
       {sidebarOpen ? (

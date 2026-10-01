@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTenantOrganization } from '@/components/TenantOrganizationProvider';
 import { useAppLanguage } from '@/hooks/use-app-language';
 
 type IntegrationStatus = {
@@ -13,6 +14,8 @@ type IntegrationStatus = {
 export default function SettingsPage() {
   const { language } = useAppLanguage();
   const en = language === 'en';
+  const { selectionReady, selectedOrganizationId, getTenantHeaders, handleTenantResponse } =
+    useTenantOrganization();
   const [integrationStatus, setIntegrationStatus] = useState<IntegrationStatus | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loadingIntegration, setLoadingIntegration] = useState(true);
@@ -55,11 +58,14 @@ export default function SettingsPage() {
   };
 
   useEffect(() => {
+    if (!selectionReady || !selectedOrganizationId) return;
+
     const bootstrap = async () => {
       setLoadingIntegration(true);
       try {
+        const headers = getTenantHeaders();
         const token = localStorage.getItem('token');
-        if (!token) {
+        if (!headers || !token) {
           setUser(null);
           setIsAdmin(false);
           setIntegrationStatus(null);
@@ -67,10 +73,11 @@ export default function SettingsPage() {
         }
 
         const response = await fetch('/api/users/me', {
-          headers: { Authorization: `Bearer ${token}` },
+          headers,
           cache: 'no-store',
         });
         const data = await response.json().catch(() => ({}));
+        if (handleTenantResponse(response.status, data)) return;
         const nextUser = data.user || null;
         const adminAccess = Boolean(nextUser?.isAdmin);
 
@@ -128,7 +135,7 @@ export default function SettingsPage() {
     };
 
     void bootstrap();
-  }, []);
+  }, [selectionReady, selectedOrganizationId, getTenantHeaders, handleTenantResponse]);
 
   const showStatus = (message: string) => {
     setStatusMessage(message);

@@ -6,6 +6,7 @@ import { ArrowRight, CalendarPlus2, MessageCircleMore, Rocket, Sparkles } from '
 import { useEffect, useMemo, useState } from 'react';
 import DailyBriefing from '@/components/DailyBriefing';
 import NextBestActionPanel from '@/components/NextBestActionPanel';
+import { useTenantOrganization } from '@/components/TenantOrganizationProvider';
 import { useAppLanguage } from '@/hooks/use-app-language';
 import { computeNextBestActions } from '@/lib/next-best-action';
 
@@ -68,23 +69,36 @@ export default function DashboardPage() {
   const [studio, setStudio] = useState<StudioPayload | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const { selectionReady, selectedOrganizationId, getTenantHeaders, handleTenantResponse } =
+    useTenantOrganization();
+
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      window.location.href = '/auth/login';
-      return;
-    }
+    if (!selectionReady || !selectedOrganizationId) return;
 
     const load = async () => {
+      const headers = getTenantHeaders();
+      const token = localStorage.getItem('token');
+      if (!headers || !token) {
+        window.location.href = '/auth/login';
+        return;
+      }
+
+      setLoading(true);
+      setLeads([]);
       try {
         const [meRes, leadsRes, studioRes] = await Promise.all([
-          fetch('/api/users/me', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }),
-          fetch('/api/crm/leads', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }),
-          fetch('/api/ai/studio', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }),
+          fetch('/api/users/me', { headers, cache: 'no-store' }),
+          fetch('/api/crm/leads', { headers, cache: 'no-store' }),
+          fetch('/api/ai/studio', {
+            headers: { Authorization: `Bearer ${token}` },
+            cache: 'no-store',
+          }),
         ]);
 
-        const meData = await meRes.json();
+        const meData = await meRes.json().catch(() => null);
+        if (handleTenantResponse(meRes.status, meData)) return;
         const leadsData = await leadsRes.json().catch(() => ({ leads: [] }));
+        if (handleTenantResponse(leadsRes.status, leadsData)) return;
         const studioData = await studioRes.json().catch(() => ({ usage: null, jobs: [] }));
 
         setPayload(meData);
@@ -96,7 +110,7 @@ export default function DashboardPage() {
     };
 
     void load();
-  }, []);
+  }, [selectionReady, selectedOrganizationId, getTenantHeaders, handleTenantResponse]);
 
   const businessName =
     String(payload?.user?.onboardingData?.businessName || '').trim() ||

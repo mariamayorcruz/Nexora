@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import CrmAddLeadModal from '@/components/CrmAddLeadModal';
 import FocusPanel, { type FocusLead } from '@/components/FocusPanel';
+import { useTenantOrganization } from '@/components/TenantOrganizationProvider';
 import { useAppLanguage } from '@/hooks/use-app-language';
 
 type ViewMode = 'kanban' | 'list';
@@ -87,6 +88,8 @@ function leadRiskLabel(lead: LeadRow, language: string): string {
 export default function DashboardCrmPage() {
   const { language } = useAppLanguage();
   const searchParams = useSearchParams();
+  const { selectionReady, selectedOrganizationId, getTenantHeaders, handleTenantResponse } =
+    useTenantOrganization();
   const [leads, setLeads] = useState<LeadRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
@@ -105,14 +108,19 @@ export default function DashboardCrmPage() {
   const focusPanelRef = useRef<HTMLDivElement | null>(null);
 
   const fetchLeads = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
+    const headers = getTenantHeaders();
+    if (!headers) return;
     try {
       const response = await fetch('/api/crm/leads', {
-        headers: { Authorization: `Bearer ${token}` },
+        headers,
         cache: 'no-store',
       });
-      const data = await response.json();
+      const data = await response.json().catch(() => ({ leads: [] }));
+      if (handleTenantResponse(response.status, data)) {
+        setLeads([]);
+        setSelectedLeadId(null);
+        return;
+      }
       setLeads(Array.isArray(data?.leads) ? data.leads : []);
     } catch {
       setLeads([]);
@@ -122,8 +130,15 @@ export default function DashboardCrmPage() {
   };
 
   useEffect(() => {
+    if (!selectionReady || !selectedOrganizationId) return;
+    setLeads([]);
+    setSelectedLeadId(null);
+    setHighlightedLeadId(null);
+    setCommandCenterSelection(null);
+    setLoading(true);
     void fetchLeads();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectionReady, selectedOrganizationId]);
 
   useEffect(() => {
     const leadIdFromUrl = searchParams.get('leadId');
@@ -440,19 +455,18 @@ export default function DashboardCrmPage() {
     setBusyLeadId(lead.id);
     setMessage('');
     try {
-      const token = localStorage.getItem('token');
+      const headers = getTenantHeaders({ 'Content-Type': 'application/json' });
+      if (!headers) throw new Error(language === 'en' ? 'Workspace required.' : 'Espacio requerido.');
       const response = await fetch(`/api/crm/leads/${lead.id}`, {
         method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           stage: UI_TO_CRM[target],
           lastContactedAt: new Date().toISOString(),
         }),
       });
       const data = await response.json().catch(() => ({}));
+      if (handleTenantResponse(response.status, data)) return;
       if (!response.ok) throw new Error(data.error || 'No se pudo mover el lead.');
       await fetchLeads();
       setMessage(language === 'en' ? 'Lead updated.' : 'Lead actualizado.');
@@ -470,17 +484,20 @@ export default function DashboardCrmPage() {
   };
 
   const handleSend = async (lead: FocusLead, channel: 'whatsapp' | 'sms' | 'email' | 'nota', text: string) => {
-    const token = localStorage.getItem('token');
+    const headers = getTenantHeaders({ 'Content-Type': 'application/json' });
+    if (!headers) {
+      setMessage(language === 'en' ? 'Workspace required.' : 'Espacio requerido.');
+      return;
+    }
 
     if (channel === 'nota') {
       const response = await fetch(`/api/crm/leads/${lead.id}`, {
         method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({ notes: text }),
       });
+      const noteData = await response.json().catch(() => ({}));
+      if (handleTenantResponse(response.status, noteData)) return;
       if (response.ok) {
         await fetchLeads();
         setMessage(language === 'en' ? 'Note saved.' : 'Nota guardada.');
@@ -492,14 +509,12 @@ export default function DashboardCrmPage() {
 
     const response = await fetch(`/api/crm/leads/${lead.id}/message`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({ channel, message: text }),
     });
 
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
+    if (handleTenantResponse(response.status, data)) return;
 
     if (!response.ok) {
       setMessage(data.error || (language === 'en' ? 'Error sending message.' : 'Error al enviar el mensaje.'));

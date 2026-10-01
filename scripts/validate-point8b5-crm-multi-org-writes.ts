@@ -429,20 +429,9 @@ async function main() {
     );
     pass('37 Point 8B-4 read isolation still holds');
 
-    // 38. No frontend 8B-5C implementation
-    const frontendGlobs = [
-      'src/components',
-      'src/app/dashboard',
-      'src/app/auth',
-    ];
-    for (const dir of frontendGlobs) {
-      const full = path.join(process.cwd(), dir);
-      if (!fs.existsSync(full)) continue;
-      // Ensure this PR does not add org-header fetch / selector UX in frontend trees we touch.
-      // Static: no new X-Nexora header wiring under dashboard/components from this phase.
-    }
-    // Diff-style: package/scripts and server API only — assert no dashboard/localStorage org selector additions
-    // by checking known frontend entrypoints do not newly import write resolver / org header fetch helpers.
+    // 38. Point 8B-5B temporal "no frontend 8B-5C" assertion retired after 8B-5C authorization.
+    // Frontend org discovery/header propagation is covered by tenancy:validate-point8b5c.
+    // Enduring rule: frontend must never call server write resolvers / treat client as authority.
     const dashboardFiles: string[] = [];
     const walk = (dir: string) => {
       if (!fs.existsSync(dir)) return;
@@ -457,11 +446,11 @@ async function main() {
     for (const file of dashboardFiles) {
       const src = fs.readFileSync(file, 'utf8');
       assert(
-        !/x-nexora-organization-id|NEXORA_ORGANIZATION_HEADER|resolveCrmWriteOrganization/.test(src),
-        `${file} must not implement 8B-5C org selection/header propagation`
+        !/resolveCrmWriteOrganization|resolveCrmReadOrganization|resolveLegacyCrmWriteOrganization/.test(src),
+        `${file} must not import server tenancy resolvers`
       );
     }
-    pass('38 no frontend 8B-5C implementation was added');
+    pass('38 frontend must not import server tenancy resolvers (8B-5C UX covered by point8b5c validator)');
 
     // 39–40. Process invariants
     pass('39 no production DB mutation occurs');

@@ -2,6 +2,7 @@
 
 import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useTenantOrganization } from '@/components/TenantOrganizationProvider';
 
 const INITIAL = {
   name: '',
@@ -25,6 +26,7 @@ export default function CrmAddLeadModal({
   onCreated: () => void | Promise<void>;
 }) {
   const en = language === 'en';
+  const { getTenantHeaders, handleTenantResponse } = useTenantOrganization();
   const [form, setForm] = useState(INITIAL);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -51,9 +53,9 @@ export default function CrmAddLeadModal({
       return;
     }
 
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setError(en ? 'Session expired. Sign in again.' : 'Sesión expirada. Inicia sesión de nuevo.');
+    const headers = getTenantHeaders({ 'Content-Type': 'application/json' });
+    if (!headers) {
+      setError(en ? 'Select a workspace first.' : 'Selecciona un espacio primero.');
       return;
     }
 
@@ -63,10 +65,7 @@ export default function CrmAddLeadModal({
       const valueNum = form.value.trim() === '' ? 0 : Number(form.value);
       const response = await fetch('/api/crm/leads', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           name,
           email: form.email.trim() || undefined,
@@ -78,6 +77,10 @@ export default function CrmAddLeadModal({
         }),
       });
       const data = await response.json().catch(() => ({}));
+      if (handleTenantResponse(response.status, data)) {
+        setError(en ? 'Organization selection required.' : 'Selección de organización requerida.');
+        return;
+      }
       if (!response.ok) {
         setError(typeof data?.error === 'string' ? data.error : en ? 'Could not create lead.' : 'No se pudo crear el lead.');
         return;
