@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { isAdminEmail, isFounderEmail, isInternalOrTestEmail } from '@/lib/access';
 import { getBearerToken, verifyUserToken } from '@/lib/jwt';
+import {
+  legacyCrmWriteClientMessage,
+  legacyCrmWriteHttpStatus,
+  NEXORA_ORGANIZATION_HEADER,
+  omitCrmLeadOrganizationId,
+  resolveLegacyCrmWriteOrganization,
+} from '@/lib/tenancy/resolve-legacy-crm-write-organization';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,6 +66,18 @@ export async function POST(request: NextRequest) {
     const auth = await getAuthorizedUser(request);
     if ('error' in auth) return auth.error;
 
+    const writeOrg = await resolveLegacyCrmWriteOrganization({
+      userId: auth.user.id,
+      authorizationHeader: request.headers.get('authorization'),
+      organizationIdHeader: request.headers.get(NEXORA_ORGANIZATION_HEADER),
+    });
+    if (!writeOrg.ok) {
+      return NextResponse.json(
+        { error: legacyCrmWriteClientMessage(writeOrg.code), code: writeOrg.code },
+        { status: legacyCrmWriteHttpStatus(writeOrg.code) }
+      );
+    }
+
     const body = await request.json();
     const captureId = String(body.captureId || '').trim();
     if (!captureId) {
@@ -84,6 +103,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No tienes permiso para mover este lead.' }, { status: 403 });
     }
 
+    // Existing-lead match remains userId-scoped; do NOT backfill organizationId on reuse (8B-3).
     const mergeOr: Array<{ id: string } | { email: string }> = [];
     if (capture.crmLeadId) mergeOr.push({ id: capture.crmLeadId });
     if (capture.email) mergeOr.push({ email: capture.email });
@@ -99,6 +119,7 @@ export async function POST(request: NextRequest) {
       (await prisma.crmLead.create({
         data: {
           userId: auth.user.id,
+          organizationId: writeOrg.organizationId,
           name: capture.name || capture.email.split('@')[0],
           email: capture.email,
           source: capture.source,
@@ -119,7 +140,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ success: true, crmLead });
+    return NextResponse.json({ success: true, crmLead: omitCrmLeadOrganizationId(crmLead) });
   } catch (error) {
     console.error('Error promoting business lead:', error);
     return NextResponse.json({ error: 'Error promoting business lead' }, { status: 500 });

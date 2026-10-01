@@ -10,6 +10,12 @@ import {
 } from '@/lib/crm-sales-engine-defaults';
 import { DEFAULT_SALES_ENGINE, parseStoredCadence, serializeCadence } from '@/lib/crm-sequences';
 import { isInternalOrTestEmail } from '@/lib/access';
+import {
+  legacyCrmWriteClientMessage,
+  legacyCrmWriteHttpStatus,
+  NEXORA_ORGANIZATION_HEADER,
+  resolveLegacyCrmWriteOrganization,
+} from '@/lib/tenancy/resolve-legacy-crm-write-organization';
 
 export const dynamic = 'force-dynamic';
 
@@ -309,6 +315,9 @@ export async function POST(request: NextRequest) {
     const pipelinePresetKey = buildPipelinePresetKey(businessType, mainGoal);
     const canCreateSampleLead = !currentOnboardingData.sampleLeadCreatedAt;
 
+    const organizationIdHeader = request.headers.get(NEXORA_ORGANIZATION_HEADER);
+    const authorizationHeader = request.headers.get('authorization');
+
     await prisma.$transaction(async (tx) => {
       let sampleLeadCreatedAt =
         typeof currentOnboardingData.sampleLeadCreatedAt === 'string'
@@ -320,6 +329,21 @@ export async function POST(request: NextRequest) {
       });
 
       if (existingLeadCount === 0 && canCreateSampleLead) {
+        // Validate write org on the same transaction client (no ensure/repair).
+        const writeOrg = await resolveLegacyCrmWriteOrganization({
+          userId: user.id,
+          authorizationHeader,
+          organizationIdHeader,
+          db: tx,
+        });
+        if (!writeOrg.ok) {
+          const err = new Error(writeOrg.code) as Error & {
+            legacyCrmWriteCode: typeof writeOrg.code;
+          };
+          err.legacyCrmWriteCode = writeOrg.code;
+          throw err;
+        }
+
         const sampleLead = buildSampleLead({
           businessType,
           businessName,
@@ -329,6 +353,7 @@ export async function POST(request: NextRequest) {
         await tx.crmLead.create({
           data: {
             userId: user.id,
+            organizationId: writeOrg.organizationId,
             name: sampleLead.name,
             email: sampleLead.email,
             company: sampleLead.company,
@@ -412,6 +437,17 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
+    const writeCode =
+      error && typeof error === 'object' && 'legacyCrmWriteCode' in error
+        ? (error as { legacyCrmWriteCode: string }).legacyCrmWriteCode
+        : null;
+    if (writeCode) {
+      const code = writeCode as Parameters<typeof legacyCrmWriteHttpStatus>[0];
+      return NextResponse.json(
+        { error: legacyCrmWriteClientMessage(code), code },
+        { status: legacyCrmWriteHttpStatus(code) }
+      );
+    }
     console.error('Onboarding save error:', error);
     return NextResponse.json({ error: 'No se pudo guardar el onboarding.' }, { status: 500 });
   }

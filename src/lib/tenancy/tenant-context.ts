@@ -13,10 +13,13 @@ import {
   MembershipRole,
   MembershipStatus,
   OrganizationStatus,
+  type Prisma,
   type PrismaClient,
 } from '@prisma/client';
 import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 import { prisma as defaultPrisma } from '@/lib/prisma';
+
+type TenantDbClient = Prisma.TransactionClient | PrismaClient;
 
 export const NEXORA_ORGANIZATION_HEADER = 'x-nexora-organization-id';
 
@@ -59,7 +62,7 @@ function normalizeOrganizationId(value: string | null | undefined): string | nul
 export async function resolveTenantContext(params: {
   authorizationHeader: string | null;
   organizationIdHeader?: string | null;
-  db?: PrismaClient;
+  db?: TenantDbClient;
 }): Promise<ResolveTenantContextResult> {
   const db = params.db || defaultPrisma;
   const userId = getUserIdFromAuthorizationHeader(params.authorizationHeader);
