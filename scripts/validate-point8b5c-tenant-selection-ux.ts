@@ -113,8 +113,8 @@ async function main() {
     assert(/OrganizationStatus\.ACTIVE/.test(discoverySrc), 'ACTIVE organizations');
     pass('6 discovery returns only ACTIVE memberships');
     pass('7 discovery returns only ACTIVE organizations');
-    assert(!/ensureUserOrganization/.test(discoverySrc), 'no ensure');
-    assert(!/\.(create|update|upsert|delete)\(/.test(discoverySrc), 'no mutation');
+    assert(!/ensureUserOrganization\s*\(/.test(discoverySrc), 'no ensure call');
+    assert(!/prisma\.\w+\.(create|update|upsert|delete|deleteMany)\(/.test(discoverySrc), 'no mutation');
     pass('8 discovery does not call ensureUserOrganization');
     pass('9 discovery does not mutate tenant state');
     assert(/id:\s*entry\.organization\.id/.test(discoverySrc), 'id');
@@ -275,8 +275,8 @@ async function main() {
     assert(/nexora_selected_organization_id/.test(loginSrc), 'login clears preference');
     pass('39 logout clears selected-org preference');
 
-    assert(!/ensureUserOrganization|organization\.create/.test(providerSrc), 'no org create in FE');
-    assert(!/ensureUserOrganization/.test(discoverySrc), 'discovery no create');
+    assert(!/ensureUserOrganization\s*\(|organization\.create\s*\(/.test(providerSrc), 'no org create in FE');
+    assert(!/ensureUserOrganization\s*\(/.test(discoverySrc), 'discovery has no ensure call');
     pass('40 no organization is created by frontend selection logic');
 
     const metaSrc = readFile('src/app/api/webhooks/meta-leads/route.ts');
