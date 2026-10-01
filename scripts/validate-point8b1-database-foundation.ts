@@ -320,42 +320,69 @@ function main(): void {
   assert(proofOut.includes('[fr004-pending-proof] PASS'), 'before-point8b1 proof did not PASS');
   console.log('[point8b1] PASS --before-point8b1 positive current-gate (pending=Point8B1 only)');
 
-  // Negative: unexpected applied migration history must fail closed.
-  const unexpectedName = '20990101000000_unexpected_test_migration';
+  function expectGateFail(label: string, pattern: RegExp): void {
+    let failed = false;
+    let out = '';
+    try {
+      out = execFileSync(proofBin, [proofScript, '--before-point8b1'], {
+        cwd: repoRoot(),
+        env: proofEnv,
+        encoding: 'utf8',
+      });
+    } catch (err) {
+      failed = true;
+      const e = err as { stdout?: string; stderr?: string; message?: string };
+      out = `${e.stdout || ''}${e.stderr || ''}${e.message || ''}`;
+    }
+    assert(failed, `before-point8b1 must FAIL CLOSED for ${label}`);
+    assert(pattern.test(out), `${label}: missing fail signal in: ${out.slice(0, 600)}`);
+    console.log(`[point8b1] PASS --before-point8b1 negative ${label} FAIL CLOSED as expected`);
+  }
+
+  // Negative 1: unknown FINISHED migration row
+  const unexpectedFinished = '20990101000000_unexpected_test_migration';
   psql(
     url,
     `INSERT INTO "_prisma_migrations"
       (id, checksum, finished_at, migration_name, logs, rolled_back_at, started_at, applied_steps_count)
      VALUES
-      ('00000000-0000-4000-8000-000000000999', '${'e'.repeat(64)}', now(), '${unexpectedName}', NULL, NULL, now(), 1);`
+      ('00000000-0000-4000-8000-000000000999', '${'e'.repeat(64)}', now(), '${unexpectedFinished}', NULL, NULL, now(), 1);`
   );
-  let negativeFailed = false;
-  let negativeOut = '';
-  try {
-    negativeOut = execFileSync(proofBin, [proofScript, '--before-point8b1'], {
-      cwd: repoRoot(),
-      env: proofEnv,
-      encoding: 'utf8',
-    });
-  } catch (err) {
-    negativeFailed = true;
-    const e = err as { stdout?: string; stderr?: string; message?: string };
-    negativeOut = `${e.stdout || ''}${e.stderr || ''}${e.message || ''}`;
-  }
-  assert(negativeFailed, 'before-point8b1 must FAIL CLOSED on unexpected applied migration');
-  assert(
-    /Applied migration set mismatch|unexpected/i.test(negativeOut),
-    `negative proof output missing mismatch signal: ${negativeOut.slice(0, 500)}`
-  );
-  console.log('[point8b1] PASS --before-point8b1 negative unexpected-migration FAIL CLOSED as expected');
+  expectGateFail('finished-unknown', /row count mismatch|name set mismatch|unexpected/i);
+  psql(url, `DELETE FROM "_prisma_migrations" WHERE "migration_name"='${unexpectedFinished}';`);
 
-  psql(url, `DELETE FROM "_prisma_migrations" WHERE "migration_name"='${unexpectedName}';`);
+  // Negative 2: unknown UNFINISHED migration row (finished_at NULL) must not escape via applied Set
+  const unexpectedUnfinished = '20990101000001_unexpected_unfinished_migration';
+  psql(
+    url,
+    `INSERT INTO "_prisma_migrations"
+      (id, checksum, finished_at, migration_name, logs, rolled_back_at, started_at, applied_steps_count)
+     VALUES
+      ('00000000-0000-4000-8000-000000000998', '${'f'.repeat(64)}', NULL, '${unexpectedUnfinished}', NULL, NULL, now(), 0);`
+  );
+  expectGateFail('unfinished-unknown', /row count mismatch|name set mismatch|unexpected|unfinished/i);
+  psql(url, `DELETE FROM "_prisma_migrations" WHERE "migration_name"='${unexpectedUnfinished}';`);
+
+  // Negative 3: duplicate expected migration-name row
+  psql(
+    url,
+    `INSERT INTO "_prisma_migrations"
+      (id, checksum, finished_at, migration_name, logs, rolled_back_at, started_at, applied_steps_count)
+     VALUES
+      ('00000000-0000-4000-8000-000000000997', '${'a'.repeat(64)}', now(), '${SLICE0_NAME}', NULL, NULL, now(), 1);`
+  );
+  expectGateFail('duplicate-expected-row', /Duplicate migration_name|row count mismatch/i);
+  psql(
+    url,
+    `DELETE FROM "_prisma_migrations" WHERE "id"='00000000-0000-4000-8000-000000000997';`
+  );
+
   const cleanupOut = execFileSync(proofBin, [proofScript, '--before-point8b1'], {
     cwd: repoRoot(),
     env: proofEnv,
     encoding: 'utf8',
   });
-  assert(cleanupOut.includes('[fr004-pending-proof] PASS'), 'gate must PASS again after removing unexpected row');
+  assert(cleanupOut.includes('[fr004-pending-proof] PASS'), 'gate must PASS again on clean 8-row history');
 
   console.log('[point8b1] ALL_PASS');
 }

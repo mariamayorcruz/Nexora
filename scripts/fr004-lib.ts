@@ -369,6 +369,69 @@ export function assertAppliedMigrationSetExactly(
   }
 }
 
+/**
+ * CURRENT --before-point8b1 raw `_prisma_migrations` history gate.
+ *
+ * Validates ALL rows (not only finished/applied Sets):
+ * - exactly 8 rows
+ * - expected names each appear exactly once (6 legacy + baseline + Slice 0)
+ * - no unknown names
+ * - every row finished_at != null
+ * - every row rolled_back_at == null
+ * - POINT8B1 absent
+ *
+ * Order ignored.
+ */
+export function assertMigrationHistoryExactlyBeforePoint8B1(rows: MigrationRow[]): void {
+  const expected = APPLIED_BEFORE_POINT8B1
+  const expectedSet = new Set<string>(expected)
+
+  if (rows.length !== expected.length) {
+    throw new Error(
+      `Raw migration history row count mismatch: expected ${expected.length}, got ${rows.length} ` +
+        `[${rows.map((r) => r.migration_name).sort().join(', ') || '(none)'}]`,
+    )
+  }
+
+  const counts = new Map<string, number>()
+  for (const row of rows) {
+    counts.set(row.migration_name, (counts.get(row.migration_name) || 0) + 1)
+  }
+
+  const duplicates = [...counts.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([name, count]) => `${name}x${count}`)
+    .sort()
+  if (duplicates.length > 0) {
+    throw new Error(`Duplicate migration_name rows in history: ${duplicates.join(', ')}`)
+  }
+
+  const names = [...counts.keys()].sort()
+  const unexpected = names.filter((name) => !expectedSet.has(name))
+  const missing = expected.filter((name) => !counts.has(name))
+  if (unexpected.length > 0 || missing.length > 0) {
+    throw new Error(
+      `Raw migration history name set mismatch: expected exactly [${expected.join(', ')}]; ` +
+        `got [${names.join(', ') || '(none)'}]` +
+        (missing.length ? `; missing=[${missing.join(', ')}]` : '') +
+        (unexpected.length ? `; unexpected=[${unexpected.join(', ')}]` : ''),
+    )
+  }
+
+  if (counts.has(POINT8B1_NAME)) {
+    throw new Error(`Point 8B-1 ${POINT8B1_NAME} unexpectedly present in raw migration history`)
+  }
+
+  for (const row of rows) {
+    if (!row.finished_at) {
+      throw new Error(`Migration row unfinished (finished_at null): ${row.migration_name}`)
+    }
+    if (row.rolled_back_at) {
+      throw new Error(`Migration row has rolled_back_at set: ${row.migration_name}`)
+    }
+  }
+}
+
 export function columnExists(databaseUrl: string, table: string, column: string): boolean {
   const safeTable = table.replace(/'/g, "''")
   const safeColumn = column.replace(/'/g, "''")

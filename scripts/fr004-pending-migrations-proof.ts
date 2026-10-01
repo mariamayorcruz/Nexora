@@ -27,7 +27,6 @@
  */
 
 import {
-  APPLIED_BEFORE_POINT8B1,
   BASELINE_NAME,
   LEGACY_PRODUCTION_MIGRATION_NAMES,
   PENDING_AFTER_AUTH_A_HISTORICAL,
@@ -35,8 +34,8 @@ import {
   POINT8B1_NAME,
   SLICE0_NAME,
   assertActiveMigrationSet,
-  assertAppliedMigrationSetExactly,
   assertLegacyProductionMigrationRows,
+  assertMigrationHistoryExactlyBeforePoint8B1,
   assertPendingExactly,
   assertSlice0Absent,
   assertSlice0Present,
@@ -99,11 +98,8 @@ function main(): void {
 
   if (mode === 'before-point8b1') {
     // CURRENT gate: Point 7 foundation complete; Point 8B-1 not applied.
-    // Reject unknown/_extra applied migration history (exact set membership + count).
-    assertAppliedMigrationSetExactly(applied, APPLIED_BEFORE_POINT8B1)
-    if (applied.has(POINT8B1_NAME)) {
-      throw new Error(`Point 8B-1 ${POINT8B1_NAME} unexpectedly already applied`)
-    }
+    // Raw history first (all rows): exact 8 names, each once, all finished, none rolled back.
+    assertMigrationHistoryExactlyBeforePoint8B1(rows)
 
     assertSlice0Present(url)
 
