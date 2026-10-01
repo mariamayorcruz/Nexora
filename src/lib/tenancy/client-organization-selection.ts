@@ -103,9 +103,21 @@ export function clearStoredOrganizationId(): void {
   }
 }
 
+const RESERVED_TENANT_HEADER_NAMES = new Set([
+  'authorization',
+  'x-nexora-organization-id',
+]);
+
+function isReservedTenantHeaderName(name: string): boolean {
+  return RESERVED_TENANT_HEADER_NAMES.has(String(name || '').trim().toLowerCase());
+}
+
 /**
  * Build Authorization (+ optional org header) for tenant-scoped requests.
  * organizationId must come from VALIDATED client selection state only.
+ *
+ * Reserved headers (Authorization, X-Nexora-Organization-Id) are assigned LAST
+ * and cannot be overridden by additionalHeaders (any casing).
  */
 export function buildTenantHeaders(params: {
   token: string;
@@ -113,15 +125,7 @@ export function buildTenantHeaders(params: {
   additionalHeaders?: HeadersInit;
 }): Record<string, string> {
   const token = String(params.token || '').trim();
-  const headers: Record<string, string> = {
-    Authorization: `Bearer ${token}`,
-  };
-
-  const organizationId =
-    params.organizationId == null ? null : String(params.organizationId).trim() || null;
-  if (organizationId) {
-    headers['X-Nexora-Organization-Id'] = organizationId;
-  }
+  const headers: Record<string, string> = {};
 
   if (params.additionalHeaders) {
     const extra =
@@ -131,8 +135,19 @@ export function buildTenantHeaders(params: {
           ? Object.fromEntries(params.additionalHeaders)
           : params.additionalHeaders;
     for (const [key, value] of Object.entries(extra)) {
-      if (typeof value === 'string') headers[key] = value;
+      if (typeof value !== 'string') continue;
+      if (isReservedTenantHeaderName(key)) continue;
+      headers[key] = value;
     }
+  }
+
+  // Canonical reserved headers always win (defense-in-depth).
+  headers.Authorization = `Bearer ${token}`;
+
+  const organizationId =
+    params.organizationId == null ? null : String(params.organizationId).trim() || null;
+  if (organizationId) {
+    headers['X-Nexora-Organization-Id'] = organizationId;
   }
 
   return headers;

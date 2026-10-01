@@ -113,6 +113,7 @@ function DashboardShell({ children }: { children: ReactNode }) {
   const [crmCount, setCrmCount] = useState(0);
   const [conversationCount, setConversationCount] = useState(0);
   const hasRedirected = useRef(false);
+  const tenantFetchGenerationRef = useRef(0);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -142,17 +143,27 @@ function DashboardShell({ children }: { children: ReactNode }) {
       return;
     }
 
-    if (!selectionReady) {
+    if (!selectionReady || !selectedOrganizationId) {
       setLoading(true);
       return;
     }
 
+    // Point 8B-5C race safety: AbortController + generation guard.
+    // A stale Org A response must never update Org B shell state / logout / redirect.
+    const abortController = new AbortController();
+    const fetchGeneration = ++tenantFetchGenerationRef.current;
+    const isActive = () =>
+      !abortController.signal.aborted && fetchGeneration === tenantFetchGenerationRef.current;
+
+    setCrmCount(0);
+    setConversationCount(0);
+    setLoading(true);
+
     const fetchData = async () => {
-      setLoading(true);
       try {
         const headers = getTenantHeaders();
-        if (!headers) {
-          setLoading(false);
+        if (!headers || !isActive()) {
+          if (isActive()) setLoading(false);
           return;
         }
 
@@ -164,10 +175,13 @@ function DashboardShell({ children }: { children: ReactNode }) {
         const response = await fetch(meUrl, {
           headers,
           cache: 'no-store',
+          signal: abortController.signal,
         });
+        if (!isActive()) return;
 
         if (!response.ok) {
           const payload = await response.json().catch(() => null);
+          if (!isActive()) return;
           if (handleTenantResponse(response.status, payload)) {
             setLoading(false);
             return;
@@ -189,6 +203,8 @@ function DashboardShell({ children }: { children: ReactNode }) {
         }
 
         const data = await response.json();
+        if (!isActive()) return;
+
         const nextUser = data.user as DashboardUser;
         const subscriptionStatus = nextUser?.subscription?.status?.toLowerCase?.() || null;
 
@@ -207,8 +223,11 @@ function DashboardShell({ children }: { children: ReactNode }) {
           const leadsResponse = await fetch('/api/crm/leads', {
             headers,
             cache: 'no-store',
+            signal: abortController.signal,
           });
+          if (!isActive()) return;
           const leadsData = await leadsResponse.json().catch(() => ({ leads: [] }));
+          if (!isActive()) return;
           if (handleTenantResponse(leadsResponse.status, leadsData)) {
             return;
           }
@@ -218,20 +237,43 @@ function DashboardShell({ children }: { children: ReactNode }) {
               String(lead.stage || '') !== 'won' && Boolean(lead.phone || lead.email)
           ).length;
           setConversationCount(activeConversations);
-        } catch {
+        } catch (leadsError) {
+          if (
+            abortController.signal.aborted ||
+            (leadsError instanceof DOMException && leadsError.name === 'AbortError') ||
+            (leadsError instanceof Error && leadsError.name === 'AbortError')
+          ) {
+            return;
+          }
+          if (!isActive()) return;
           setConversationCount(0);
         }
       } catch (error) {
+        if (
+          abortController.signal.aborted ||
+          (error instanceof DOMException && error.name === 'AbortError') ||
+          (error instanceof Error && error.name === 'AbortError')
+        ) {
+          // Tenant changed / unmounted — never treat as auth failure.
+          return;
+        }
+        if (!isActive()) return;
         console.error('Error fetching dashboard shell:', error);
         localStorage.removeItem('token');
         clearOrganizationPreferenceOnLogout();
         router.push('/auth/login');
       } finally {
-        setLoading(false);
+        if (isActive()) {
+          setLoading(false);
+        }
       }
     };
 
     void fetchData();
+
+    return () => {
+      abortController.abort();
+    };
   }, [
     pathname,
     router,

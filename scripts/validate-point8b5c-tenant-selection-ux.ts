@@ -168,6 +168,60 @@ async function main() {
     pass('18 selected org must be validated against server-returned list (provider applies pure resolver)');
     pass('19 header helper emits x-nexora-organization-id only for validated selection');
 
+    // Reserved-header override protection (architectural review)
+    const authOverride = buildTenantHeaders({
+      token: 'trusted-token',
+      organizationId: 'org_trusted',
+      additionalHeaders: { Authorization: 'Bearer attacker' },
+    });
+    assert(
+      authOverride.Authorization === 'Bearer trusted-token',
+      'additionalHeaders must not override Authorization'
+    );
+    pass('19a Authorization override blocked');
+
+    for (const spoofKey of [
+      'X-Nexora-Organization-Id',
+      'x-nexora-organization-id',
+      'X-NEXORA-ORGANIZATION-ID',
+      'authorization',
+      'AUTHORIZATION',
+    ]) {
+      const spoofed = buildTenantHeaders({
+        token: 'trusted-token',
+        organizationId: 'org_trusted',
+        additionalHeaders: { [spoofKey]: spoofKey.toLowerCase().includes('auth') ? 'Bearer attacker' : 'org_attacker' },
+      });
+      assert(spoofed.Authorization === 'Bearer trusted-token', `${spoofKey}: Authorization reserved`);
+      assert(
+        spoofed['X-Nexora-Organization-Id'] === 'org_trusted',
+        `${spoofKey}: org header reserved`
+      );
+      assert(
+        !Object.keys(spoofed).some(
+          (k) =>
+            k.toLowerCase() === 'x-nexora-organization-id' &&
+            k !== 'X-Nexora-Organization-Id' &&
+            spoofed[k] === 'org_attacker'
+        ),
+        `${spoofKey}: attacker org value must not remain`
+      );
+    }
+    pass('19b organization-header override blocked (casing variants)');
+
+    const contentTypeOk = buildTenantHeaders({
+      token: 'trusted-token',
+      organizationId: 'org_trusted',
+      additionalHeaders: { 'Content-Type': 'application/json' },
+    });
+    assert(contentTypeOk['Content-Type'] === 'application/json', 'Content-Type preserved');
+    assert(contentTypeOk.Authorization === 'Bearer trusted-token', 'Content-Type path keeps auth');
+    assert(
+      contentTypeOk['X-Nexora-Organization-Id'] === 'org_trusted',
+      'Content-Type path keeps org header'
+    );
+    pass('19c Content-Type additional header still works');
+
     const layoutSrc = readFile('src/app/dashboard/layout.tsx');
     assert(/TenantOrganizationProvider/.test(layoutSrc), 'provider in layout');
     assert(/\/api\/tenant\/organizations/.test(readFile('src/components/TenantOrganizationProvider.tsx')), 'provider discovers orgs');
@@ -188,6 +242,33 @@ async function main() {
     pass('23 single org remains seamless');
     assert(/organizationEpoch|key=\{selectedOrganizationId/.test(layoutSrc), 'remount/refetch on switch');
     pass('24 organization switch causes tenant data refresh/remount');
+
+    // Tenant-switch race safety (architectural review)
+    assert(/AbortController/.test(layoutSrc), 'DashboardShell uses AbortController');
+    assert(/abortController\.abort\(/.test(layoutSrc), 'cleanup aborts prior tenant fetch');
+    assert(/signal:\s*abortController\.signal/.test(layoutSrc), 'fetches pass abort signal');
+    assert(
+      /tenantFetchGenerationRef|fetchGeneration/.test(layoutSrc),
+      'explicit generation/active guard present'
+    );
+    assert(/setCrmCount\(0\)/.test(layoutSrc) && /setConversationCount\(0\)/.test(layoutSrc), 'clears shell counts on tenant change');
+    pass('24a DashboardShell has AbortController + generation cleanup for tenant changes');
+
+    assert(/AbortError/.test(layoutSrc), 'AbortError handled explicitly');
+    // Aborted path must return before token clear / login redirect.
+    const abortCatchBlocks = [...layoutSrc.matchAll(/catch\s*\(([^)]*)\)\s*\{([\s\S]*?)\n\s*\}/g)];
+    const abortGuarded = abortCatchBlocks.some((m) => /AbortError/.test(m[2]) && /return;/.test(m[2]));
+    assert(abortGuarded, 'AbortError path returns without side effects');
+    // Ensure AbortError branch does not clear token before return
+    const abortErrorSection = layoutSrc.includes('AbortError')
+      ? layoutSrc.slice(layoutSrc.indexOf('AbortError'))
+      : '';
+    const abortReturnIdx = abortErrorSection.indexOf('return;');
+    const tokenClearAfterAbort = abortErrorSection
+      .slice(0, abortReturnIdx === -1 ? 200 : abortReturnIdx)
+      .includes("removeItem('token')");
+    assert(!tokenClearAfterAbort, 'AbortError path must not clear JWT before return');
+    pass('24b aborted tenant request path does not clear JWT or redirect');
 
     const crmPage = readFile('src/app/dashboard/crm/page.tsx');
     assert(/getTenantHeaders/.test(crmPage) && /\/api\/crm\/leads/.test(crmPage), 'CRM GET headers');
