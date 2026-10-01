@@ -64,9 +64,9 @@ export async function PATCH(
       }
     }
 
-    // Locate by userId during 8B-2 (reads still userId-scoped).
+    // Point 8B-4: row targeting by writeOrg.organizationId. Do NOT set organizationId (no backfill).
     const existing = await prisma.crmLead.findFirst({
-      where: { id: params.leadId, userId },
+      where: { id: params.leadId, organizationId: writeOrg.organizationId },
     });
 
     if (!existing) {
@@ -74,7 +74,7 @@ export async function PATCH(
     }
 
     const lead = await prisma.crmLead.update({
-      where: { id: params.leadId, userId },
+      where: { id: existing.id },
       data: {
         name: body.name !== undefined ? String(body.name).trim() : undefined,
         email: body.email !== undefined ? body.email?.trim() || null : undefined,

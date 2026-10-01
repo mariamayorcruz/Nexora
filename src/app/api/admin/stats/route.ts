@@ -162,6 +162,8 @@ export async function GET(request: NextRequest) {
           trackerId: true,
         },
       }),
+      // Point 8B-4 intentional platform-admin exception: global CrmLead aggregate.
+      // Not a tenant-facing CRM read — do NOT convert to organizationId scoping here.
       prisma.crmLead.findMany({
         orderBy: { updatedAt: 'desc' },
         select: {

@@ -34,8 +34,9 @@ export async function POST(
       );
     }
 
+    // Point 8B-4: row targeting by writeOrg.organizationId. Do NOT set organizationId.
     const lead = await prisma.crmLead.findFirst({
-      where: { id: params.leadId, userId },
+      where: { id: params.leadId, organizationId: writeOrg.organizationId },
     });
 
     if (!lead) {
@@ -87,7 +88,7 @@ export async function POST(
         }
 
         await prisma.crmLead.update({
-          where: { id: params.leadId, userId },
+          where: { id: lead.id },
           data: {
             lastContactedAt: new Date(),
             notes: lead.notes
@@ -105,7 +106,7 @@ export async function POST(
     }
 
     await prisma.crmLead.update({
-      where: { id: params.leadId, userId },
+      where: { id: lead.id },
       data: {
         lastContactedAt: new Date(),
         notes: lead.notes

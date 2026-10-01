@@ -7,6 +7,11 @@ import { getHigherTierPlan } from '@/lib/billing';
 import { getBearerToken, verifyUserToken } from '@/lib/jwt';
 import { hashPassword, validatePassword, verifyPassword } from '@/lib/auth';
 import { getStripeClient } from '@/lib/stripe';
+import {
+  crmReadErrorResponse,
+  NEXORA_ORGANIZATION_HEADER,
+  resolveCrmReadOrganization,
+} from '@/lib/tenancy/resolve-crm-read-organization';
 
 export const dynamic = 'force-dynamic';
 
@@ -97,10 +102,22 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // Point 8B-4: CRM metrics only — organization-scoped. Fail closed if org selection is ambiguous.
+    // LeadCapture / Campaign / AdAccount remain userId-owned in this PR.
+    const readOrg = await resolveCrmReadOrganization({
+      authorizationHeader: request.headers.get('authorization'),
+      organizationIdHeader: request.headers.get(NEXORA_ORGANIZATION_HEADER),
+    });
+    if (!readOrg.ok) {
+      return crmReadErrorResponse(readOrg);
+    }
+
     const [crmLeads, leadCapturesOpen, crmWon] = await Promise.all([
-      prisma.crmLead.count({ where: { userId: user.id } }),
+      prisma.crmLead.count({ where: { organizationId: readOrg.context.organizationId } }),
       prisma.leadCapture.count({ where: { userId: user.id, convertedToCrmAt: null } }),
-      prisma.crmLead.count({ where: { userId: user.id, stage: 'won' } }),
+      prisma.crmLead.count({
+        where: { organizationId: readOrg.context.organizationId, stage: 'won' },
+      }),
     ]);
 
     const entitlements = buildEntitlementSummary(effectivePlan, {

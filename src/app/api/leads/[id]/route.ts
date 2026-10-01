@@ -2,9 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma, withPrismaRetry } from '@/lib/prisma';
 import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 import {
+  crmReadErrorResponse,
+  NEXORA_ORGANIZATION_HEADER,
+  resolveCrmReadOrganization,
+} from '@/lib/tenancy/resolve-crm-read-organization';
+import {
   legacyCrmWriteClientMessage,
   legacyCrmWriteHttpStatus,
-  NEXORA_ORGANIZATION_HEADER,
   resolveLegacyCrmWriteOrganization,
 } from '@/lib/tenancy/resolve-legacy-crm-write-organization';
 
@@ -22,9 +26,13 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const userId = getUserIdFromAuthorizationHeader(request.headers.get('authorization'));
-    if (!userId) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    const authorizationHeader = request.headers.get('authorization');
+    const readOrg = await resolveCrmReadOrganization({
+      authorizationHeader,
+      organizationIdHeader: request.headers.get(NEXORA_ORGANIZATION_HEADER),
+    });
+    if (!readOrg.ok) {
+      return crmReadErrorResponse(readOrg);
     }
 
     const { id } = params;
@@ -35,7 +43,7 @@ export async function GET(
 
     const lead = await withPrismaRetry(() =>
       prisma.crmLead.findFirst({
-        where: { id: leadId, userId },
+        where: { id: leadId, organizationId: readOrg.context.organizationId },
         select: {
           id: true,
           name: true,
@@ -130,9 +138,10 @@ export async function PATCH(
       return NextResponse.json({ error: 'Nada que actualizar' }, { status: 400 });
     }
 
+    // Point 8B-4: row targeting by writeOrg.organizationId (writes remain legacy-only via helper).
     const updated = await withPrismaRetry(() =>
       prisma.crmLead.updateMany({
-        where: { id: leadId, userId },
+        where: { id: leadId, organizationId: writeOrg.organizationId },
         data: updateData,
       })
     );
@@ -143,7 +152,7 @@ export async function PATCH(
 
     const lead = await withPrismaRetry(() =>
       prisma.crmLead.findFirst({
-        where: { id: leadId, userId },
+        where: { id: leadId, organizationId: writeOrg.organizationId },
         select: {
           id: true,
           name: true,

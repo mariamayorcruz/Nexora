@@ -4,9 +4,13 @@ import { prisma, withPrismaRetry } from '@/lib/prisma';
 import { validateEmail } from '@/lib/auth';
 import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 import {
+  crmReadErrorResponse,
+  NEXORA_ORGANIZATION_HEADER,
+  resolveCrmReadOrganization,
+} from '@/lib/tenancy/resolve-crm-read-organization';
+import {
   legacyCrmWriteClientMessage,
   legacyCrmWriteHttpStatus,
-  NEXORA_ORGANIZATION_HEADER,
   resolveLegacyCrmWriteOrganization,
 } from '@/lib/tenancy/resolve-legacy-crm-write-organization';
 
@@ -19,14 +23,19 @@ const campaignSelect = {
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = getUserIdFromAuthorizationHeader(request.headers.get('authorization'));
-    if (!userId) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    const authorizationHeader = request.headers.get('authorization');
+    const readOrg = await resolveCrmReadOrganization({
+      authorizationHeader,
+      organizationIdHeader: request.headers.get(NEXORA_ORGANIZATION_HEADER),
+    });
+    if (!readOrg.ok) {
+      return crmReadErrorResponse(readOrg);
     }
 
+    // Point 8B-4: organizationId authorization boundary (explicit select keeps public shape).
     const rawLeads = await withPrismaRetry(() =>
       prisma.crmLead.findMany({
-        where: { userId },
+        where: { organizationId: readOrg.context.organizationId },
         orderBy: { createdAt: 'desc' },
         select: {
           id: true,

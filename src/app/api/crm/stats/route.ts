@@ -1,24 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getBearerToken, getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 import { CRM_ALLOWED_STAGES } from '@/lib/sales-playbook';
+import {
+  crmReadErrorResponse,
+  NEXORA_ORGANIZATION_HEADER,
+  resolveCrmReadOrganization,
+} from '@/lib/tenancy/resolve-crm-read-organization';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  if (!getBearerToken(authHeader)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const userId = getUserIdFromAuthorizationHeader(authHeader);
-  if (!userId) {
-    return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-  }
-
   try {
+    const authorizationHeader = request.headers.get('authorization');
+    const readOrg = await resolveCrmReadOrganization({
+      authorizationHeader,
+      organizationIdHeader: request.headers.get(NEXORA_ORGANIZATION_HEADER),
+    });
+    if (!readOrg.ok) {
+      return crmReadErrorResponse(readOrg);
+    }
+
+    // Point 8B-4: CRM stats authorize by organizationId only.
     const leads = await prisma.crmLead.findMany({
-      where: { userId },
+      where: { organizationId: readOrg.context.organizationId },
       select: { stage: true, value: true },
     });
 

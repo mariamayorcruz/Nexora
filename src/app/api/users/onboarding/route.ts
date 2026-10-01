@@ -324,12 +324,9 @@ export async function POST(request: NextRequest) {
           ? String(currentOnboardingData.sampleLeadCreatedAt)
           : null;
 
-      const existingLeadCount = await tx.crmLead.count({
-        where: { userId: user.id },
-      });
-
-      if (existingLeadCount === 0 && canCreateSampleLead) {
-        // Validate write org on the same transaction client (no ensure/repair).
+      if (canCreateSampleLead) {
+        // Point 8B-4: sample existence is organization-scoped. Writes remain legacy-only (8B-2).
+        // Validate on the same transaction client (no ensure/repair).
         const writeOrg = await resolveLegacyCrmWriteOrganization({
           userId: user.id,
           authorizationHeader,
@@ -344,29 +341,35 @@ export async function POST(request: NextRequest) {
           throw err;
         }
 
-        const sampleLead = buildSampleLead({
-          businessType,
-          businessName,
-          mainGoal,
+        const existingLeadCount = await tx.crmLead.count({
+          where: { organizationId: writeOrg.organizationId },
         });
 
-        await tx.crmLead.create({
-          data: {
-            userId: user.id,
-            organizationId: writeOrg.organizationId,
-            name: sampleLead.name,
-            email: sampleLead.email,
-            company: sampleLead.company,
-            source: sampleLead.source,
-            stage: sampleLead.stage,
-            value: sampleLead.value,
-            confidence: sampleLead.confidence,
-            nextAction: sampleLead.nextAction,
-            notes: sampleLead.notes,
-          },
-        });
+        if (existingLeadCount === 0) {
+          const sampleLead = buildSampleLead({
+            businessType,
+            businessName,
+            mainGoal,
+          });
 
-        sampleLeadCreatedAt = new Date().toISOString();
+          await tx.crmLead.create({
+            data: {
+              userId: user.id,
+              organizationId: writeOrg.organizationId,
+              name: sampleLead.name,
+              email: sampleLead.email,
+              company: sampleLead.company,
+              source: sampleLead.source,
+              stage: sampleLead.stage,
+              value: sampleLead.value,
+              confidence: sampleLead.confidence,
+              nextAction: sampleLead.nextAction,
+              notes: sampleLead.notes,
+            },
+          });
+
+          sampleLeadCreatedAt = new Date().toISOString();
+        }
       }
 
       const existingSettings = await tx.crmWorkspaceSettings.findUnique({

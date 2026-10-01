@@ -19,6 +19,11 @@ import {
   filterVisibleSentLogs,
   type SalesEngineConfig,
 } from '@/lib/crm-sequences';
+import {
+  crmReadErrorResponse,
+  NEXORA_ORGANIZATION_HEADER,
+  resolveCrmReadOrganization,
+} from '@/lib/tenancy/resolve-crm-read-organization';
 
 /** CTA principal: compra / aplicar auditoría (#pricing). El enlace de reunión sigue pudiendo ir en el cuerpo vía {{meeting_link}}. */
 const CRM_FOLLOWUP_PRIMARY_CTA = {
@@ -75,8 +80,17 @@ export async function POST(request: NextRequest) {
     let leadName = 'cliente';
 
     if (!to && body.leadId) {
+      // Point 8B-4: CrmLead lookup is organization-scoped. Settings/LeadCapture remain userId-owned.
+      const readOrg = await resolveCrmReadOrganization({
+        authorizationHeader: request.headers.get('authorization'),
+        organizationIdHeader: request.headers.get(NEXORA_ORGANIZATION_HEADER),
+      });
+      if (!readOrg.ok) {
+        return crmReadErrorResponse(readOrg);
+      }
+
       const lead = await prisma.crmLead.findFirst({
-        where: { id: String(body.leadId), userId },
+        where: { id: String(body.leadId), organizationId: readOrg.context.organizationId },
       });
 
       if (!lead) {
