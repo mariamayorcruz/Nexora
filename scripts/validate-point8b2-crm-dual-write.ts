@@ -224,23 +224,35 @@ async function main() {
     assert(created.organizationId === legacyId, 'create must persist organizationId');
     pass('15 create path writes organizationId');
 
-    // Static audit: every create site includes organizationId; none assign from body.organizationId
-    const createFiles = [
+    // Static audit: CREATE sites dual-write organizationId; none trust body.organizationId.
+    // Point 8B-5B: interactive routes use writeOrg.context.organizationId; Meta keeps writeOrg.organizationId.
+    const interactiveCreateFiles = [
       'src/app/api/crm/leads/route.ts',
       'src/app/api/leads/route.ts',
       'src/app/api/business/leads/route.ts',
       'src/app/api/users/onboarding/route.ts',
-      'src/app/api/webhooks/meta-leads/route.ts',
     ];
-    for (const file of createFiles) {
+    for (const file of interactiveCreateFiles) {
       const src = readFile(file);
       assert(/crmLead\.create\(/.test(src), `${file} must create CrmLead`);
-      assert(/organizationId:\s*writeOrg\.organizationId/.test(src), `${file} must dual-write organizationId`);
+      assert(
+        /organizationId:\s*writeOrg\.context\.organizationId/.test(src),
+        `${file} must write TenantContext organizationId`
+      );
       assert(!/organizationId:\s*body\.organizationId/.test(src), `${file} must not trust body.organizationId`);
+      assert(/resolveCrmWriteOrganization/.test(src), `${file} must use resolveCrmWriteOrganization`);
+      assert(!/resolveLegacyCrmWriteOrganization/.test(src), `${file} must not use legacy write resolver`);
     }
+    const metaCreateSrc = readFile('src/app/api/webhooks/meta-leads/route.ts');
+    assert(/crmLead\.create\(/.test(metaCreateSrc), 'meta must create CrmLead');
+    assert(
+      /organizationId:\s*writeOrg\.organizationId/.test(metaCreateSrc),
+      'meta must dual-write legacy organizationId'
+    );
+    assert(!/organizationId:\s*body\.organizationId/.test(metaCreateSrc), 'meta must not trust body.organizationId');
     pass('15-16 every CREATE path dual-writes; no create trusts client organizationId');
 
-    // 17 Meta uses config.userId path (static)
+    // 17 Meta uses config.userId path (static) — enduring Meta exception
     const metaSrc = readFile('src/app/api/webhooks/meta-leads/route.ts');
     assert(/resolveLegacyCrmWriteOrganization\(\{\s*userId:\s*config\.userId/.test(metaSrc), 'Meta must use config.userId');
     assert(!/NEXORA_ORGANIZATION_HEADER/.test(metaSrc), 'Meta must not use browser org header');
@@ -249,18 +261,25 @@ async function main() {
     // 18 onboarding uses tx client
     const onboardingSrc = readFile('src/app/api/users/onboarding/route.ts');
     assert(/db:\s*tx/.test(onboardingSrc), 'onboarding must validate with transaction client');
-    assert(/organizationId:\s*writeOrg\.organizationId/.test(onboardingSrc), 'onboarding sample lead dual-write');
+    assert(
+      /organizationId:\s*writeOrg\.context\.organizationId/.test(onboardingSrc),
+      'onboarding sample lead dual-write'
+    );
     pass('18 onboarding transaction writes organizationId');
 
     // 19 business promotion does not backfill existing
     const businessSrc = readFile('src/app/api/business/leads/route.ts');
     assert(/existingLead\s*\|\|/.test(businessSrc), 'promotion reuses existing lead');
-    assert(/organizationId:\s*writeOrg\.organizationId/.test(businessSrc), 'new promotion dual-writes');
+    assert(
+      /organizationId:\s*writeOrg\.context\.organizationId/.test(businessSrc),
+      'new promotion dual-writes'
+    );
     assert(!/crmLead\.update\(/.test(businessSrc), 'business route must not update CrmLead rows');
     assert(!/organizationId:\s*[^=\n]*existing/.test(businessSrc), 'must not assign org from existing lead mutation');
     pass('19 existing-lead promotion does not opportunistically backfill');
 
     // 20 PATCH/message do not set organizationId
+    // Point 8B-5B: interactive mutations use resolveCrmWriteOrganization (not legacy helper).
     const patchFiles = [
       'src/app/api/crm/leads/[leadId]/route.ts',
       'src/app/api/crm/leads/[leadId]/message/route.ts',
@@ -268,7 +287,8 @@ async function main() {
     ];
     for (const file of patchFiles) {
       const src = readFile(file);
-      assert(/resolveLegacyCrmWriteOrganization/.test(src), `${file} must apply write guard`);
+      assert(/resolveCrmWriteOrganization/.test(src), `${file} must apply write guard`);
+      assert(!/resolveLegacyCrmWriteOrganization/.test(src), `${file} must not use legacy write resolver`);
       assert(!/data:\s*\{[^}]*organizationId/.test(src), `${file} must not set organizationId in updates`);
     }
     pass('20 PATCH/message/update routes do not set organizationId');

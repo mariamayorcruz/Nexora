@@ -268,8 +268,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Tenant automation config not found' }, { status: 404 });
     }
 
-    // Point 8B-2/8B-4: config.userId -> deterministic legacy org (no browser TenantContext/header).
-    // Resolve writeOrg before duplicate lookup so reads are organizationId-scoped.
+    // Point 8B-5B EXCEPTION: Meta stays legacy-org mapped.
+    // TenantAutomationConfig is still userId-owned (no organizationId). Meta has no browser
+    // user / X-Nexora-Organization-Id, so resolveCrmWriteOrganization is unsafe here.
+    // config.userId -> deterministic legacy org; duplicate lookup remains organization-scoped.
     const writeOrg = await resolveLegacyCrmWriteOrganization({
       userId: config.userId,
     });

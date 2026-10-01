@@ -230,7 +230,8 @@ async function main() {
 
     const leadsId = readFile('src/app/api/leads/[id]/route.ts');
     assert(/organizationId:\s*readOrg\.context\.organizationId/.test(leadsId), 'GET leads/[id] org');
-    assert(/organizationId:\s*writeOrg\.organizationId/.test(leadsId), 'PATCH leads/[id] writeOrg');
+    // Point 8B-5B: interactive writes use writeOrg.context.organizationId
+    assert(/organizationId:\s*writeOrg\.context\.organizationId/.test(leadsId), 'PATCH leads/[id] writeOrg');
     pass('12 GET /api/leads/[id] is organizationId-scoped');
 
     const statsSrc = readFile('src/app/api/crm/stats/route.ts');
@@ -248,15 +249,21 @@ async function main() {
     pass('15 Follow-up lead lookup is organizationId-scoped');
 
     const business = readFile('src/app/api/business/leads/route.ts');
-    assert(/organizationId:\s*writeOrg\.organizationId,\s*OR:/.test(business.replace(/\s+/g, ' ')), 'business reuse org');
+    assert(
+      /organizationId:\s*writeOrg\.context\.organizationId,\s*OR:/.test(business.replace(/\s+/g, ' ')),
+      'business reuse org'
+    );
     pass('16 Business lead existing CRM reuse is organizationId-scoped');
 
     const onboarding = readFile('src/app/api/users/onboarding/route.ts');
-    assert(/count\(\{\s*where:\s*\{\s*organizationId:\s*writeOrg\.organizationId/.test(onboarding), 'onboarding count org');
+    assert(
+      /count\(\{\s*where:\s*\{\s*organizationId:\s*writeOrg\.context\.organizationId/.test(onboarding),
+      'onboarding count org'
+    );
     pass('17 Onboarding CRM count is organizationId-scoped');
 
     const patchLead = readFile('src/app/api/crm/leads/[leadId]/route.ts');
-    assert(/organizationId:\s*writeOrg\.organizationId/.test(patchLead), 'mutation lookup writeOrg');
+    assert(/organizationId:\s*writeOrg\.context\.organizationId/.test(patchLead), 'mutation lookup writeOrg');
     assert(!/data:\s*\{[^}]*organizationId/.test(patchLead), 'mutation must not set organizationId');
     // Defense-in-depth: UPDATE WHERE itself must be organization-scoped (not id-only after lookup).
     const patchUpdateBlocks = [...patchLead.matchAll(/crmLead\.update\(\s*\{([\s\S]*?)\n\s*\}\s*\)/g)].map(
@@ -265,15 +272,15 @@ async function main() {
     assert(patchUpdateBlocks.length >= 1, 'crm/leads/[leadId] must call crmLead.update');
     for (const block of patchUpdateBlocks) {
       assert(
-        /where:\s*\{[^}]*organizationId:\s*writeOrg\.organizationId/.test(block),
-        'crmLead.update WHERE must include organizationId: writeOrg.organizationId'
+        /where:\s*\{[^}]*organizationId:\s*writeOrg\.context\.organizationId/.test(block),
+        'crmLead.update WHERE must include organizationId: writeOrg.context.organizationId'
       );
       assert(/where:\s*\{[^}]*\bid\b/.test(block), 'crmLead.update WHERE must include id');
     }
-    pass('18 Mutation lead lookup/update uses writeOrg.organizationId');
+    pass('18 Mutation lead lookup/update uses writeOrg.context.organizationId');
 
     const messageSrc = readFile('src/app/api/crm/leads/[leadId]/message/route.ts');
-    assert(/organizationId:\s*writeOrg\.organizationId/.test(messageSrc), 'message lookup writeOrg');
+    assert(/organizationId:\s*writeOrg\.context\.organizationId/.test(messageSrc), 'message lookup writeOrg');
     // Both message-route updates must tenant-scope WHERE (not id-only).
     const messageUpdateBlocks = [...messageSrc.matchAll(/crmLead\.update\(\s*\{([\s\S]*?)\n\s*\}\s*\)/g)].map(
       (m) => m[1]
@@ -281,12 +288,12 @@ async function main() {
     assert(messageUpdateBlocks.length === 2, `message route must have exactly 2 crmLead.update calls, got ${messageUpdateBlocks.length}`);
     for (const [idx, block] of messageUpdateBlocks.entries()) {
       assert(
-        /where:\s*\{[^}]*organizationId:\s*writeOrg\.organizationId/.test(block),
-        `message crmLead.update[${idx}] WHERE must include organizationId: writeOrg.organizationId`
+        /where:\s*\{[^}]*organizationId:\s*writeOrg\.context\.organizationId/.test(block),
+        `message crmLead.update[${idx}] WHERE must include organizationId: writeOrg.context.organizationId`
       );
       assert(/where:\s*\{[^}]*\bid\b/.test(block), `message crmLead.update[${idx}] WHERE must include id`);
     }
-    pass('19 Message lead lookup/update uses writeOrg.organizationId');
+    pass('19 Message lead lookup/update uses writeOrg.context.organizationId');
 
     // Runtime shared-org + isolation
     const orgBOnly = await prisma.organization.create({
@@ -391,7 +398,8 @@ async function main() {
     assert(dual.userId === userA.id && dual.organizationId === legacyA, 'dual-write preserved');
     pass('29 New CRM creates still dual-write userId + organizationId');
 
-    // Non-legacy write still blocked
+    // Legacy helper (Meta path) still blocks non-legacy orgs.
+    // Point 8B-5B interactive writes use resolveCrmWriteOrganization — covered by tenancy:validate-point8b5.
     const nonLegacyOrg = await prisma.organization.create({
       data: {
         id: 'org_non_legacy_write_8b4',
@@ -419,9 +427,9 @@ async function main() {
     });
     assert(
       !blockedWrite.ok && blockedWrite.code === 'crm_multi_org_write_not_ready',
-      'non-legacy writes still fail'
+      'legacy helper still fails closed for non-legacy (Meta exception)'
     );
-    pass('30 Non-legacy CRM writes still fail crm_multi_org_write_not_ready');
+    pass('30 Legacy write helper still fails crm_multi_org_write_not_ready for non-legacy (Meta path)');
 
     pass('31 No production mutation is performed by validation');
     assert(

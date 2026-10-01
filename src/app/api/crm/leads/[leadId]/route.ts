@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 import { CRM_ALLOWED_STAGES } from '@/lib/sales-playbook';
 import {
-  legacyCrmWriteClientMessage,
-  legacyCrmWriteHttpStatus,
+  crmWriteErrorResponse,
   NEXORA_ORGANIZATION_HEADER,
-  omitCrmLeadOrganizationId,
-  resolveLegacyCrmWriteOrganization,
-} from '@/lib/tenancy/resolve-legacy-crm-write-organization';
+  resolveCrmWriteOrganization,
+} from '@/lib/tenancy/resolve-crm-write-organization';
+import { omitCrmLeadOrganizationId } from '@/lib/tenancy/resolve-legacy-crm-write-organization';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,22 +35,12 @@ export async function PATCH(
 ) {
   try {
     const authorizationHeader = request.headers.get('authorization');
-    const userId = getUserIdFromAuthorizationHeader(authorizationHeader);
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Transitional write guard: reject non-legacy org selection. Do NOT set organizationId (no partial backfill).
-    const writeOrg = await resolveLegacyCrmWriteOrganization({
-      userId,
+    const writeOrg = await resolveCrmWriteOrganization({
       authorizationHeader,
       organizationIdHeader: request.headers.get(NEXORA_ORGANIZATION_HEADER),
     });
     if (!writeOrg.ok) {
-      return NextResponse.json(
-        { error: legacyCrmWriteClientMessage(writeOrg.code), code: writeOrg.code },
-        { status: legacyCrmWriteHttpStatus(writeOrg.code) }
-      );
+      return crmWriteErrorResponse(writeOrg);
     }
 
     const body = await request.json();
@@ -64,9 +52,10 @@ export async function PATCH(
       }
     }
 
-    // Point 8B-4: row targeting by writeOrg.organizationId. Do NOT set organizationId (no backfill).
+    // Point 8B-5B: tenant-scoped by organizationId. Do NOT filter by creator userId.
+    // Do NOT set organizationId in data.
     const existing = await prisma.crmLead.findFirst({
-      where: { id: params.leadId, organizationId: writeOrg.organizationId },
+      where: { id: params.leadId, organizationId: writeOrg.context.organizationId },
     });
 
     if (!existing) {
@@ -74,7 +63,7 @@ export async function PATCH(
     }
 
     const lead = await prisma.crmLead.update({
-      where: { id: existing.id, organizationId: writeOrg.organizationId },
+      where: { id: existing.id, organizationId: writeOrg.context.organizationId },
       data: {
         name: body.name !== undefined ? String(body.name).trim() : undefined,
         email: body.email !== undefined ? body.email?.trim() || null : undefined,

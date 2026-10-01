@@ -3,12 +3,11 @@ import { prisma } from '@/lib/prisma';
 import { isAdminEmail, isFounderEmail, isInternalOrTestEmail } from '@/lib/access';
 import { getBearerToken, verifyUserToken } from '@/lib/jwt';
 import {
-  legacyCrmWriteClientMessage,
-  legacyCrmWriteHttpStatus,
+  crmWriteErrorResponse,
   NEXORA_ORGANIZATION_HEADER,
-  omitCrmLeadOrganizationId,
-  resolveLegacyCrmWriteOrganization,
-} from '@/lib/tenancy/resolve-legacy-crm-write-organization';
+  resolveCrmWriteOrganization,
+} from '@/lib/tenancy/resolve-crm-write-organization';
+import { omitCrmLeadOrganizationId } from '@/lib/tenancy/resolve-legacy-crm-write-organization';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,16 +65,13 @@ export async function POST(request: NextRequest) {
     const auth = await getAuthorizedUser(request);
     if ('error' in auth) return auth.error;
 
-    const writeOrg = await resolveLegacyCrmWriteOrganization({
-      userId: auth.user.id,
+    // Point 8B-5B: CRM destination from TenantContext. LeadCapture stays userId-owned.
+    const writeOrg = await resolveCrmWriteOrganization({
       authorizationHeader: request.headers.get('authorization'),
       organizationIdHeader: request.headers.get(NEXORA_ORGANIZATION_HEADER),
     });
     if (!writeOrg.ok) {
-      return NextResponse.json(
-        { error: legacyCrmWriteClientMessage(writeOrg.code), code: writeOrg.code },
-        { status: legacyCrmWriteHttpStatus(writeOrg.code) }
-      );
+      return crmWriteErrorResponse(writeOrg);
     }
 
     const body = await request.json();
@@ -103,7 +99,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No tienes permiso para mover este lead.' }, { status: 403 });
     }
 
-    // Point 8B-4: existing CRM reuse is organization-scoped. Do NOT backfill/mutate ownership.
+    // Existing CRM reuse is organization-scoped. Do NOT backfill/mutate ownership.
     // LeadCapture remains userId-owned.
     const mergeOr: Array<{ id: string } | { email: string }> = [];
     if (capture.crmLeadId) mergeOr.push({ id: capture.crmLeadId });
@@ -111,7 +107,7 @@ export async function POST(request: NextRequest) {
     const existingLead =
       mergeOr.length > 0
         ? await prisma.crmLead.findFirst({
-            where: { organizationId: writeOrg.organizationId, OR: mergeOr },
+            where: { organizationId: writeOrg.context.organizationId, OR: mergeOr },
           })
         : null;
 
@@ -119,8 +115,8 @@ export async function POST(request: NextRequest) {
       existingLead ||
       (await prisma.crmLead.create({
         data: {
-          userId: auth.user.id,
-          organizationId: writeOrg.organizationId,
+          userId: writeOrg.context.userId,
+          organizationId: writeOrg.context.organizationId,
           name: capture.name || capture.email.split('@')[0],
           email: capture.email,
           source: capture.source,
