@@ -27,6 +27,7 @@
  */
 
 import {
+  APPLIED_BEFORE_POINT8B1,
   BASELINE_NAME,
   LEGACY_PRODUCTION_MIGRATION_NAMES,
   PENDING_AFTER_AUTH_A_HISTORICAL,
@@ -34,6 +35,7 @@ import {
   POINT8B1_NAME,
   SLICE0_NAME,
   assertActiveMigrationSet,
+  assertAppliedMigrationSetExactly,
   assertLegacyProductionMigrationRows,
   assertPendingExactly,
   assertSlice0Absent,
@@ -97,17 +99,8 @@ function main(): void {
 
   if (mode === 'before-point8b1') {
     // CURRENT gate: Point 7 foundation complete; Point 8B-1 not applied.
-    for (const name of LEGACY_PRODUCTION_MIGRATION_NAMES) {
-      if (!applied.has(name)) {
-        throw new Error(`Missing expected legacy production migration row: ${name}`)
-      }
-    }
-    if (!applied.has(BASELINE_NAME)) {
-      throw new Error(`Baseline ${BASELINE_NAME} must be applied`)
-    }
-    if (!applied.has(SLICE0_NAME)) {
-      throw new Error(`Slice 0 ${SLICE0_NAME} must be applied before Point 8B-1 gate`)
-    }
+    // Reject unknown/_extra applied migration history (exact set membership + count).
+    assertAppliedMigrationSetExactly(applied, APPLIED_BEFORE_POINT8B1)
     if (applied.has(POINT8B1_NAME)) {
       throw new Error(`Point 8B-1 ${POINT8B1_NAME} unexpectedly already applied`)
     }

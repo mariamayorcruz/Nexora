@@ -337,6 +337,38 @@ export const PENDING_AFTER_AUTH_A_HISTORICAL = [SLICE0_NAME, POINT8B1_NAME] as c
 /** CURRENT production gate before authorized Point 8B-1 apply: only Point 8B-1 pending. */
 export const PENDING_BEFORE_POINT8B1 = [POINT8B1_NAME] as const
 
+/**
+ * CURRENT pre-Point8B1 applied set (order-independent):
+ * six legacy rows + baseline + Slice 0. Point 8B-1 must be absent.
+ */
+export const APPLIED_BEFORE_POINT8B1 = [
+  ...LEGACY_PRODUCTION_MIGRATION_NAMES,
+  BASELINE_NAME,
+  SLICE0_NAME,
+] as const
+
+/**
+ * Fail closed unless the applied migration-name set equals `expected` exactly
+ * (membership + count; order ignored).
+ */
+export function assertAppliedMigrationSetExactly(
+  appliedNames: Iterable<string>,
+  expected: readonly string[],
+): void {
+  const applied = new Set(appliedNames)
+  const expectedSet = new Set(expected)
+  const unexpected = [...applied].filter((name) => !expectedSet.has(name)).sort()
+  const missing = [...expectedSet].filter((name) => !applied.has(name)).sort()
+  if (applied.size !== expectedSet.size || unexpected.length > 0 || missing.length > 0) {
+    throw new Error(
+      `Applied migration set mismatch: expected exactly [${expected.join(', ')}]; ` +
+        `got [${[...applied].sort().join(', ') || '(none)'}]` +
+        (missing.length ? `; missing=[${missing.join(', ')}]` : '') +
+        (unexpected.length ? `; unexpected=[${unexpected.join(', ')}]` : ''),
+    )
+  }
+}
+
 export function columnExists(databaseUrl: string, table: string, column: string): boolean {
   const safeTable = table.replace(/'/g, "''")
   const safeColumn = column.replace(/'/g, "''")

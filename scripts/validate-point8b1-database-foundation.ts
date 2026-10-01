@@ -60,15 +60,6 @@ function columnNullable(url: string, table: string, column: string): boolean {
   return r === 'YES';
 }
 
-function columnExists(url: string, table: string, column: string): boolean {
-  const r = psql(
-    url,
-    `SELECT COUNT(*)::text FROM information_schema.columns
-     WHERE table_schema='public' AND table_name='${table}' AND column_name='${column}';`
-  );
-  return r === '1';
-}
-
 function indexExists(url: string, indexName: string): boolean {
   const r = psql(
     url,
@@ -318,16 +309,54 @@ function main(): void {
 
   const proofBin = path.join(repoRoot(), 'node_modules', '.bin', 'tsx');
   const proofScript = path.join(repoRoot(), 'scripts', 'fr004-pending-migrations-proof.ts');
+  const proofEnv = { ...process.env, FR004_DATABASE_URL: url, DATABASE_URL: url };
   const proofOut = execFileSync(proofBin, [proofScript, '--before-point8b1'], {
     cwd: repoRoot(),
-    env: { ...process.env, FR004_DATABASE_URL: url, DATABASE_URL: url },
+    env: proofEnv,
     encoding: 'utf8',
   });
   console.log(proofOut);
   assert(proofOut.includes('pending=Point8B1 only') || proofOut.includes(POINT8B1_NAME), 'pending proof output missing Point8B1');
   assert(proofOut.includes('[fr004-pending-proof] PASS'), 'before-point8b1 proof did not PASS');
+  console.log('[point8b1] PASS --before-point8b1 positive current-gate (pending=Point8B1 only)');
 
-  console.log('[point8b1] PASS --before-point8b1 pending==Point8B1 only');
+  // Negative: unexpected applied migration history must fail closed.
+  const unexpectedName = '20990101000000_unexpected_test_migration';
+  psql(
+    url,
+    `INSERT INTO "_prisma_migrations"
+      (id, checksum, finished_at, migration_name, logs, rolled_back_at, started_at, applied_steps_count)
+     VALUES
+      ('00000000-0000-4000-8000-000000000999', '${'e'.repeat(64)}', now(), '${unexpectedName}', NULL, NULL, now(), 1);`
+  );
+  let negativeFailed = false;
+  let negativeOut = '';
+  try {
+    negativeOut = execFileSync(proofBin, [proofScript, '--before-point8b1'], {
+      cwd: repoRoot(),
+      env: proofEnv,
+      encoding: 'utf8',
+    });
+  } catch (err) {
+    negativeFailed = true;
+    const e = err as { stdout?: string; stderr?: string; message?: string };
+    negativeOut = `${e.stdout || ''}${e.stderr || ''}${e.message || ''}`;
+  }
+  assert(negativeFailed, 'before-point8b1 must FAIL CLOSED on unexpected applied migration');
+  assert(
+    /Applied migration set mismatch|unexpected/i.test(negativeOut),
+    `negative proof output missing mismatch signal: ${negativeOut.slice(0, 500)}`
+  );
+  console.log('[point8b1] PASS --before-point8b1 negative unexpected-migration FAIL CLOSED as expected');
+
+  psql(url, `DELETE FROM "_prisma_migrations" WHERE "migration_name"='${unexpectedName}';`);
+  const cleanupOut = execFileSync(proofBin, [proofScript, '--before-point8b1'], {
+    cwd: repoRoot(),
+    env: proofEnv,
+    encoding: 'utf8',
+  });
+  assert(cleanupOut.includes('[fr004-pending-proof] PASS'), 'gate must PASS again after removing unexpected row');
+
   console.log('[point8b1] ALL_PASS');
 }
 
