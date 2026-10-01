@@ -11,11 +11,12 @@ import {
 import { DEFAULT_SALES_ENGINE, parseStoredCadence, serializeCadence } from '@/lib/crm-sequences';
 import { isInternalOrTestEmail } from '@/lib/access';
 import {
-  legacyCrmWriteClientMessage,
-  legacyCrmWriteHttpStatus,
+  crmWriteClientMessage,
+  crmWriteHttpStatus,
   NEXORA_ORGANIZATION_HEADER,
-  resolveLegacyCrmWriteOrganization,
-} from '@/lib/tenancy/resolve-legacy-crm-write-organization';
+  resolveCrmWriteOrganization,
+} from '@/lib/tenancy/resolve-crm-write-organization';
+import type { TenantContextErrorCode } from '@/lib/tenancy/tenant-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -325,24 +326,22 @@ export async function POST(request: NextRequest) {
           : null;
 
       if (canCreateSampleLead) {
-        // Point 8B-4: sample existence is organization-scoped. Writes remain legacy-only (8B-2).
-        // Validate on the same transaction client (no ensure/repair).
-        const writeOrg = await resolveLegacyCrmWriteOrganization({
-          userId: user.id,
+        // Point 8B-5B: sample CRM lead uses TenantContext on the same tx client (no ensure/repair).
+        const writeOrg = await resolveCrmWriteOrganization({
           authorizationHeader,
           organizationIdHeader,
           db: tx,
         });
         if (!writeOrg.ok) {
           const err = new Error(writeOrg.code) as Error & {
-            legacyCrmWriteCode: typeof writeOrg.code;
+            crmWriteCode: TenantContextErrorCode;
           };
-          err.legacyCrmWriteCode = writeOrg.code;
+          err.crmWriteCode = writeOrg.code;
           throw err;
         }
 
         const existingLeadCount = await tx.crmLead.count({
-          where: { organizationId: writeOrg.organizationId },
+          where: { organizationId: writeOrg.context.organizationId },
         });
 
         if (existingLeadCount === 0) {
@@ -354,8 +353,8 @@ export async function POST(request: NextRequest) {
 
           await tx.crmLead.create({
             data: {
-              userId: user.id,
-              organizationId: writeOrg.organizationId,
+              userId: writeOrg.context.userId,
+              organizationId: writeOrg.context.organizationId,
               name: sampleLead.name,
               email: sampleLead.email,
               company: sampleLead.company,
@@ -441,14 +440,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     const writeCode =
-      error && typeof error === 'object' && 'legacyCrmWriteCode' in error
-        ? (error as { legacyCrmWriteCode: string }).legacyCrmWriteCode
+      error && typeof error === 'object' && 'crmWriteCode' in error
+        ? (error as { crmWriteCode: TenantContextErrorCode }).crmWriteCode
         : null;
     if (writeCode) {
-      const code = writeCode as Parameters<typeof legacyCrmWriteHttpStatus>[0];
       return NextResponse.json(
-        { error: legacyCrmWriteClientMessage(code), code },
-        { status: legacyCrmWriteHttpStatus(code) }
+        { error: crmWriteClientMessage(writeCode), code: writeCode },
+        { status: crmWriteHttpStatus(writeCode) }
       );
     }
     console.error('Onboarding save error:', error);

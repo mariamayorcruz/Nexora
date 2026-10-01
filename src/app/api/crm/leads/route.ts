@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isInternalOrTestEmail } from '@/lib/access';
 import { prisma } from '@/lib/prisma';
-import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 import { CRM_ALLOWED_STAGES } from '@/lib/sales-playbook';
 import {
   crmReadErrorResponse,
@@ -9,11 +8,10 @@ import {
   resolveCrmReadOrganization,
 } from '@/lib/tenancy/resolve-crm-read-organization';
 import {
-  legacyCrmWriteClientMessage,
-  legacyCrmWriteHttpStatus,
-  omitCrmLeadOrganizationId,
-  resolveLegacyCrmWriteOrganization,
-} from '@/lib/tenancy/resolve-legacy-crm-write-organization';
+  crmWriteErrorResponse,
+  resolveCrmWriteOrganization,
+} from '@/lib/tenancy/resolve-crm-write-organization';
+import { omitCrmLeadOrganizationId } from '@/lib/tenancy/resolve-legacy-crm-write-organization';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,21 +73,12 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const authorizationHeader = request.headers.get('authorization');
-    const userId = getUserIdFromAuthorizationHeader(authorizationHeader);
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const writeOrg = await resolveLegacyCrmWriteOrganization({
-      userId,
+    const writeOrg = await resolveCrmWriteOrganization({
       authorizationHeader,
       organizationIdHeader: request.headers.get(NEXORA_ORGANIZATION_HEADER),
     });
     if (!writeOrg.ok) {
-      return NextResponse.json(
-        { error: legacyCrmWriteClientMessage(writeOrg.code), code: writeOrg.code },
-        { status: legacyCrmWriteHttpStatus(writeOrg.code) }
-      );
+      return crmWriteErrorResponse(writeOrg);
     }
 
     const body = await request.json();
@@ -106,11 +95,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Never trust body.organizationId — ownership is server-assigned only.
+    // Point 8B-5B: ownership from TenantContext. Never trust body.organizationId.
     const lead = await prisma.crmLead.create({
       data: {
-        userId,
-        organizationId: writeOrg.organizationId,
+        userId: writeOrg.context.userId,
+        organizationId: writeOrg.context.organizationId,
         name,
         email: cleanEmail,
         phone: body.phone?.trim() || null,

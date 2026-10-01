@@ -2,17 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isInternalOrTestEmail } from '@/lib/access';
 import { prisma, withPrismaRetry } from '@/lib/prisma';
 import { validateEmail } from '@/lib/auth';
-import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 import {
   crmReadErrorResponse,
   NEXORA_ORGANIZATION_HEADER,
   resolveCrmReadOrganization,
 } from '@/lib/tenancy/resolve-crm-read-organization';
 import {
-  legacyCrmWriteClientMessage,
-  legacyCrmWriteHttpStatus,
-  resolveLegacyCrmWriteOrganization,
-} from '@/lib/tenancy/resolve-legacy-crm-write-organization';
+  crmWriteErrorResponse,
+  resolveCrmWriteOrganization,
+} from '@/lib/tenancy/resolve-crm-write-organization';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,21 +64,12 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const authorizationHeader = request.headers.get('authorization');
-    const userId = getUserIdFromAuthorizationHeader(authorizationHeader);
-    if (!userId) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
-
-    const writeOrg = await resolveLegacyCrmWriteOrganization({
-      userId,
+    const writeOrg = await resolveCrmWriteOrganization({
       authorizationHeader,
       organizationIdHeader: request.headers.get(NEXORA_ORGANIZATION_HEADER),
     });
     if (!writeOrg.ok) {
-      return NextResponse.json(
-        { error: legacyCrmWriteClientMessage(writeOrg.code), code: writeOrg.code },
-        { status: legacyCrmWriteHttpStatus(writeOrg.code) }
-      );
+      return crmWriteErrorResponse(writeOrg);
     }
 
     let body: Record<string, unknown>;
@@ -108,13 +97,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Campaign remains userId-owned; validate against authenticated actor.
+    const actorUserId = writeOrg.context.userId;
     const rawCampaign = body.campaignId;
     let resolvedCampaignId: string | null = null;
     if (rawCampaign != null && String(rawCampaign).trim() !== '') {
       const campaignId = String(rawCampaign).trim();
       const owned = await withPrismaRetry(() =>
         prisma.campaign.findFirst({
-          where: { id: campaignId, userId },
+          where: { id: campaignId, userId: actorUserId },
           select: { id: true },
         })
       );
@@ -124,12 +115,12 @@ export async function POST(request: NextRequest) {
       resolvedCampaignId = owned.id;
     }
 
-    // Never trust body.organizationId — ownership is server-assigned only.
+    // Point 8B-5B: ownership from TenantContext. Never trust body.organizationId.
     const lead = await withPrismaRetry(() =>
       prisma.crmLead.create({
         data: {
-          userId,
-          organizationId: writeOrg.organizationId,
+          userId: writeOrg.context.userId,
+          organizationId: writeOrg.context.organizationId,
           name,
           email,
           source: 'manual',

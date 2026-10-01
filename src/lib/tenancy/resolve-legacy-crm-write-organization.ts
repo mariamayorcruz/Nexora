@@ -5,10 +5,11 @@
  * Does NOT create/repair tenant state. Does NOT authorize multi-org CRM writes.
  * Does NOT backfill existing rows.
  *
- * Allowed write organization until Point 8B-5 multi-org writes:
- *   buildLegacyOrganizationId(userId)  ONLY
+ * Point 8B-5B: interactive authenticated CRM writes use resolveCrmWriteOrganization.
+ * This helper remains required by the Meta webhook (TenantAutomationConfig is still userId-owned).
  *
- * Point 8B-4 cut CRM reads over to organizationId; writes remain legacy-only.
+ * Allowed write organization for Meta / legacy integration path:
+ *   buildLegacyOrganizationId(userId)  ONLY
  */
 
 import {

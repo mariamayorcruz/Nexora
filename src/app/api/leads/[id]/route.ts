@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma, withPrismaRetry } from '@/lib/prisma';
-import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 import {
   crmReadErrorResponse,
   NEXORA_ORGANIZATION_HEADER,
   resolveCrmReadOrganization,
 } from '@/lib/tenancy/resolve-crm-read-organization';
 import {
-  legacyCrmWriteClientMessage,
-  legacyCrmWriteHttpStatus,
-  resolveLegacyCrmWriteOrganization,
-} from '@/lib/tenancy/resolve-legacy-crm-write-organization';
+  crmWriteErrorResponse,
+  resolveCrmWriteOrganization,
+} from '@/lib/tenancy/resolve-crm-write-organization';
 
 export const dynamic = 'force-dynamic';
 
@@ -83,22 +81,12 @@ export async function PATCH(
 ) {
   try {
     const authorizationHeader = request.headers.get('authorization');
-    const userId = getUserIdFromAuthorizationHeader(authorizationHeader);
-    if (!userId) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
-
-    // Transitional write guard only — do not set organizationId on existing rows.
-    const writeOrg = await resolveLegacyCrmWriteOrganization({
-      userId,
+    const writeOrg = await resolveCrmWriteOrganization({
       authorizationHeader,
       organizationIdHeader: request.headers.get(NEXORA_ORGANIZATION_HEADER),
     });
     if (!writeOrg.ok) {
-      return NextResponse.json(
-        { error: legacyCrmWriteClientMessage(writeOrg.code), code: writeOrg.code },
-        { status: legacyCrmWriteHttpStatus(writeOrg.code) }
-      );
+      return crmWriteErrorResponse(writeOrg);
     }
 
     const { id } = params;
@@ -138,10 +126,10 @@ export async function PATCH(
       return NextResponse.json({ error: 'Nada que actualizar' }, { status: 400 });
     }
 
-    // Point 8B-4: row targeting by writeOrg.organizationId (writes remain legacy-only via helper).
+    // Point 8B-5B: updateMany WHERE is id + organizationId (no creator userId filter).
     const updated = await withPrismaRetry(() =>
       prisma.crmLead.updateMany({
-        where: { id: leadId, organizationId: writeOrg.organizationId },
+        where: { id: leadId, organizationId: writeOrg.context.organizationId },
         data: updateData,
       })
     );
@@ -152,7 +140,7 @@ export async function PATCH(
 
     const lead = await withPrismaRetry(() =>
       prisma.crmLead.findFirst({
-        where: { id: leadId, organizationId: writeOrg.organizationId },
+        where: { id: leadId, organizationId: writeOrg.context.organizationId },
         select: {
           id: true,
           name: true,

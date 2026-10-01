@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getUserIdFromAuthorizationHeader } from '@/lib/jwt';
 import {
-  legacyCrmWriteClientMessage,
-  legacyCrmWriteHttpStatus,
+  crmWriteErrorResponse,
   NEXORA_ORGANIZATION_HEADER,
-  resolveLegacyCrmWriteOrganization,
-} from '@/lib/tenancy/resolve-legacy-crm-write-organization';
+  resolveCrmWriteOrganization,
+} from '@/lib/tenancy/resolve-crm-write-organization';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,27 +14,17 @@ export async function POST(
 ) {
   try {
     const authorizationHeader = request.headers.get('authorization');
-    const userId = getUserIdFromAuthorizationHeader(authorizationHeader);
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Transitional write guard only — do not set organizationId on existing rows.
-    const writeOrg = await resolveLegacyCrmWriteOrganization({
-      userId,
+    const writeOrg = await resolveCrmWriteOrganization({
       authorizationHeader,
       organizationIdHeader: request.headers.get(NEXORA_ORGANIZATION_HEADER),
     });
     if (!writeOrg.ok) {
-      return NextResponse.json(
-        { error: legacyCrmWriteClientMessage(writeOrg.code), code: writeOrg.code },
-        { status: legacyCrmWriteHttpStatus(writeOrg.code) }
-      );
+      return crmWriteErrorResponse(writeOrg);
     }
 
-    // Point 8B-4: row targeting by writeOrg.organizationId. Do NOT set organizationId.
+    // Point 8B-5B: tenant-scoped by organizationId. Do NOT set organizationId.
     const lead = await prisma.crmLead.findFirst({
-      where: { id: params.leadId, organizationId: writeOrg.organizationId },
+      where: { id: params.leadId, organizationId: writeOrg.context.organizationId },
     });
 
     if (!lead) {
@@ -88,7 +76,7 @@ export async function POST(
         }
 
         await prisma.crmLead.update({
-          where: { id: lead.id, organizationId: writeOrg.organizationId },
+          where: { id: lead.id, organizationId: writeOrg.context.organizationId },
           data: {
             lastContactedAt: new Date(),
             notes: lead.notes
@@ -106,7 +94,7 @@ export async function POST(
     }
 
     await prisma.crmLead.update({
-      where: { id: lead.id, organizationId: writeOrg.organizationId },
+      where: { id: lead.id, organizationId: writeOrg.context.organizationId },
       data: {
         lastContactedAt: new Date(),
         notes: lead.notes
