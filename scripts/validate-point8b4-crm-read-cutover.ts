@@ -258,10 +258,34 @@ async function main() {
     const patchLead = readFile('src/app/api/crm/leads/[leadId]/route.ts');
     assert(/organizationId:\s*writeOrg\.organizationId/.test(patchLead), 'mutation lookup writeOrg');
     assert(!/data:\s*\{[^}]*organizationId/.test(patchLead), 'mutation must not set organizationId');
+    // Defense-in-depth: UPDATE WHERE itself must be organization-scoped (not id-only after lookup).
+    const patchUpdateBlocks = [...patchLead.matchAll(/crmLead\.update\(\s*\{([\s\S]*?)\n\s*\}\s*\)/g)].map(
+      (m) => m[1]
+    );
+    assert(patchUpdateBlocks.length >= 1, 'crm/leads/[leadId] must call crmLead.update');
+    for (const block of patchUpdateBlocks) {
+      assert(
+        /where:\s*\{[^}]*organizationId:\s*writeOrg\.organizationId/.test(block),
+        'crmLead.update WHERE must include organizationId: writeOrg.organizationId'
+      );
+      assert(/where:\s*\{[^}]*\bid\b/.test(block), 'crmLead.update WHERE must include id');
+    }
     pass('18 Mutation lead lookup/update uses writeOrg.organizationId');
 
     const messageSrc = readFile('src/app/api/crm/leads/[leadId]/message/route.ts');
     assert(/organizationId:\s*writeOrg\.organizationId/.test(messageSrc), 'message lookup writeOrg');
+    // Both message-route updates must tenant-scope WHERE (not id-only).
+    const messageUpdateBlocks = [...messageSrc.matchAll(/crmLead\.update\(\s*\{([\s\S]*?)\n\s*\}\s*\)/g)].map(
+      (m) => m[1]
+    );
+    assert(messageUpdateBlocks.length === 2, `message route must have exactly 2 crmLead.update calls, got ${messageUpdateBlocks.length}`);
+    for (const [idx, block] of messageUpdateBlocks.entries()) {
+      assert(
+        /where:\s*\{[^}]*organizationId:\s*writeOrg\.organizationId/.test(block),
+        `message crmLead.update[${idx}] WHERE must include organizationId: writeOrg.organizationId`
+      );
+      assert(/where:\s*\{[^}]*\bid\b/.test(block), `message crmLead.update[${idx}] WHERE must include id`);
+    }
     pass('19 Message lead lookup/update uses writeOrg.organizationId');
 
     // Runtime shared-org + isolation

@@ -88,7 +88,7 @@ export async function POST(
         }
 
         await prisma.crmLead.update({
-          where: { id: lead.id },
+          where: { id: lead.id, organizationId: writeOrg.organizationId },
           data: {
             lastContactedAt: new Date(),
             notes: lead.notes
@@ -106,7 +106,7 @@ export async function POST(
     }
 
     await prisma.crmLead.update({
-      where: { id: lead.id },
+      where: { id: lead.id, organizationId: writeOrg.organizationId },
       data: {
         lastContactedAt: new Date(),
         notes: lead.notes
