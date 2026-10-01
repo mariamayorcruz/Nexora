@@ -9,6 +9,8 @@ import path from 'node:path'
 
 export const BASELINE_NAME = '20260918010000_baseline_production_pre_organization'
 export const SLICE0_NAME = '20260918020000_add_organization_membership'
+/** Point 8B-1 additive CrmLead.organizationId foundation (nullable; no backfill). */
+export const POINT8B1_NAME = '20260930011200_add_crmlead_organization_tenancy_foundation'
 
 export const LEGACY_PRODUCTION_MIGRATION_NAMES = [
   '20260215120000_lead_capture_paid_flags',
@@ -74,7 +76,7 @@ export function listActiveMigrationNames(): string[] {
 
 export function assertActiveMigrationSet(): void {
   const names = listActiveMigrationNames()
-  const expected = [BASELINE_NAME, SLICE0_NAME]
+  const expected = [BASELINE_NAME, SLICE0_NAME, POINT8B1_NAME]
   if (names.length !== expected.length || expected.some((n, i) => names[i] !== n)) {
     throw new Error(
       `Active prisma/migrations must be exactly [${expected.join(', ')}]; found [${names.join(', ')}]`,
@@ -313,12 +315,132 @@ export function derivePendingLocalActive(
   return localActive.filter((name) => !appliedNames.has(name))
 }
 
-export function assertPendingIsSlice0Only(pending: string[]): void {
-  if (pending.length !== 1 || pending[0] !== SLICE0_NAME) {
+/** Fail closed unless pending local-active migrations match `expected` exactly (order + membership). */
+export function assertPendingExactly(pending: string[], expected: readonly string[]): void {
+  if (
+    pending.length !== expected.length ||
+    expected.some((name, index) => pending[index] !== name)
+  ) {
     throw new Error(
-      `Expected pending local-active migrations to be exactly [${SLICE0_NAME}]; got [${pending.join(', ')}]`,
+      `Expected pending local-active migrations to be exactly [${expected.join(', ')}]; got [${pending.join(', ') || '(none)'}]`,
     )
   }
+}
+
+/**
+ * HISTORICAL — after Authorization A, before Authorization B.
+ * With Point 8B-1 in the active chain, pending is Slice 0 then Point 8B-1.
+ * Not the current production Point 8B-1 gate.
+ */
+export const PENDING_AFTER_AUTH_A_HISTORICAL = [SLICE0_NAME, POINT8B1_NAME] as const
+
+/** CURRENT production gate before authorized Point 8B-1 apply: only Point 8B-1 pending. */
+export const PENDING_BEFORE_POINT8B1 = [POINT8B1_NAME] as const
+
+/**
+ * CURRENT pre-Point8B1 applied set (order-independent):
+ * six legacy rows + baseline + Slice 0. Point 8B-1 must be absent.
+ */
+export const APPLIED_BEFORE_POINT8B1 = [
+  ...LEGACY_PRODUCTION_MIGRATION_NAMES,
+  BASELINE_NAME,
+  SLICE0_NAME,
+] as const
+
+/**
+ * Fail closed unless the applied migration-name set equals `expected` exactly
+ * (membership + count; order ignored).
+ */
+export function assertAppliedMigrationSetExactly(
+  appliedNames: Iterable<string>,
+  expected: readonly string[],
+): void {
+  const applied = new Set(appliedNames)
+  const expectedSet = new Set(expected)
+  const unexpected = [...applied].filter((name) => !expectedSet.has(name)).sort()
+  const missing = [...expectedSet].filter((name) => !applied.has(name)).sort()
+  if (applied.size !== expectedSet.size || unexpected.length > 0 || missing.length > 0) {
+    throw new Error(
+      `Applied migration set mismatch: expected exactly [${expected.join(', ')}]; ` +
+        `got [${[...applied].sort().join(', ') || '(none)'}]` +
+        (missing.length ? `; missing=[${missing.join(', ')}]` : '') +
+        (unexpected.length ? `; unexpected=[${unexpected.join(', ')}]` : ''),
+    )
+  }
+}
+
+/**
+ * CURRENT --before-point8b1 raw `_prisma_migrations` history gate.
+ *
+ * Validates ALL rows (not only finished/applied Sets):
+ * - exactly 8 rows
+ * - expected names each appear exactly once (6 legacy + baseline + Slice 0)
+ * - no unknown names
+ * - every row finished_at != null
+ * - every row rolled_back_at == null
+ * - POINT8B1 absent
+ *
+ * Order ignored.
+ */
+export function assertMigrationHistoryExactlyBeforePoint8B1(rows: MigrationRow[]): void {
+  const expected = APPLIED_BEFORE_POINT8B1
+  const expectedSet = new Set<string>(expected)
+
+  if (rows.length !== expected.length) {
+    throw new Error(
+      `Raw migration history row count mismatch: expected ${expected.length}, got ${rows.length} ` +
+        `[${rows.map((r) => r.migration_name).sort().join(', ') || '(none)'}]`,
+    )
+  }
+
+  const counts = new Map<string, number>()
+  for (const row of rows) {
+    counts.set(row.migration_name, (counts.get(row.migration_name) || 0) + 1)
+  }
+
+  const duplicates = [...counts.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([name, count]) => `${name}x${count}`)
+    .sort()
+  if (duplicates.length > 0) {
+    throw new Error(`Duplicate migration_name rows in history: ${duplicates.join(', ')}`)
+  }
+
+  const names = [...counts.keys()].sort()
+  const unexpected = names.filter((name) => !expectedSet.has(name))
+  const missing = expected.filter((name) => !counts.has(name))
+  if (unexpected.length > 0 || missing.length > 0) {
+    throw new Error(
+      `Raw migration history name set mismatch: expected exactly [${expected.join(', ')}]; ` +
+        `got [${names.join(', ') || '(none)'}]` +
+        (missing.length ? `; missing=[${missing.join(', ')}]` : '') +
+        (unexpected.length ? `; unexpected=[${unexpected.join(', ')}]` : ''),
+    )
+  }
+
+  if (counts.has(POINT8B1_NAME)) {
+    throw new Error(`Point 8B-1 ${POINT8B1_NAME} unexpectedly present in raw migration history`)
+  }
+
+  for (const row of rows) {
+    if (!row.finished_at) {
+      throw new Error(`Migration row unfinished (finished_at null): ${row.migration_name}`)
+    }
+    if (row.rolled_back_at) {
+      throw new Error(`Migration row has rolled_back_at set: ${row.migration_name}`)
+    }
+  }
+}
+
+export function columnExists(databaseUrl: string, table: string, column: string): boolean {
+  const safeTable = table.replace(/'/g, "''")
+  const safeColumn = column.replace(/'/g, "''")
+  const r = psql(
+    databaseUrl,
+    `SELECT COUNT(*)::text FROM information_schema.columns
+     WHERE table_schema='public' AND table_name='${safeTable}' AND column_name='${safeColumn}';`,
+  )
+  return r === '1'
 }
 
 export function assertPreOrgTablesPresent(databaseUrl: string): void {

@@ -1,6 +1,8 @@
 # FR-004 — Migration integrity runbook
 
-Repository-only remediation establishes a trusted Prisma baseline. **Production mutation is not authorized by merging the repository PR alone.**
+Repository-only remediation established a trusted Prisma baseline and Point 7
+Slice 0 foundation. **Later production mutations (including Point 8B-1) require
+their own explicit authorization.**
 
 ## External baseline parity
 
@@ -10,13 +12,14 @@ Repository-only remediation establishes a trusted Prisma baseline. **Production 
 
 Details: `docs/database/fr-004-baseline-review-checklist.md`.
 
-Parity PASS does **not** authorize Production Authorization A or B.
+Parity PASS did **not** by itself authorize production mutation; Auth A/B were
+completed under separate explicit authorizations (see Historical section).
 
 ## Concepts
 
 | History | Role |
 |---------|------|
-| `prisma/migrations/` | Active Prisma replay: baseline + Slice 0 only |
+| `prisma/migrations/` | Active Prisma replay: baseline + Slice 0 + Point 8B-1 |
 | `prisma/migrations-legacy-pre-baseline/` | Frozen historical SQL evidence (not replayed) |
 | `supabase/migrations/` | Supabase RLS / security history (separate from Prisma) |
 
@@ -29,118 +32,170 @@ Runtime tooling prints `baseline_parity_status=SEE_REVIEW_CHECKLIST` and does no
 
 1. `20260918010000_baseline_production_pre_organization`
 2. `20260918020000_add_organization_membership`
+3. `20260930011200_add_crmlead_organization_tenancy_foundation` (Point 8B-1 — additive nullable `CrmLead.organizationId`; no backfill; production apply separately authorized)
 
-## `prisma migrate status` after squash
+## Current expected production state (before Point 8B-1 apply)
 
-After Authorization A, production `_prisma_migrations` still contains six legacy ALTER-era rows that are **not** present in the active local folder. Prisma may report `historiesDiverge` / “migrations from the database are not found locally”.
+Point 7 foundation is **COMPLETE** (not blocked):
 
-That is **informational** for intentional squash/baselining.
+- six historical legacy `_prisma_migrations` rows remain
+- trusted baseline recorded/applied
+- Slice 0 recorded/applied
+- Organization / Membership / related enums exist
+- legacy Organization backfill completed
+- Point 7 Slice 1A merged/deployed
+- **Point 8B-1 is NOT yet applied**
+- **`CrmLead.organizationId` does NOT yet exist**
 
-**Do not** use a successful `prisma migrate status` as the production gate. Use:
-
-```bash
-FR004_DATABASE_URL=... npm run fr004:pending-proof -- --after-auth-a --allow-hosted-readonly
-FR004_DATABASE_URL=... npm run fr004:preflight -- --allow-hosted-readonly --expect-baseline-applied
-```
-
-When `--allow-hosted-readonly` is set, **`FR004_DATABASE_URL` is required** (no fallback to `DATABASE_URL`). Prefer a least-privilege **read-only** credential for metadata inspection. Do not embed credentials in docs or scripts.
-
----
-
-## Production Authorization A
-
-**Status: BLOCKED** pending all of:
-
-1. merged repository PR
-2. backup / PITR verification (`VERIFY_BEFORE_EXECUTION`)
-3. fresh production preflight (fail-closed legacy history + schema checks)
-4. explicit authorization
-
-Parity PASS alone is insufficient.
-
-**Allowed (only after the above)**
-
-```bash
-prisma migrate resolve --applied 20260918010000_baseline_production_pre_organization
-```
-
-**Not allowed**
-
-- `prisma migrate deploy`
-- backfill
-- any other schema mutation
-- deleting/altering the six legacy `_prisma_migrations` rows
-- `db push` / `migrate reset` / `migrate dev` against production
-
-**Verification**
-
-1. Six legacy rows remain unchanged (`finished_at` present, `rolled_back_at` null; `applied_steps_count = 0` on the first historical row is accepted)
-2. Baseline row added and finished
-3. Application schema unchanged (still no Organization / Membership / related enums)
-4. Custom pending proof: pending local-active == Slice 0 only
+Do **not** use `prisma migrate status` alone as the production gate (legacy rows
+still diverge from the local active folder). Use the custom pending proof below.
 
 ---
 
-## Production Authorization B
+## POINT 8B-1 PRODUCTION MIGRATION GATE
 
-**Status: BLOCKED** separately until Authorization A is complete and verified, plus explicit DDL authorization.
+**Status: BLOCKED** pending separate explicit authorization.
 
-**Preconditions**
+This is the **current** next production Prisma DDL operation.
 
-- Authorization A completed and verified
-- Custom pending-state proof PASS (`--after-auth-a`)
-- Explicit separate authorization for DDL
+### Preconditions
 
-**Allowed**
+1. Point 8B-1 PR reviewed (and merged when that step is authorized)
+2. Backup / PITR posture confirmed as required by operators
+3. Read-only current-state preflight PASS:
+
+```bash
+FR004_DATABASE_URL=... npm run fr004:pending-proof -- --before-point8b1 --allow-hosted-readonly
+```
+
+When `--allow-hosted-readonly` is set, **`FR004_DATABASE_URL` is required**
+(no fallback to `DATABASE_URL`). Prefer a least-privilege **read-only**
+credential. Do not embed credentials in docs or scripts.
+
+4. Derived pending local-active migrations are **EXACTLY**:
+
+`20260930011200_add_crmlead_organization_tenancy_foundation`
+
+5. Explicit production migration authorization for Point 8B-1 only
+
+### Expected future apply (only when authorized)
 
 ```bash
 prisma migrate deploy
 ```
 
-**Expected**
+**Expected:** ONLY
 
-- Only `20260918020000_add_organization_membership` executes
-- Organization / Membership / enums / indexes / FKs created
+`20260930011200_add_crmlead_organization_tenancy_foundation`
 
-**Not allowed**
+### Expected post-apply DB
 
-- Marking Slice 0 applied via `migrate resolve`
-- Backfill
-- Any other pending migration slipping through
+- `CrmLead.organizationId` exists and is **nullable**
+- indexes exist:
+  - `CrmLead_organizationId_updatedAt_idx`
+  - `CrmLead_organizationId_stage_idx`
+  - `CrmLead_userId_idx`
+- FK `CrmLead_organizationId_fkey` → `Organization` with **ON DELETE RESTRICT**
+- existing `CrmLead` rows remain `organizationId = NULL` (no backfill)
+- active runtime Prisma schema alignment still deferred until **8B-2**
+- no dual-write / read cutover / multi-org writes yet
 
-**Verification**
+### Not authorized by this runbook section
 
-1. Slice 0 row finished in `_prisma_migrations`
-2. Six legacy + baseline rows still present/unchanged
-3. Organization / Membership / enums exist
-4. Runtime tenancy behavior still unchanged (userId authoritative)
+- production migration apply (until explicit authorization)
+- backfill
+- runtime dual-write
+- organizationId read cutover
+- multi-org CRM writes
+- active `prisma/schema.prisma` alignment before physical DB verification
+- `db push` / `migrate reset` / `migrate dev` against production
 
 ---
 
-## Backfill (separate later authorization)
+## Historical — Production Authorization A (COMPLETED)
 
-Dry-run and `--apply` of legacy organization backfill are **not** part of FR-004 Auth A/B.
+**Status: COMPLETED / HISTORICAL** — do not treat as the current next operation.
 
-See `docs/point-7-slice-0.md`. Production backfill requires its own explicit approval after Auth B.
-
----
-
-## Local / CI validation (repository)
+Historical allowed command (already executed under prior authorization):
 
 ```bash
-# Empty disposable DB
-FR004_DATABASE_URL=postgresql://... npm run fr004:greenfield
-
-# Disposable prod-history simulation
-FR004_DATABASE_URL=postgresql://... npm run fr004:prodsim
+prisma migrate resolve --applied 20260918010000_baseline_production_pre_organization
 ```
 
-Scripts refuse obvious hosted/production URLs unless `--allow-hosted-readonly` is explicitly used with `FR004_DATABASE_URL`.
+Historical verification intent:
+
+1. Six legacy rows remain unchanged
+2. Baseline row added and finished
+3. Application schema unchanged at that moment (no Organization / Membership yet)
+4. Pending local-active at that historical moment (with today's chain) would be
+   Slice 0 **then** Point 8B-1 — use historical mode only for simulations:
+
+```bash
+# HISTORICAL simulation gate only — NOT current Point 8B-1 production procedure
+FR004_DATABASE_URL=... npm run fr004:pending-proof -- --after-auth-a
+```
+
+---
+
+## Historical — Production Authorization B (COMPLETED)
+
+**Status: COMPLETED / HISTORICAL** — Slice 0 DDL already applied in production.
+
+Historical expected apply:
+
+- `20260918020000_add_organization_membership`
+
+Historical verification intent:
+
+1. Slice 0 row finished
+2. Six legacy + baseline rows still present
+3. Organization / Membership / enums exist
+4. Runtime tenancy still userId-authoritative for business tables at that time
+
+**Note:** With Point 8B-1 now present in the active local chain, a fresh
+historical Auth-A simulation (`fr004:prodsim`) will show pending
+`[Slice0, Point8B1]` and a subsequent `migrate deploy` applies **both**.
+That is correct for disposable historical simulation against today's folder,
+and is **not** the current production Point 8B-1 gate (use `--before-point8b1`).
+
+---
+
+## Historical — legacy Organization backfill (COMPLETED)
+
+Dry-run / `--apply` of legacy organization backfill was a separate Point 7
+authorization after Auth B. See `docs/point-7-slice-0.md`.
+
+Point 8B-1 does **not** backfill `CrmLead.organizationId` (that is Point 8B-3,
+separately authorized later).
+
+---
+
+## Local / CI validation (repository / disposable only)
+
+```bash
+# Empty disposable DB — applies baseline + Slice 0 + Point 8B-1
+FR004_DATABASE_URL=postgresql://... npm run fr004:greenfield
+
+# Disposable HISTORICAL prod-history simulation (Auth A → deploy Slice0+8B1)
+FR004_DATABASE_URL=postgresql://... npm run fr004:prodsim
+
+# Point 8B-1 migration semantics + CURRENT --before-point8b1 gate on synthetic DB
+FR004_DATABASE_URL=postgresql://... npm run tenancy:validate-point8b1
+```
+
+Scripts refuse obvious hosted/production URLs unless `--allow-hosted-readonly`
+is explicitly used with `FR004_DATABASE_URL`.
 
 ## Stop conditions
 
-Stop closed if baseline ≠ production on material structure, Org/Membership already exist before Auth B, unexpected pending migrations, missing/unfinished/rolled-back legacy history rows, backup unavailable, or any command other than the authorized one would mutate production.
+Stop closed if unexpected pending migrations, missing/unfinished/rolled-back
+legacy history rows, backup unavailable, Point 8B-1 already partially applied,
+`CrmLead.organizationId` present before authorized apply, or any command other
+than the authorized one would mutate production.
 
 ## CI note
 
-No GitHub Actions workflow was added in this PR because the repository had no existing workflow directory to extend. Validation scripts `fr004:greenfield` and `fr004:prodsim` are ready for manual/CI wiring later without production secrets.
+No GitHub Actions workflow is required by this document. Validation scripts
+`fr004:greenfield`, `fr004:prodsim`, `fr004:pending-proof`, and
+`tenancy:validate-point8b1` are ready for manual/CI wiring later without
+production secrets.
