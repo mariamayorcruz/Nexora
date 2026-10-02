@@ -4,6 +4,7 @@ import { CalendarPlus2, Search, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import AISuggestionBar from '@/components/AISuggestionBar';
+import { useTenantOrganization } from '@/components/TenantOrganizationProvider';
 import { useAppLanguage } from '@/hooks/use-app-language';
 
 type ConversationFilter = 'all' | 'unread' | 'whatsapp' | 'sms' | 'email' | 'ai';
@@ -64,6 +65,8 @@ function buildMessages(lead: LeadRow): ChatMessage[] {
 export default function ConversacionesPage() {
   const router = useRouter();
   const { language } = useAppLanguage();
+  const { selectionReady, selectedOrganizationId, getTenantHeaders, handleTenantResponse } =
+    useTenantOrganization();
   const [leads, setLeads] = useState<LeadRow[]>([]);
   const [activeTab, setActiveTab] = useState<ConversationFilter>('all');
   const [sideFilter, setSideFilter] = useState<SideFilter>('all');
@@ -77,19 +80,26 @@ export default function ConversacionesPage() {
   const [aiLoading, setAiLoading] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
+    if (!selectionReady || !selectedOrganizationId) return;
+    const headers = getTenantHeaders();
+    if (!headers) return;
+    setLeads([]);
+    setSelectedId(null);
     void fetch('/api/crm/leads', {
-      headers: { Authorization: `Bearer ${token}` },
+      headers,
       cache: 'no-store',
     })
-      .then((res) => res.json())
-      .then((data) => {
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({ leads: [] }));
+        if (handleTenantResponse(res.status, data)) {
+          setLeads([]);
+          return;
+        }
         const rows = Array.isArray(data?.leads) ? data.leads : [];
         setLeads(rows.filter((lead: LeadRow) => Boolean(lead.phone || lead.email)));
       })
       .catch(() => setLeads([]));
-  }, []);
+  }, [selectionReady, selectedOrganizationId, getTenantHeaders, handleTenantResponse]);
 
   useEffect(() => {
     if (!selectedId && leads.length) setSelectedId(leads[0].id);
@@ -182,19 +192,20 @@ export default function ConversacionesPage() {
     setSendSuccess(false);
     setSendError('');
     try {
-      const token = localStorage.getItem('token');
+      const headers = getTenantHeaders({ 'Content-Type': 'application/json' });
+      if (!headers) throw new Error(language === 'en' ? 'Workspace required.' : 'Espacio requerido.');
       const response = await fetch(`/api/crm/leads/${selected.id}/message`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           channel: composerTab,
           message: draft.trim(),
         }),
       });
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
+      if (handleTenantResponse(response.status, data)) {
+        throw new Error(language === 'en' ? 'Organization selection required.' : 'Selección de organización requerida.');
+      }
       if (!response.ok) throw new Error(data.error || 'Error al enviar');
       setDraft('');
       setSendSuccess(true);

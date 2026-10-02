@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTenantOrganization } from '@/components/TenantOrganizationProvider';
 import { BILLING_PLANS, BillingCycle, BillingPlan, getBillingPlanLabel } from '@/lib/billing';
 import { useAppLanguage } from '@/hooks/use-app-language';
 
@@ -62,6 +63,8 @@ function readBillingQueryState(): BillingQueryState {
 export default function BillingPage() {
   const { language } = useAppLanguage();
   const en = language === 'en';
+  const { selectionReady, selectedOrganizationId, getTenantHeaders, handleTenantResponse } =
+    useTenantOrganization();
   const [subscription, setSubscription] = useState<SubscriptionState | null>(null);
   const [invoices, setInvoices] = useState<BillingInvoiceRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,15 +85,18 @@ export default function BillingPage() {
 
   const currentPlanLabel = useMemo(() => getBillingPlanLabel(subscription?.plan), [subscription?.plan]);
 
-  const fetchSubscription = async () => {
+  const fetchSubscription = useCallback(async () => {
     try {
+      const headers = getTenantHeaders();
       const token = localStorage.getItem('token');
+      if (!headers || !token) return;
       const response = await fetch('/api/users/me?allowIncomplete=1', {
-        headers: { Authorization: `Bearer ${token}` },
+        headers,
         cache: 'no-store',
       });
-      const data = await response.json();
-      setSubscription(data.user.subscription);
+      const data = await response.json().catch(() => ({}));
+      if (handleTenantResponse(response.status, data)) return;
+      setSubscription(data.user?.subscription ?? null);
 
       const invResponse = await fetch('/api/billing/invoices', {
         headers: { Authorization: `Bearer ${token}` },
@@ -107,15 +113,16 @@ export default function BillingPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [getTenantHeaders, handleTenantResponse]);
 
   useEffect(() => {
     setQueryState(readBillingQueryState());
   }, []);
 
   useEffect(() => {
+    if (!selectionReady || !selectedOrganizationId) return;
     void fetchSubscription();
-  }, []);
+  }, [selectionReady, selectedOrganizationId, fetchSubscription]);
 
   useEffect(() => {
     if (requestedPlanFromUrl) {
@@ -200,7 +207,7 @@ export default function BillingPage() {
     };
 
     void verifyCheckout();
-  }, [checkoutStatus, en, sessionId]);
+  }, [checkoutStatus, en, sessionId, fetchSubscription]);
 
   const handlePlanChange = async (plan: BillingPlan, cycle: BillingCycle, withTrial = false) => {
     setProcessingPlan(`${plan}-${cycle}`);

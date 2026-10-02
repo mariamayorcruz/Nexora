@@ -87,6 +87,11 @@ function SignupForm() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error con Google');
       localStorage.setItem('token', data.token);
+      try {
+        localStorage.removeItem('nexora_selected_organization_id');
+      } catch {
+        // ignore
+      }
       if (selectedPlanConfig && !data.user?.founderAccess) {
         localStorage.setItem(
           'nexoraSelectedPlan',
@@ -165,6 +170,11 @@ function SignupForm() {
         return;
       }
       localStorage.setItem('token', data.token);
+      try {
+        localStorage.removeItem('nexora_selected_organization_id');
+      } catch {
+        // ignore
+      }
       if (selectedPlanConfig && !data.user?.founderAccess) {
         localStorage.setItem(
           'nexoraSelectedPlan',
