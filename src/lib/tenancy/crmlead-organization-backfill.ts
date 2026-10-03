@@ -183,13 +183,15 @@ export type CrmLeadOrgBackfillSummary = {
   totalCrmLeads: number;
   nullOrganizationId: number;
   alreadyAssigned: number;
-  rowsWouldUpdate: number;
+  /** Alias exposed as wouldUpdate in CLI JSON. */
+  wouldUpdate: number;
+  missingUser: number;
   missingOrganization: number;
   inactiveOrganization: number;
   missingMembership: number;
   inactiveMembership: number;
-  userMissing: number;
-  ambiguousInconsistentMapping: number;
+  ambiguousMapping: number;
+  inconsistentMapping: number;
   /** Non-null rows with legacy_org_* != legacy_org_<userId> */
   alreadyAssignedLegacyInconsistent: number;
   /** Non-null rows whose user lacks ACTIVE membership on lead org */
@@ -204,13 +206,14 @@ export function emptyCrmLeadOrgBackfillSummary(): CrmLeadOrgBackfillSummary {
     totalCrmLeads: 0,
     nullOrganizationId: 0,
     alreadyAssigned: 0,
-    rowsWouldUpdate: 0,
+    wouldUpdate: 0,
+    missingUser: 0,
     missingOrganization: 0,
     inactiveOrganization: 0,
     missingMembership: 0,
     inactiveMembership: 0,
-    userMissing: 0,
-    ambiguousInconsistentMapping: 0,
+    ambiguousMapping: 0,
+    inconsistentMapping: 0,
     alreadyAssignedLegacyInconsistent: 0,
     alreadyAssignedMissingActiveMembership: 0,
     alreadyAssignedOrphanOrganization: 0,
@@ -218,9 +221,34 @@ export function emptyCrmLeadOrgBackfillSummary(): CrmLeadOrgBackfillSummary {
   };
 }
 
+export function integrityIssuesCount(summary: CrmLeadOrgBackfillSummary): number {
+  return (
+    summary.alreadyAssignedOrphanOrganization +
+    summary.alreadyAssignedLegacyInconsistent +
+    summary.alreadyAssignedMissingActiveMembership
+  );
+}
+
+export function toBackfillReportCounters(summary: CrmLeadOrgBackfillSummary) {
+  return {
+    totalCrmLeads: summary.totalCrmLeads,
+    nullOrganizationId: summary.nullOrganizationId,
+    alreadyAssigned: summary.alreadyAssigned,
+    wouldUpdate: summary.wouldUpdate,
+    missingUser: summary.missingUser,
+    missingOrganization: summary.missingOrganization,
+    inactiveOrganization: summary.inactiveOrganization,
+    missingMembership: summary.missingMembership,
+    inactiveMembership: summary.inactiveMembership,
+    ambiguousMapping: summary.ambiguousMapping,
+    inconsistentMapping: summary.inconsistentMapping,
+    integrityIssues: integrityIssuesCount(summary),
+  };
+}
+
 export function recordNullPlan(summary: CrmLeadOrgBackfillSummary, plan: CrmLeadOrgBackfillPlan) {
   if (plan.action === 'would_update') {
-    summary.rowsWouldUpdate += 1;
+    summary.wouldUpdate += 1;
     return;
   }
   if (plan.action === 'skip_already_assigned') {
@@ -241,14 +269,16 @@ export function recordNullPlan(summary: CrmLeadOrgBackfillSummary, plan: CrmLead
       summary.inactiveMembership += 1;
       break;
     case 'user_missing':
-      summary.userMissing += 1;
+      summary.missingUser += 1;
+      break;
+    case 'mapping_ambiguous':
+      summary.ambiguousMapping += 1;
       break;
     case 'mapping_inconsistent':
-    case 'mapping_ambiguous':
-      summary.ambiguousInconsistentMapping += 1;
+      summary.inconsistentMapping += 1;
       break;
     default:
-      summary.ambiguousInconsistentMapping += 1;
+      summary.ambiguousMapping += 1;
   }
 }
 
@@ -270,32 +300,24 @@ export function evaluateCrmLeadOrgBackfillGate(
     summary.inactiveOrganization +
     summary.missingMembership +
     summary.inactiveMembership +
-    summary.userMissing +
-    summary.ambiguousInconsistentMapping;
+    summary.missingUser +
+    summary.ambiguousMapping +
+    summary.inconsistentMapping;
 
-  if (summary.nullOrganizationId !== summary.rowsWouldUpdate + blockedNulls) {
+  if (summary.nullOrganizationId !== summary.wouldUpdate + blockedNulls) {
     failures.push('internal_count_mismatch_for_null_rows');
   }
   if (blockedNulls > 0) {
     failures.push(`blocked_null_rows=${blockedNulls}`);
   }
-  if (summary.rowsWouldUpdate !== summary.nullOrganizationId) {
+  if (summary.wouldUpdate !== summary.nullOrganizationId) {
     failures.push(
-      `not_all_null_rows_eligible wouldUpdate=${summary.rowsWouldUpdate} nulls=${summary.nullOrganizationId}`
+      `not_all_null_rows_eligible wouldUpdate=${summary.wouldUpdate} nulls=${summary.nullOrganizationId}`
     );
   }
-  if (summary.alreadyAssignedOrphanOrganization > 0) {
-    failures.push(`alreadyAssignedOrphanOrganization=${summary.alreadyAssignedOrphanOrganization}`);
-  }
-  if (summary.alreadyAssignedLegacyInconsistent > 0) {
-    failures.push(
-      `alreadyAssignedLegacyInconsistent=${summary.alreadyAssignedLegacyInconsistent}`
-    );
-  }
-  if (summary.alreadyAssignedMissingActiveMembership > 0) {
-    failures.push(
-      `alreadyAssignedMissingActiveMembership=${summary.alreadyAssignedMissingActiveMembership}`
-    );
+  const integrityIssues = integrityIssuesCount(summary);
+  if (integrityIssues > 0) {
+    failures.push(`integrityIssues=${integrityIssues}`);
   }
   return { pass: failures.length === 0, failures };
 }

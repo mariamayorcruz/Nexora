@@ -227,7 +227,7 @@ async function main() {
     const dry = runBackfill(url, false);
     assert(dry.status === 0, `dry-run should PASS on happy fixture: ${dry.stdout}`);
     assert(/DRY_RUN/.test(dry.stdout) || /mode.: .DRY_RUN/.test(dry.stdout), 'dry-run mode labeled');
-    assert(/"rowsWouldUpdate": 1/.test(dry.stdout), 'dry-run would update 1');
+    assert(/"wouldUpdate": 1/.test(dry.stdout), 'dry-run would update 1');
     assert(/"nullOrganizationId": 1/.test(dry.stdout), 'dry-run sees 1 null');
     pass('4 dry-run happy path counts');
 
@@ -249,7 +249,7 @@ async function main() {
     // Idempotent second apply
     const apply2 = runBackfill(url, true);
     assert(apply2.status === 0, `second apply should PASS no-op: ${apply2.stdout}`);
-    assert(/"appliedUpdates": 0/.test(apply2.stdout) || /"rowsWouldUpdate": 0/.test(apply2.stdout), 'second apply no-op');
+    assert(/"appliedUpdates": 0/.test(apply2.stdout) || /"wouldUpdate": 0/.test(apply2.stdout), 'second apply no-op');
     pass('7 second apply is idempotent no-op');
 
     // Fail-closed: missing organization
@@ -400,19 +400,59 @@ async function main() {
       totalCrmLeads: 3,
       nullOrganizationId: 0,
       alreadyAssigned: 3,
-      rowsWouldUpdate: 0,
+      wouldUpdate: 0,
+      missingUser: 0,
       missingOrganization: 0,
       inactiveOrganization: 0,
       missingMembership: 0,
       inactiveMembership: 0,
-      userMissing: 0,
-      ambiguousInconsistentMapping: 0,
+      ambiguousMapping: 0,
+      inconsistentMapping: 0,
       alreadyAssignedLegacyInconsistent: 0,
       alreadyAssignedMissingActiveMembership: 0,
       alreadyAssignedOrphanOrganization: 0,
       appliedUpdates: 0,
     }).pass, 'empty null set gate pass');
+
+    // Inconsistent mapping FAIL (legacy org id exists for different user shape)
+    await resetPublic(prisma);
+    await prisma.$disconnect();
+    runPrismaMigrateDeploy(url);
+    await prisma.$connect();
+    const uInc = await prisma.user.create({
+      data: { email: 'crm8b3-inconsistent@example.com', name: 'INC', password: 'x' },
+    });
+    await ensureUserOrganization(prisma, { userId: uInc.id });
+    // Create a foreign org and attach ACTIVE membership so planner reaches org lookup on expected legacy —
+    // then delete expected legacy org membership path: create null lead while swapping org id mismatch
+    // by creating Organization with wrong id that matches buildLegacyOrganizationId of ANOTHER user.
+    const other = await prisma.user.create({
+      data: { email: 'crm8b3-other-map@example.com', name: 'O', password: 'x' },
+    });
+    await ensureUserOrganization(prisma, { userId: other.id });
+    // Force inconsistent planner path: membership exists for expected legacy but org.id check fails —
+    // simulate by temporarily using planNull with foreign org snapshot in unit style + script path:
+    // Delete membership on expected legacy and point a null lead at user whose org row was renamed id is impossible.
+    // Practical DB path: remove expected org, create org with id legacy_org_<user> replaced — instead create
+    // lead for uInc with null org, then replace Organization id is not possible. Use pure planner assert:
+    const expected = buildLegacyOrganizationId(uInc.id);
+    const inconsistentPlan = planNullCrmLeadOrganizationBackfill({
+      lead: { id: 'Lx', userId: uInc.id, organizationId: null },
+      userExists: true,
+      organization: { id: expected, status: OrganizationStatus.ACTIVE },
+      membership: {
+        organizationId: buildLegacyOrganizationId(other.id),
+        userId: uInc.id,
+        role: MembershipRole.OWNER,
+        status: MembershipStatus.ACTIVE,
+      },
+    });
+    assert(inconsistentPlan.action === 'blocked', 'inconsistent membership org mapping blocked');
+    if (inconsistentPlan.action === 'blocked') {
+      assert(inconsistentPlan.reason === 'mapping_inconsistent', 'reason mapping_inconsistent');
+    }
     pass('14 fixture: 2 nulls backfilled, 1 assigned untouched; 8B-6 gates green');
+    pass('14b inconsistent mapping → FAIL CLOSED (planner)');
 
     pass('15 no production mutation (disposable only)');
     pass('16 production --apply / 8B-6 activation remain unauthorized');
