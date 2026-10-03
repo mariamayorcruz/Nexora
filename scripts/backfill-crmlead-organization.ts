@@ -22,6 +22,7 @@ import {
   evaluatePoint8b6ReadinessFromCounts,
   planNullCrmLeadOrganizationBackfill,
   recordNullPlan,
+  toBackfillReportCounters,
   type CrmLeadOrgBackfillPlan,
   type CrmLeadOrgBackfillSummary,
 } from '../src/lib/tenancy/crmlead-organization-backfill';
@@ -194,22 +195,12 @@ async function main() {
       JSON.stringify(
         {
           mode,
-          summary: {
-            totalCrmLeads: summary.totalCrmLeads,
-            nullOrganizationId: summary.nullOrganizationId,
-            alreadyAssigned: summary.alreadyAssigned,
-            rowsWouldUpdate: summary.rowsWouldUpdate,
-            missingOrganization: summary.missingOrganization,
-            inactiveOrganization: summary.inactiveOrganization,
-            missingMembership: summary.missingMembership,
-            inactiveMembership: summary.inactiveMembership,
-            userMissing: summary.userMissing,
-            ambiguousInconsistentMapping: summary.ambiguousInconsistentMapping,
-            alreadyAssignedOrphanOrganization: summary.alreadyAssignedOrphanOrganization,
-            alreadyAssignedLegacyInconsistent: summary.alreadyAssignedLegacyInconsistent,
-            alreadyAssignedMissingActiveMembership: summary.alreadyAssignedMissingActiveMembership,
+          summary: toBackfillReportCounters(summary),
+          gate: {
+            pass: gate.pass,
+            status: gate.pass ? 'PASS' : 'FAIL',
+            failures: gate.failures,
           },
-          gate,
           blockedSample: blocked.slice(0, 20),
           wouldUpdateSample: wouldUpdateIds.slice(0, 20),
         },
