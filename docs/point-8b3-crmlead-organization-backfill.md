@@ -2,12 +2,12 @@
 
 ## Authorization boundary (current)
 
-**Authorized:** DESIGN + DRY-RUN + DISPOSABLE VALIDATION (Draft PR only).
+**Authorized:** DESIGN + DRY-RUN + DISPOSABLE VALIDATION + hosted **SELECT-only** preflight evidence (this PR).
 
 **NOT authorized:**
 
 - Production mutation / production `--apply`
-- Merge to `main`
+- Merge to `main` (until separately authorized)
 - Point 8B-6 migration apply / `organizationId` NOT NULL
 - Automatic Organization/Membership repair during backfill
 - Campaign / LeadCapture / AdAccount / TenantAutomationConfig migration
@@ -107,19 +107,41 @@ After successful disposable `--apply`:
 
 1. Environments where Slice-0 legacy Organization/Membership backfill was incomplete will FAIL CLOSED until repaired by the dedicated tenant backfill (not this script).
 2. Pre-existing **non-null** inconsistent leads block apply (by design) so 8B-6 gates stay honest.
-3. Production null counts are unknown until a separately authorized hosted read-only preflight.
+3. Hosted production currently shows **zero** null `organizationId` rows (see evidence below); production `--apply` remains unauthorized and is **not needed** at this time.
+
+## Hosted production evidence (SELECT-only)
+
+Executed against Nexora/Supabase with **read-only** SQL (no writes, no `--apply`):
+
+```json
+{
+  "totalCrmLeads": 5,
+  "nullOrganizationId": 0,
+  "orphanOrganizationId": 0,
+  "legacyMappingInconsistent": 0,
+  "missingActiveMembership": 0,
+  "organizationInactive": 0
+}
+```
+
+| Conclusion | Status |
+|------------|--------|
+| Production rows requiring 8B-3 backfill | **0** |
+| Production `--apply` needed now | **No** |
+| Production `--apply` authorized | **No** |
 
 ## Relation to Point 8B-6
 
-Successful 8B-3 apply satisfies the 8B-6 preflight blockers for null/orphan/legacy/membership.  
-It does **not** authorize 8B-6 schema NOT NULL activation (PR #15 remains design-only).
+Successful 8B-3 apply (disposable / future authorized environments with nulls) satisfies the 8B-6 preflight blockers for null/orphan/legacy/membership.  
+It does **not** authorize 8B-6 schema NOT NULL activation (PR #15 remains design-only).  
+Current hosted counters already meet the numeric 8B-6 readiness zeros; that still does **not** authorize 8B-6 apply.
 
 ## GO / NO-GO
 
 | Question | Verdict |
 |----------|---------|
 | Design + disposable dry-run/apply/validator | **GO** |
-| Hosted read-only production preflight | Needs separate auth |
-| Production `--apply` | **NO-GO** |
-| Merge | **NO-GO** |
+| Hosted read-only production preflight | **DONE** (SELECT-only; see evidence) |
+| Production `--apply` | **NO-GO** (not needed; 0 nulls) |
+| Merge | Pending separate authorization |
 | Activate 8B-6 NOT NULL | **NO-GO** |
