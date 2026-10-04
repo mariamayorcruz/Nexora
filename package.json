@@ -24,6 +24,8 @@
     "tenancy:validate-point8b4": "tsx scripts/validate-point8b4-crm-read-cutover.ts",
     "tenancy:validate-point8b5": "tsx scripts/validate-point8b5-crm-multi-org-writes.ts",
     "tenancy:validate-point8b5c": "tsx scripts/validate-point8b5c-tenant-selection-ux.ts",
+    "tenancy:preflight-point8b6": "tsx scripts/preflight-point8b6-crmlead-org-not-null.ts",
+    "tenancy:validate-point8b6": "tsx scripts/validate-point8b6-crmlead-org-not-null.ts",
     "fr004:greenfield": "tsx scripts/fr004-greenfield-validate.ts",
     "fr004:prodsim": "tsx scripts/fr004-prodsim-validate.ts",
     "fr004:preflight": "tsx scripts/fr004-preflight-metadata.ts",

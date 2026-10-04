@@ -77,8 +77,15 @@ async function collectIntegrityOnAssigned(prisma: PrismaClient, summary: CrmLead
   summary.alreadyAssignedMissingActiveMembership = Number(missingMembership[0]?.count || 0);
 }
 
+async function countNullOrganizationId(prisma: PrismaClient): Promise<number> {
+  const rows = await prisma.$queryRaw<Array<{ count: bigint }>>`
+    SELECT COUNT(*)::bigint AS count FROM "CrmLead" WHERE "organizationId" IS NULL
+  `;
+  return Number(rows[0]?.count || 0);
+}
+
 async function collectPoint8b6Counts(prisma: PrismaClient) {
-  const nullOrganizationId = await prisma.crmLead.count({ where: { organizationId: null } });
+  const nullOrganizationId = await countNullOrganizationId(prisma);
   const orphanRows = await prisma.$queryRaw<Array<{ count: bigint }>>`
     SELECT COUNT(*)::bigint AS count
     FROM "CrmLead" c
@@ -118,16 +125,20 @@ async function planAll(
   const plans: CrmLeadOrgBackfillPlan[] = [];
 
   summary.totalCrmLeads = await prisma.crmLead.count();
-  summary.nullOrganizationId = await prisma.crmLead.count({ where: { organizationId: null } });
+  summary.nullOrganizationId = await countNullOrganizationId(prisma);
   summary.alreadyAssigned = summary.totalCrmLeads - summary.nullOrganizationId;
 
   await collectIntegrityOnAssigned(prisma, summary);
 
-  const nullLeads = await prisma.crmLead.findMany({
-    where: { organizationId: null },
-    select: { id: true, userId: true, organizationId: true },
-    orderBy: { createdAt: 'asc' },
-  });
+  // Raw query: Prisma client rejects organizationId:null filters after schema NOT NULL.
+  const nullLeads = await prisma.$queryRaw<
+    Array<{ id: string; userId: string; organizationId: string | null }>
+  >`
+    SELECT id, "userId" AS "userId", "organizationId" AS "organizationId"
+    FROM "CrmLead"
+    WHERE "organizationId" IS NULL
+    ORDER BY "createdAt" ASC
+  `;
 
   for (const lead of nullLeads) {
     const expectedOrganizationId = buildLegacyOrganizationId(lead.userId);
@@ -238,19 +249,21 @@ async function main() {
     const applied = await prisma.$transaction(async (tx) => {
       let count = 0;
       for (const row of updates) {
-        const result = await tx.crmLead.updateMany({
-          where: {
-            id: row.leadId,
-            organizationId: null,
-            userId: row.userId,
-          },
-          data: {
-            organizationId: row.organizationId,
-          },
-        });
-        if (result.count !== 1) {
+        // Raw update: Prisma rejects organizationId:null filters after schema NOT NULL.
+        const result = await tx.$executeRawUnsafe(
+          `UPDATE "CrmLead"
+           SET "organizationId" = $1, "updatedAt" = NOW()
+           WHERE id = $2
+             AND "userId" = $3
+             AND "organizationId" IS NULL`,
+          row.organizationId,
+          row.leadId,
+          row.userId
+        );
+        const matched = typeof result === 'number' ? result : 0;
+        if (matched !== 1) {
           throw new Error(
-            `Transactional update failed for lead ${row.leadId} (count=${result.count}) — rolling back`
+            `Expected exactly 1 update for lead ${row.leadId}; matched=${matched}`
           );
         }
         count += 1;

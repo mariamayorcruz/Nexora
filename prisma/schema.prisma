@@ -188,10 +188,10 @@ model CrmLead {
   id              String   @id @default(cuid())
   userId          String
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  /// Point 8B-1 nullable tenancy column. Point 8B-2 writes deterministic legacy org on CREATE only.
-  /// Reads remain userId-scoped until Point 8B-4. Historical nulls left for Point 8B-3 backfill.
-  organizationId  String?
-  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  /// Point 8B-6: organizationId is required tenant ownership (NOT NULL).
+  /// userId retained as actor/provenance. FK ON DELETE RESTRICT unchanged.
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   name            String
   email           String?
   phone           String?

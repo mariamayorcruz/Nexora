@@ -11,6 +11,8 @@ export const BASELINE_NAME = '20260918010000_baseline_production_pre_organizatio
 export const SLICE0_NAME = '20260918020000_add_organization_membership'
 /** Point 8B-1 additive CrmLead.organizationId foundation (nullable; no backfill). */
 export const POINT8B1_NAME = '20260930011200_add_crmlead_organization_tenancy_foundation'
+/** Point 8B-6 CrmLead.organizationId NOT NULL hardening. */
+export const POINT8B6_NAME = '20261004120000_crmlead_organization_id_not_null'
 
 export const LEGACY_PRODUCTION_MIGRATION_NAMES = [
   '20260215120000_lead_capture_paid_flags',
@@ -76,7 +78,7 @@ export function listActiveMigrationNames(): string[] {
 
 export function assertActiveMigrationSet(): void {
   const names = listActiveMigrationNames()
-  const expected = [BASELINE_NAME, SLICE0_NAME, POINT8B1_NAME]
+  const expected = [BASELINE_NAME, SLICE0_NAME, POINT8B1_NAME, POINT8B6_NAME]
   if (names.length !== expected.length || expected.some((n, i) => names[i] !== n)) {
     throw new Error(
       `Active prisma/migrations must be exactly [${expected.join(', ')}]; found [${names.join(', ')}]`,
@@ -332,10 +334,10 @@ export function assertPendingExactly(pending: string[], expected: readonly strin
  * With Point 8B-1 in the active chain, pending is Slice 0 then Point 8B-1.
  * Not the current production Point 8B-1 gate.
  */
-export const PENDING_AFTER_AUTH_A_HISTORICAL = [SLICE0_NAME, POINT8B1_NAME] as const
+export const PENDING_AFTER_AUTH_A_HISTORICAL = [SLICE0_NAME, POINT8B1_NAME, POINT8B6_NAME] as const
 
-/** CURRENT production gate before authorized Point 8B-1 apply: only Point 8B-1 pending. */
-export const PENDING_BEFORE_POINT8B1 = [POINT8B1_NAME] as const
+/** Pending when baseline+Slice0 applied and Point 8B-1/8B-6 not yet applied. */
+export const PENDING_BEFORE_POINT8B1 = [POINT8B1_NAME, POINT8B6_NAME] as const
 
 /**
  * CURRENT pre-Point8B1 applied set (order-independent):

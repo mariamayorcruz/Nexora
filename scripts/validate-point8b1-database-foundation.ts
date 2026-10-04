@@ -2,7 +2,7 @@
  * Point 8B-1 — disposable validation for CrmLead organization DB foundation.
  *
  * Validates the additive migration only:
- *   - nullable organizationId column
+ *   - organizationId column (NOT NULL after Point 8B-6)
  *   - approved indexes
  *   - FK → Organization ON DELETE RESTRICT (confdeltype exactly 'r')
  *   - no backfill side effects
@@ -111,10 +111,11 @@ function main(): void {
   const rows = readMigrationRows(url);
   const names = rows.map((r) => r.migration_name);
   assert(
-    names.length === 3 &&
+    names.length === 4 &&
       names[0] === BASELINE_NAME &&
       names[1] === SLICE0_NAME &&
-      names[2] === POINT8B1_NAME,
+      names[2] === POINT8B1_NAME &&
+      names[3] === '20261004120000_crmlead_organization_id_not_null',
     `unexpected migration rows: ${names.join(',')}`
   );
 
@@ -122,7 +123,7 @@ function main(): void {
   assertSlice0Present(url);
 
   assert(columnExists(url, 'CrmLead', 'organizationId'), 'organizationId column missing');
-  assert(columnNullable(url, 'CrmLead', 'organizationId'), 'organizationId must be nullable');
+  assert(!columnNullable(url, 'CrmLead', 'organizationId'), 'organizationId must be NOT NULL after 8B-6');
   assert(columnExists(url, 'CrmLead', 'userId'), 'userId missing');
   assert(!columnNullable(url, 'CrmLead', 'userId'), 'userId must remain NOT NULL');
 

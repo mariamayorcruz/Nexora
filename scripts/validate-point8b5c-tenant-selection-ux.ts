@@ -93,14 +93,15 @@ async function main() {
 
     const schema = readFile('prisma/schema.prisma');
     const crmLeadBlock = schema.match(/model CrmLead \{[\s\S]*?\n\}/)?.[0] || '';
-    assert(/organizationId\s+String\?/.test(crmLeadBlock), 'organizationId must remain nullable');
-    pass('1 no new Prisma migration / schema nullable preserved (part A)');
+    assert(/organizationId\s+String\b/.test(crmLeadBlock) && !/organizationId\s+String\?/.test(crmLeadBlock), 'organizationId must be NOT NULL after 8B-6');
+    pass('1 schema organizationId NOT NULL after 8B-6 (part A)');
 
     const migrations = listMigrationDirs();
-    assert(migrations.length === 3, `expected exactly 3 migrations, got ${migrations.length}`);
+    assert(migrations.length === 4, `expected exactly 4 migrations, got ${migrations.length}`);
     assert(!migrations.some((m) => /8b.?5c|tenant.?selection/i.test(m)), 'no 8B-5C migration');
-    pass('1 no new Prisma migration exists');
-    pass('2 schema field definitions unchanged (organizationId still String?)');
+    assert(migrations.includes('20261004120000_crmlead_organization_id_not_null'), '8B-6 migration required');
+    pass('1 no 8B-5C migration directory (8B-6 present)');
+    pass('2 schema field definitions include organizationId String (NOT NULL)');
 
     const discoverySrc = readFile('src/app/api/tenant/organizations/route.ts');
     assert(/export async function GET/.test(discoverySrc), 'discovery GET exists');
@@ -370,8 +371,11 @@ async function main() {
     pass('43 no second membership auto-creation');
     assert(!/RBAC|permissions table|capability matrix/i.test(providerSrc), 'no Point 30');
     pass('44 no Point 30 RBAC');
-    assert(/organizationId\s+String\?/.test(crmLeadBlock), 'no 8B-6 NOT NULL');
-    pass('45 no Point 8B-6 hardening');
+    assert(
+      /organizationId\s+String\b/.test(crmLeadBlock) && !/organizationId\s+String\?/.test(crmLeadBlock),
+      'Point 8B-6 NOT NULL present'
+    );
+    pass('45 Point 8B-6 organizationId NOT NULL activated');
 
     const crmLeadsRoute = readFile('src/app/api/crm/leads/route.ts');
     assert(/omitCrmLeadOrganizationId/.test(crmLeadsRoute), 'public omit org');

@@ -38,6 +38,30 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
+async function insertNullOrgLead(
+  prisma: PrismaClient,
+  params: { userId: string; name: string; source?: string }
+): Promise<{ id: string }> {
+  const id = `cl_null_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const source = params.source || 'manual';
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO "CrmLead" (id, "userId", "organizationId", name, source, stage, status, value, confidence, "createdAt", "updatedAt")
+     VALUES ($1, $2, NULL, $3, $4, 'lead', 'nuevo', 0, 25, NOW(), NOW())`,
+    id,
+    params.userId,
+    params.name,
+    source
+  );
+  return { id };
+}
+
+async function countNullOrgLeads(prisma: PrismaClient): Promise<number> {
+  const rows = await prisma.$queryRaw<Array<{ count: bigint }>>`
+    SELECT COUNT(*)::bigint AS count FROM "CrmLead" WHERE "organizationId" IS NULL
+  `;
+  return Number(rows[0]?.count || 0);
+}
+
 function readFile(rel: string): string {
   return fs.readFileSync(path.join(process.cwd(), rel), 'utf8');
 }
@@ -77,7 +101,10 @@ function runBackfill(url: string, apply: boolean): { stdout: string; status: num
 }
 
 async function collect8b6(prisma: PrismaClient) {
-  const nullOrganizationId = await prisma.crmLead.count({ where: { organizationId: null } });
+  const nullRows = await prisma.$queryRaw<Array<{ count: bigint }>>`
+    SELECT COUNT(*)::bigint AS count FROM "CrmLead" WHERE "organizationId" IS NULL
+  `;
+  const nullOrganizationId = Number(nullRows[0]?.count || 0);
   const orphanRows = await prisma.$queryRaw<Array<{ count: bigint }>>`
     SELECT COUNT(*)::bigint AS count FROM "CrmLead" c
     LEFT JOIN "Organization" o ON o.id = c."organizationId"
@@ -130,13 +157,15 @@ async function main() {
     pass('1 backfill script is dry-run default, explicit apply, transactional, non-repairing');
 
     const schema = readFile('prisma/schema.prisma');
-    assert(/organizationId\s+String\?/.test(schema.match(/model CrmLead \{[\s\S]*?\n\}/)?.[0] || ''), 'schema still nullable (no 8B-6)');
+    const crmLeadBlock = schema.match(/model CrmLead \{[\s\S]*?\n\}/)?.[0] || '';
+    assert(/organizationId\s+String\b/.test(crmLeadBlock) && !/organizationId\s+String\?/.test(crmLeadBlock), 'schema organizationId NOT NULL after 8B-6');
     const migrations = fs
       .readdirSync(path.join(process.cwd(), 'prisma/migrations'), { withFileTypes: true })
       .filter((d) => d.isDirectory())
       .map((d) => d.name);
-    assert(migrations.length === 3, 'no 8B-6 migration activated');
-    pass('2 no 8B-6 NOT NULL activation / schema unchanged');
+    assert(migrations.includes('20261004120000_crmlead_organization_id_not_null'), '8B-6 migration must be activated');
+    assert(migrations.length === 4, 'expected 4 active migrations including 8B-6');
+    pass('2 8B-6 NOT NULL activated; schema organizationId required');
 
     // Pure planner unit cases
     const lead = { id: 'L1', userId: 'U1', organizationId: null as string | null };
@@ -198,6 +227,14 @@ async function main() {
     await prisma.$disconnect();
     runPrismaMigrateDeploy(url);
     await prisma.$connect();
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "CrmLead" ALTER COLUMN "organizationId" DROP NOT NULL'
+    );
+
+    // Disposable-only: reopen nullability to regress historical 8B-3 backfill behavior.
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "CrmLead" ALTER COLUMN "organizationId" DROP NOT NULL'
+    );
 
     // Fixture: happy user + historical null + already assigned
     const user = await prisma.user.create({
@@ -206,14 +243,7 @@ async function main() {
     await ensureUserOrganization(prisma, { userId: user.id });
     const legacyId = buildLegacyOrganizationId(user.id);
 
-    const historical = await prisma.crmLead.create({
-      data: {
-        userId: user.id,
-        organizationId: null,
-        name: 'HISTORICAL NULL',
-        source: 'manual',
-      },
-    });
+    const historical = await insertNullOrgLead(prisma, { userId: user.id, name: 'HISTORICAL NULL' })
     const modern = await prisma.crmLead.create({
       data: {
         userId: user.id,
@@ -257,16 +287,17 @@ async function main() {
     await prisma.$disconnect();
     runPrismaMigrateDeploy(url);
     await prisma.$connect();
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "CrmLead" ALTER COLUMN "organizationId" DROP NOT NULL'
+    );
     const u2 = await prisma.user.create({
       data: { email: 'crm8b3-missing-org@example.com', name: 'M', password: 'x' },
     });
     // Intentionally do NOT ensureUserOrganization
-    await prisma.crmLead.create({
-      data: { userId: u2.id, organizationId: null, name: 'NO ORG', source: 'manual' },
-    });
+    await insertNullOrgLead(prisma, { userId: u2.id, name: 'NO ORG' })
     const missOrg = runBackfill(url, true);
     assert(missOrg.status !== 0, 'missing org must FAIL apply');
-    assert((await prisma.crmLead.count({ where: { organizationId: null } })) === 1, 'no partial write on missing org');
+    assert((await countNullOrgLeads(prisma)) === 1, 'no partial write on missing org');
     pass('8 missing Organization → FAIL CLOSED (no writes)');
 
     // Fail-closed: inactive organization
@@ -274,6 +305,9 @@ async function main() {
     await prisma.$disconnect();
     runPrismaMigrateDeploy(url);
     await prisma.$connect();
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "CrmLead" ALTER COLUMN "organizationId" DROP NOT NULL'
+    );
     const u3 = await prisma.user.create({
       data: { email: 'crm8b3-inactive-org@example.com', name: 'I', password: 'x' },
     });
@@ -283,12 +317,10 @@ async function main() {
       where: { id: legacy3 },
       data: { status: OrganizationStatus.SUSPENDED },
     });
-    await prisma.crmLead.create({
-      data: { userId: u3.id, organizationId: null, name: 'INACTIVE ORG', source: 'manual' },
-    });
+    await insertNullOrgLead(prisma, { userId: u3.id, name: 'INACTIVE ORG' })
     const inactiveOrg = runBackfill(url, true);
     assert(inactiveOrg.status !== 0, 'inactive org must FAIL');
-    assert((await prisma.crmLead.count({ where: { organizationId: null } })) === 1, 'no write on inactive org');
+    assert((await countNullOrgLeads(prisma)) === 1, 'no write on inactive org');
     pass('9 inactive Organization → FAIL CLOSED');
 
     // Fail-closed: missing membership
@@ -296,6 +328,9 @@ async function main() {
     await prisma.$disconnect();
     runPrismaMigrateDeploy(url);
     await prisma.$connect();
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "CrmLead" ALTER COLUMN "organizationId" DROP NOT NULL'
+    );
     const u4 = await prisma.user.create({
       data: { email: 'crm8b3-missing-mem@example.com', name: 'MM', password: 'x' },
     });
@@ -308,12 +343,10 @@ async function main() {
         status: OrganizationStatus.ACTIVE,
       },
     });
-    await prisma.crmLead.create({
-      data: { userId: u4.id, organizationId: null, name: 'NO MEMBERSHIP', source: 'manual' },
-    });
+    await insertNullOrgLead(prisma, { userId: u4.id, name: 'NO MEMBERSHIP' })
     const missMem = runBackfill(url, true);
     assert(missMem.status !== 0, 'missing membership must FAIL');
-    assert((await prisma.crmLead.count({ where: { organizationId: null } })) === 1, 'no write on missing membership');
+    assert((await countNullOrgLeads(prisma)) === 1, 'no write on missing membership');
     pass('10 missing Membership → FAIL CLOSED');
 
     // Fail-closed: inactive membership
@@ -321,6 +354,9 @@ async function main() {
     await prisma.$disconnect();
     runPrismaMigrateDeploy(url);
     await prisma.$connect();
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "CrmLead" ALTER COLUMN "organizationId" DROP NOT NULL'
+    );
     const u5 = await prisma.user.create({
       data: { email: 'crm8b3-inactive-mem@example.com', name: 'IM', password: 'x' },
     });
@@ -330,12 +366,10 @@ async function main() {
       where: { organizationId_userId: { organizationId: legacy5, userId: u5.id } },
       data: { status: MembershipStatus.SUSPENDED },
     });
-    await prisma.crmLead.create({
-      data: { userId: u5.id, organizationId: null, name: 'INACTIVE MEM', source: 'manual' },
-    });
+    await insertNullOrgLead(prisma, { userId: u5.id, name: 'INACTIVE MEM' })
     const inactiveMem = runBackfill(url, true);
     assert(inactiveMem.status !== 0, 'inactive membership must FAIL');
-    assert((await prisma.crmLead.count({ where: { organizationId: null } })) === 1, 'no write on inactive membership');
+    assert((await countNullOrgLeads(prisma)) === 1, 'no write on inactive membership');
     pass('11 inactive Membership → FAIL CLOSED');
 
     // Fail-closed: batch with one bad null aborts all (transactional / gate)
@@ -343,6 +377,9 @@ async function main() {
     await prisma.$disconnect();
     runPrismaMigrateDeploy(url);
     await prisma.$connect();
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "CrmLead" ALTER COLUMN "organizationId" DROP NOT NULL'
+    );
     const good = await prisma.user.create({
       data: { email: 'crm8b3-good@example.com', name: 'G', password: 'x' },
     });
@@ -350,15 +387,11 @@ async function main() {
     const bad = await prisma.user.create({
       data: { email: 'crm8b3-bad@example.com', name: 'B', password: 'x' },
     });
-    await prisma.crmLead.create({
-      data: { userId: good.id, organizationId: null, name: 'GOOD NULL', source: 'manual' },
-    });
-    await prisma.crmLead.create({
-      data: { userId: bad.id, organizationId: null, name: 'BAD NULL', source: 'manual' },
-    });
+    await insertNullOrgLead(prisma, { userId: good.id, name: 'GOOD NULL' })
+    await insertNullOrgLead(prisma, { userId: bad.id, name: 'BAD NULL' })
     const mixed = runBackfill(url, true);
     assert(mixed.status !== 0, 'mixed batch must FAIL');
-    assert((await prisma.crmLead.count({ where: { organizationId: null } })) === 2, 'no partial writes in mixed batch');
+    assert((await countNullOrgLeads(prisma)) === 2, 'no partial writes in mixed batch');
     pass('12 mixed eligible+blocked batch → FAIL CLOSED (no partial writes)');
 
     // Runtime create paths unchanged (static)
@@ -377,15 +410,19 @@ async function main() {
     await prisma.$disconnect();
     runPrismaMigrateDeploy(url);
     await prisma.$connect();
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "CrmLead" ALTER COLUMN "organizationId" DROP NOT NULL'
+    );
     const finalUser = await prisma.user.create({
       data: { email: 'crm8b3-final@example.com', name: 'F', password: 'x' },
     });
     await ensureUserOrganization(prisma, { userId: finalUser.id });
     const finalLegacy = buildLegacyOrganizationId(finalUser.id);
+    await insertNullOrgLead(prisma, { userId: finalUser.id, name: 'N1' });
+    await insertNullOrgLead(prisma, { userId: finalUser.id, name: 'N2' });
+    // keep assigned row via createMany below
     await prisma.crmLead.createMany({
       data: [
-        { userId: finalUser.id, organizationId: null, name: 'N1', source: 'manual' },
-        { userId: finalUser.id, organizationId: null, name: 'N2', source: 'manual' },
         { userId: finalUser.id, organizationId: finalLegacy, name: 'A1', source: 'manual' },
       ],
     });
@@ -419,6 +456,9 @@ async function main() {
     await prisma.$disconnect();
     runPrismaMigrateDeploy(url);
     await prisma.$connect();
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "CrmLead" ALTER COLUMN "organizationId" DROP NOT NULL'
+    );
     const uInc = await prisma.user.create({
       data: { email: 'crm8b3-inconsistent@example.com', name: 'INC', password: 'x' },
     });
@@ -455,7 +495,7 @@ async function main() {
     pass('14b inconsistent mapping → FAIL CLOSED (planner)');
 
     pass('15 no production mutation (disposable only)');
-    pass('16 production --apply / 8B-6 activation remain unauthorized');
+    pass('16 production 8B-3 --apply remains unnecessary/unauthorized; 8B-6 activated separately');
 
     console.log(`[point8b3] ALL_PASS count=${passed}`);
   } finally {
