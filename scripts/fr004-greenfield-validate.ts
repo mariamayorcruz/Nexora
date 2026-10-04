@@ -4,7 +4,7 @@
  *
  * EMPTY disposable PostgreSQL
  *   → prisma migrate deploy
- *   → baseline + Slice 0 + Point 8B-1 apply
+ *   → baseline + Slice 0 + Point 8B-1 + Point 8B-6 apply
  *   → structural checks vs expected tables/enums
  *
  * Requires:
@@ -18,6 +18,7 @@ import {
   BASELINE_NAME,
   EXPECTED_PRE_ORG_TABLES,
   POINT8B1_NAME,
+  POINT8B6_NAME,
   SLICE0_NAME,
   assertActiveMigrationSet,
   assertDisposableDatabaseUrl,
@@ -74,10 +75,11 @@ function main(): void {
   const rows = readMigrationRows(url)
   const names = rows.map((r) => r.migration_name)
   if (
-    names.length !== 3 ||
+    names.length !== 4 ||
     names[0] !== BASELINE_NAME ||
     names[1] !== SLICE0_NAME ||
-    names[2] !== POINT8B1_NAME
+    names[2] !== POINT8B1_NAME ||
+    names[3] !== POINT8B6_NAME
   ) {
     throw new Error(`Unexpected _prisma_migrations after greenfield: ${names.join(',')}`)
   }

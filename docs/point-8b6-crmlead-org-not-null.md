@@ -2,18 +2,15 @@
 
 ## Authorization boundary (current)
 
-**Authorized now:** PRE-FLIGHT + DESIGN + VALIDATION (Draft PR only).
+**Authorized now:** PRE-FLIGHT + DESIGN + VALIDATION + **controlled migration activation/apply** (this PR).
 
 **NOT authorized:**
 
-- Production migration apply / `SET NOT NULL`
-- Production DB mutation / backfill
 - Merge to `main` (until separately authorized)
-- Promoting proposed SQL into active `prisma/migrations/`
-- Changing active `prisma/schema.prisma` to `organizationId String` (NOT NULL)
 - Point 8C / RLS / RBAC / Point 30
 - Removing `userId`
 - Migrating Campaign, LeadCapture, AdAccount, TenantAutomationConfig
+- Production mutation outside versioned `prisma migrate deploy`
 
 ## Goal
 

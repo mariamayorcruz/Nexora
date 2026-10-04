@@ -96,17 +96,18 @@ async function main() {
 
     const schema = readFile('prisma/schema.prisma');
     const crmLeadBlock = schema.match(/model CrmLead \{[\s\S]*?\n\}/)?.[0] || '';
-    assert(/organizationId\s+String\?/.test(crmLeadBlock), 'organizationId must remain nullable');
+    assert(/organizationId\s+String\b/.test(crmLeadBlock) && !/organizationId\s+String\?/.test(crmLeadBlock), 'organizationId must be NOT NULL after 8B-6');
     assert(/^\s*userId\s+String\s*$/m.test(crmLeadBlock), 'userId must remain required');
-    pass('1 CrmLead.organizationId remains nullable; userId required');
+    pass('1 CrmLead.organizationId NOT NULL; userId required');
 
     const migrations = listMigrationDirs();
-    assert(migrations.length === 3, `expected exactly 3 migrations, got ${migrations.length}`);
+    assert(migrations.length === 4, `expected exactly 4 migrations, got ${migrations.length}`);
     assert(
       !migrations.some((m) => /8b4|read.?cutover/i.test(m)),
       'no Point 8B-4 migration directory'
     );
-    pass('2 no new Prisma migration exists');
+    assert(migrations.includes('20261004120000_crmlead_organization_id_not_null'), '8B-6 migration required');
+    pass('2 migration set includes 8B-6 NOT NULL (no 8B-4-specific migration)');
 
     await resetPublic(prisma);
     await prisma.$disconnect();

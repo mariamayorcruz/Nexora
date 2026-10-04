@@ -88,7 +88,7 @@ async function main() {
     // 1–6 schema / migration invariants (static + migrate deploy)
     const schema = readFile('prisma/schema.prisma');
     const crmLeadBlock = schema.match(/model CrmLead \{[\s\S]*?\n\}/)?.[0] || '';
-    assert(/organizationId\s+String\?/.test(crmLeadBlock), 'CrmLead.organizationId must be String?');
+    assert(/organizationId\s+String\b/.test(crmLeadBlock) && !/organizationId\s+String\?/.test(crmLeadBlock), 'CrmLead.organizationId must be String (NOT NULL after 8B-6)');
     assert(/^\s*userId\s+String\s*$/m.test(crmLeadBlock), 'userId must remain required (NOT NULL)');
     assert(
       /onDelete:\s*Restrict/.test(crmLeadBlock),
@@ -98,7 +98,7 @@ async function main() {
     assert(/@@index\(\[organizationId,\s*stage\]\)/.test(crmLeadBlock), 'missing organizationId+stage index');
     assert(/@@index\(\[userId\]\)/.test(crmLeadBlock), 'missing userId index');
     assert(/model Organization \{[\s\S]*?crmLeads\s+CrmLead\[\]/.test(schema), 'Organization.crmLeads missing');
-    pass('1-6 prisma schema aligns with Point 8B-1 physical design');
+    pass('1-6 prisma schema aligns with Point 8B-1/8B-6 physical design');
 
     const migrations = listMigrationDirs();
     assert(
@@ -106,11 +106,15 @@ async function main() {
       'Point 8B-1 migration missing'
     );
     assert(
-      !migrations.some((m) => /point.?8b.?2|dual.?write|crmlead.*organiz/i.test(m) && !m.includes('20260930011200')),
+      migrations.includes('20261004120000_crmlead_organization_id_not_null'),
+      'Point 8B-6 migration missing'
+    );
+    assert(
+      !migrations.some((m) => /point.?8b.?2|dual.?write/i.test(m)),
       'unexpected new Point 8B-2 migration directory'
     );
-    assert(migrations.length === 3, `expected exactly 3 migration dirs, got ${migrations.length}`);
-    pass('2 no new migration created (exactly 3 migration dirs)');
+    assert(migrations.length === 4, `expected exactly 4 migration dirs, got ${migrations.length}`);
+    pass('2 migration set includes 8B-1 foundation + 8B-6 NOT NULL (exactly 4)');
 
     await resetPublic(prisma);
     await prisma.$disconnect();
@@ -313,22 +317,22 @@ async function main() {
     assert(!/console\.(log|info|error)\([^\n]*password|secret|token/i.test(readFile('src/lib/tenancy/resolve-legacy-crm-write-organization.ts')), 'helper must not log secrets');
     pass('24 helper does not log secret values');
 
-    // Runtime create + PATCH does not alter null historical org (simulate)
-    const historical = await prisma.crmLead.create({
+    // Post-8B-6: historical null rows cannot be created. Prove UPDATE does not clear org id.
+    const assigned = await prisma.crmLead.create({
       data: {
         userId: user.id,
-        organizationId: null,
-        name: 'Historical Null',
+        organizationId: legacyId,
+        name: 'Assigned Lead',
         source: 'manual',
       },
     });
     await prisma.crmLead.update({
-      where: { id: historical.id },
-      data: { notes: 'touched without org backfill' },
+      where: { id: assigned.id },
+      data: { notes: 'touched without org rewrite' },
     });
-    const after = await prisma.crmLead.findUnique({ where: { id: historical.id } });
-    assert(after?.organizationId === null, 'update must leave null organizationId untouched');
-    pass('20b update leaves historical null organizationId untouched');
+    const after = await prisma.crmLead.findUnique({ where: { id: assigned.id } });
+    assert(after?.organizationId === legacyId, 'update must leave organizationId unchanged');
+    pass('20b update leaves organizationId untouched (null inserts retired post-8B-6)');
 
     // Header with legacy org succeeds
     const withHeader = await resolveLegacyCrmWriteOrganization({

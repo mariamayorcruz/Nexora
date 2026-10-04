@@ -1,10 +1,9 @@
 /**
- * Point 8B-6 — disposable validation for CrmLead.organizationId NOT NULL hardening DESIGN.
+ * Point 8B-6 — disposable validation for CrmLead.organizationId NOT NULL hardening.
  *
- * Does NOT apply production migration.
- * Does NOT place the proposed SQL into prisma/migrations (apply not authorized).
- * Proves on disposable DB that after simulated 8B-3 backfill, SET NOT NULL succeeds
- * and runtime CREATE paths cannot omit organizationId.
+ * Expects the active prisma migration + schema NOT NULL to be present.
+ * Proves on disposable DB that SET NOT NULL is enforced, CREATE paths stamp org id,
+ * and fail-closed behavior holds when nulls are reintroduced only for regression.
  *
  * Usage:
  *   FR004_DATABASE_URL=postgresql://... npm run tenancy:validate-point8b6
@@ -36,6 +35,9 @@ import {
 
 const PROPOSED_SQL_REL =
   'docs/migrations/20261003120000_crmlead_organization_id_not_null.proposed.sql';
+const ACTIVE_MIGRATION_SQL_REL =
+  'prisma/migrations/20261004120000_crmlead_organization_id_not_null/migration.sql';
+const ACTIVE_MIGRATION_NAME = '20261004120000_crmlead_organization_id_not_null';
 
 const RUNTIME_CREATE_FILES = [
   'src/app/api/crm/leads/route.ts',
@@ -122,17 +124,17 @@ async function main() {
   try {
     console.log('[point8b6] target=', url.replace(/:\/\/[^@]+@/, '://***@'));
 
-    // --- Static design artifacts ---
-    assert(fs.existsSync(path.join(process.cwd(), PROPOSED_SQL_REL)), 'proposed SQL missing');
-    const proposedSql = readFile(PROPOSED_SQL_REL);
-    assert(/ALTER TABLE "CrmLead"/i.test(proposedSql), 'proposed SQL must alter CrmLead');
+    // --- Static design artifacts (activated) ---
+    assert(fs.existsSync(path.join(process.cwd(), ACTIVE_MIGRATION_SQL_REL)), 'active 8B-6 migration missing');
+    assert(fs.existsSync(path.join(process.cwd(), PROPOSED_SQL_REL)), 'proposed SQL reference missing');
+    const activeSql = readFile(ACTIVE_MIGRATION_SQL_REL);
+    assert(/ALTER TABLE "CrmLead"/i.test(activeSql), 'active SQL must alter CrmLead');
     assert(
-      /ALTER COLUMN "organizationId" SET NOT NULL/i.test(proposedSql),
-      'proposed SQL must SET NOT NULL on organizationId'
+      /ALTER COLUMN "organizationId" SET NOT NULL/i.test(activeSql),
+      'active SQL must SET NOT NULL on organizationId'
     );
-    assert(!/DROP COLUMN "userId"/i.test(proposedSql), 'must not drop userId');
-    // Executable statements only (ignore comment inventory of non-scope models).
-    const executableSql = proposedSql
+    assert(!/DROP COLUMN "userId"/i.test(activeSql), 'must not drop userId');
+    const executableSql = activeSql
       .split('\n')
       .filter((line) => !line.trim().startsWith('--'))
       .join('\n');
@@ -145,22 +147,23 @@ async function main() {
       (executableSql.match(/ALTER TABLE/gi) || []).length === 1,
       'exactly one ALTER TABLE statement'
     );
-    pass('1 proposed migration SQL is minimal NOT NULL hardening');
+    pass('1 active migration SQL is minimal NOT NULL hardening');
 
     const migrations = listMigrationDirs();
-    assert(migrations.length === 3, `active prisma/migrations must remain 3 until apply authorized (got ${migrations.length})`);
-    assert(
-      !migrations.some((m) => /not.?null|8b.?6/i.test(m)),
-      '8B-6 migration must NOT be active in prisma/migrations yet'
-    );
-    pass('2 proposed SQL is not prematurely activated in prisma/migrations');
+    assert(migrations.length === 4, `active prisma/migrations must be 4 including 8B-6 (got ${migrations.length})`);
+    assert(migrations.includes(ACTIVE_MIGRATION_NAME), '8B-6 migration must be active in prisma/migrations');
+    pass('2 8B-6 migration activated in prisma/migrations');
 
     const schema = readFile('prisma/schema.prisma');
     const crmLeadBlock = schema.match(/model CrmLead \{[\s\S]*?\n\}/)?.[0] || '';
-    assert(/organizationId\s+String\?/.test(crmLeadBlock), 'active schema remains nullable until apply authorized');
+    assert(
+      /organizationId\s+String\b/.test(crmLeadBlock) && !/organizationId\s+String\?/.test(crmLeadBlock),
+      'active schema organizationId must be required String'
+    );
+    assert(/organization\s+Organization\s+@relation/.test(crmLeadBlock), 'organization relation required');
     assert(/^\s*userId\s+String\s*$/m.test(crmLeadBlock), 'userId remains required');
     assert(/onDelete:\s*Restrict/.test(crmLeadBlock), 'FK Restrict retained');
-    pass('3 active Prisma schema still nullable (apply not authorized)');
+    pass('3 active Prisma schema organizationId NOT NULL (userId retained)');
 
     // --- Static CREATE path audit ---
     for (const file of RUNTIME_CREATE_FILES) {
@@ -235,8 +238,8 @@ async function main() {
     await prisma.$disconnect();
     runPrismaMigrateDeploy(url);
     await prisma.$connect();
-    assert(columnNullable(url, 'CrmLead', 'organizationId'), 'pre-8B-6 column must be nullable');
-    pass('10 disposable migrate deploy leaves organizationId nullable');
+    assert(!columnNullable(url, 'CrmLead', 'organizationId'), 'migrate deploy must apply 8B-6 NOT NULL');
+    pass('10 disposable migrate deploy applies organizationId NOT NULL');
 
     const user = await prisma.user.create({
       data: { email: 'crm8b6@example.com', name: 'CRM8B6', password: 'x' },
@@ -244,6 +247,12 @@ async function main() {
     await ensureUserOrganization(prisma, { userId: user.id });
     const legacyId = buildLegacyOrganizationId(user.id);
     const token = signUserToken({ userId: user.id, email: user.email, sid: 'sid-8b6' });
+
+    // Regression window: reopen nullability only on disposable to prove fail-closed SET NOT NULL.
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "CrmLead" ALTER COLUMN "organizationId" DROP NOT NULL'
+    );
+    assert(columnNullable(url, 'CrmLead', 'organizationId'), 'disposable DROP NOT NULL for regression');
 
     // Historical null (pre-8B-3 shape)
     await prisma.crmLead.create({
@@ -292,12 +301,12 @@ async function main() {
     assert(postBackfill.nullOrganizationId === 0, 'zero nulls after simulated backfill');
     pass('13 simulated 8B-3 backfill yields preflight PASS (zero null / valid ownership)');
 
-    // Apply proposed NOT NULL SQL on disposable
+    // Re-apply NOT NULL SQL on disposable after backfill
     await prisma.$executeRawUnsafe(
       'ALTER TABLE "CrmLead" ALTER COLUMN "organizationId" SET NOT NULL'
     );
     assert(!columnNullable(url, 'CrmLead', 'organizationId'), 'organizationId must be NOT NULL after apply');
-    pass('14 disposable apply of proposed SET NOT NULL succeeds after backfill');
+    pass('14 disposable re-apply of SET NOT NULL succeeds after backfill');
 
     // Null insert must fail
     let nullInsertFailed = false;
@@ -422,10 +431,8 @@ async function main() {
     pass('21 final preflight PASS on hardened disposable DB');
 
     pass('22 no production mutation (disposable only)');
-    pass('23 apply to prisma/migrations + schema NOT NULL remains unauthorized');
-    // 8B-3 tooling may already be merged; disposable still proves the null→backfill→NOT NULL gate.
-    // Production 8B-3 --apply / 8B-6 SET NOT NULL remain separately authorized.
-    pass('24 zero-null preflight (8B-3 dependency / hosted SELECT-only) remains a hard gate before SET NOT NULL');
+    pass('23 prisma/migrations + schema NOT NULL activation verified on disposable');
+    pass('24 zero-null preflight remains a hard gate before SET NOT NULL (8B-3 dependency satisfied)');
 
     console.log(`[point8b6] ALL_PASS count=${passed}`);
   } finally {

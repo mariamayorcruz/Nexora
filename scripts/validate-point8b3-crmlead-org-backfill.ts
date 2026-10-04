@@ -130,13 +130,15 @@ async function main() {
     pass('1 backfill script is dry-run default, explicit apply, transactional, non-repairing');
 
     const schema = readFile('prisma/schema.prisma');
-    assert(/organizationId\s+String\?/.test(schema.match(/model CrmLead \{[\s\S]*?\n\}/)?.[0] || ''), 'schema still nullable (no 8B-6)');
+    const crmLeadBlock = schema.match(/model CrmLead \{[\s\S]*?\n\}/)?.[0] || '';
+    assert(/organizationId\s+String\b/.test(crmLeadBlock) && !/organizationId\s+String\?/.test(crmLeadBlock), 'schema organizationId NOT NULL after 8B-6');
     const migrations = fs
       .readdirSync(path.join(process.cwd(), 'prisma/migrations'), { withFileTypes: true })
       .filter((d) => d.isDirectory())
       .map((d) => d.name);
-    assert(migrations.length === 3, 'no 8B-6 migration activated');
-    pass('2 no 8B-6 NOT NULL activation / schema unchanged');
+    assert(migrations.includes('20261004120000_crmlead_organization_id_not_null'), '8B-6 migration must be activated');
+    assert(migrations.length === 4, 'expected 4 active migrations including 8B-6');
+    pass('2 8B-6 NOT NULL activated; schema organizationId required');
 
     // Pure planner unit cases
     const lead = { id: 'L1', userId: 'U1', organizationId: null as string | null };
@@ -198,6 +200,11 @@ async function main() {
     await prisma.$disconnect();
     runPrismaMigrateDeploy(url);
     await prisma.$connect();
+
+    // Disposable-only: reopen nullability to regress historical 8B-3 backfill behavior.
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "CrmLead" ALTER COLUMN "organizationId" DROP NOT NULL'
+    );
 
     // Fixture: happy user + historical null + already assigned
     const user = await prisma.user.create({
@@ -455,7 +462,7 @@ async function main() {
     pass('14b inconsistent mapping → FAIL CLOSED (planner)');
 
     pass('15 no production mutation (disposable only)');
-    pass('16 production --apply / 8B-6 activation remain unauthorized');
+    pass('16 production 8B-3 --apply remains unnecessary/unauthorized; 8B-6 activated separately');
 
     console.log(`[point8b3] ALL_PASS count=${passed}`);
   } finally {
