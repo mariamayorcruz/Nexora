@@ -3,6 +3,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Building2, CheckCircle2, Sparkles, Target, Waves, Workflow } from 'lucide-react';
+import {
+  NoOrganizationState,
+  OrganizationChooserPanel,
+  TenantOrganizationProvider,
+  useTenantOrganization,
+} from '@/components/TenantOrganizationProvider';
 import { useAppLanguage } from '@/hooks/use-app-language';
 
 const BUSINESS_TYPE_OPTIONS = [
@@ -83,7 +89,23 @@ const inputClassName =
   'w-full rounded-2xl border border-slate-600 bg-slate-800/50 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/10';
 
 export default function OnboardingPage() {
+  return (
+    <TenantOrganizationProvider>
+      <OnboardingPageInner />
+    </TenantOrganizationProvider>
+  );
+}
+
+function OnboardingPageInner() {
   const router = useRouter();
+  const {
+    status: tenantStatus,
+    selectionReady,
+    selectedOrganizationId,
+    getTenantHeaders,
+    handleTenantResponse,
+    clearOrganizationPreferenceOnLogout,
+  } = useTenantOrganization();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -115,19 +137,56 @@ export default function OnboardingPage() {
       return;
     }
 
+    if (tenantStatus === 'loading') {
+      setLoading(true);
+      return;
+    }
+
+    if (tenantStatus === 'unauthenticated') {
+      localStorage.removeItem('token');
+      clearOrganizationPreferenceOnLogout();
+      router.push('/auth/login');
+      return;
+    }
+
+    if (tenantStatus === 'selection_required' || tenantStatus === 'no_organization' || tenantStatus === 'error') {
+      setLoading(false);
+      return;
+    }
+
+    if (!selectionReady || !selectedOrganizationId) {
+      setLoading(true);
+      return;
+    }
+
     const validateAccess = async () => {
       try {
+        const headers = getTenantHeaders();
+        if (!headers) {
+          setLoading(false);
+          return;
+        }
+
         const response = await fetch('/api/users/me?allowIncomplete=1', {
-          headers: { Authorization: `Bearer ${token}` },
+          headers,
           cache: 'no-store',
         });
 
+        const data = (await response.json().catch(() => null)) as MeResponse | null;
+        if (handleTenantResponse(response.status, data)) {
+          setLoading(false);
+          return;
+        }
+
         if (!response.ok) {
+          if (response.status === 401) {
+            localStorage.removeItem('token');
+            clearOrganizationPreferenceOnLogout();
+          }
           router.push('/auth/login');
           return;
         }
 
-        const data = (await response.json()) as MeResponse;
         const status = data?.user?.subscription?.status?.toLowerCase?.() || null;
         const completed = data?.user?.onboardingCompletedAt ?? null;
         const canPreview = Boolean(previewMode && data?.user?.previewOnboardingAccess);
@@ -183,7 +242,16 @@ export default function OnboardingPage() {
     };
 
     void validateAccess();
-  }, [previewMode, router]);
+  }, [
+    previewMode,
+    router,
+    tenantStatus,
+    selectionReady,
+    selectedOrganizationId,
+    getTenantHeaders,
+    handleTenantResponse,
+    clearOrganizationPreferenceOnLogout,
+  ]);
 
   useEffect(() => {
     if (!launchReady) return;
@@ -246,13 +314,14 @@ export default function OnboardingPage() {
     setError('');
 
     try {
-      const token = localStorage.getItem('token');
+      const headers = getTenantHeaders({ 'Content-Type': 'application/json' });
+      if (!headers) {
+        setError(en ? 'Select a workspace first.' : 'Selecciona un espacio primero.');
+        return;
+      }
       const response = await fetch('/api/users/onboarding', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
         body: JSON.stringify({
           ...form,
           ...(previewModeAllowed ? { previewMode: true } : {}),
@@ -260,6 +329,10 @@ export default function OnboardingPage() {
       });
 
       const payload = await response.json().catch(() => null);
+      if (handleTenantResponse(response.status, payload)) {
+        setError(en ? 'Organization selection required.' : 'Selección de organización requerida.');
+        return;
+      }
       if (!response.ok) {
         setError(payload?.error || (en ? 'We could not save your onboarding.' : 'No pudimos guardar tu onboarding.'));
         return;
@@ -274,6 +347,25 @@ export default function OnboardingPage() {
       setSaving(false);
     }
   };
+
+  if (tenantStatus === 'loading' || (loading && tenantStatus === 'ready')) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-slate-950 to-slate-900 px-6 text-slate-200">
+        <div className="text-center">
+          <div className="inline-block h-12 w-12 animate-spin rounded-full border-b-2 border-cyan-400" />
+          <p className="mt-4 text-sm text-slate-400">{en ? 'Preparing your workspace...' : 'Preparando tu espacio...'}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (tenantStatus === 'no_organization' || tenantStatus === 'error') {
+    return <NoOrganizationState language={language} />;
+  }
+
+  if (tenantStatus === 'selection_required') {
+    return <OrganizationChooserPanel language={language} />;
+  }
 
   if (loading) {
     return (

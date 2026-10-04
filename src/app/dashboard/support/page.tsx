@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Bot, Cpu, Layers, Zap } from 'lucide-react';
+import { useTenantOrganization } from '@/components/TenantOrganizationProvider';
 import { useAppLanguage } from '@/hooks/use-app-language';
 
 interface SupportReply {
@@ -42,6 +43,8 @@ const PROVIDER_META: Record<string, { label: string; icon: React.ReactNode; colo
 export default function SupportPage() {
   const { language } = useAppLanguage();
   const en = language === 'en';
+  const { selectionReady, selectedOrganizationId, getTenantHeaders, handleTenantResponse } =
+    useTenantOrganization();
   const [user, setUser] = useState<DashboardSupportUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [message, setMessage] = useState('');
@@ -62,15 +65,21 @@ export default function SupportPage() {
       setAiProvider(savedProvider);
     }
     if (savedKey) setAiApiKey(savedKey);
+  }, []);
+
+  useEffect(() => {
+    if (!selectionReady || !selectedOrganizationId) return;
 
     const loadUser = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const headers = getTenantHeaders();
+        if (!headers) return;
         const response = await fetch('/api/users/me', {
-          headers: { Authorization: `Bearer ${token}` },
+          headers,
           cache: 'no-store',
         });
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
+        if (handleTenantResponse(response.status, data)) return;
         setUser(data.user);
         setIsAdmin(Boolean(data?.user?.isAdmin));
       } catch (error) {
@@ -79,7 +88,7 @@ export default function SupportPage() {
     };
 
     void loadUser();
-  }, []);
+  }, [selectionReady, selectedOrganizationId, getTenantHeaders, handleTenantResponse]);
 
   const handleAsk = async () => {
     if (!message.trim()) return;

@@ -3,6 +3,7 @@
 import { PlusCircle, Star } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import AISuggestionBar from '@/components/AISuggestionBar';
+import { useTenantOrganization } from '@/components/TenantOrganizationProvider';
 import { useAppLanguage } from '@/hooks/use-app-language';
 
 export interface FocusLead {
@@ -47,6 +48,7 @@ export default function FocusPanel({
 }) {
   const { language } = useAppLanguage();
   const en = language === 'en';
+  const { getTenantHeaders, handleTenantResponse } = useTenantOrganization();
   const [activeTab, setActiveTab] = useState<ComposerTab>('whatsapp');
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
@@ -91,20 +93,21 @@ export default function FocusPanel({
     setSendSuccess(false);
     setSendError('');
     try {
-      const token = localStorage.getItem('token');
+      const headers = getTenantHeaders({ 'Content-Type': 'application/json' });
+      if (!headers) throw new Error(en ? 'Select a workspace first.' : 'Selecciona un espacio primero.');
       const messageToSend = draft.trim();
       const response = await fetch(`/api/crm/leads/${lead.id}/message`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           channel: activeTab,
           message: messageToSend,
         }),
       });
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
+      if (handleTenantResponse(response.status, data)) {
+        throw new Error(en ? 'Organization selection required.' : 'Selección de organización requerida.');
+      }
       if (!response.ok) throw new Error(data.error || (en ? 'Could not send' : 'Error al enviar'));
       setDraft('');
       await onSend?.(lead, activeTab, messageToSend);

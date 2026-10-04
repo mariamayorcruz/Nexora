@@ -2,6 +2,7 @@
 
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useTenantOrganization } from '@/components/TenantOrganizationProvider';
 import { useAppLanguage } from '@/hooks/use-app-language';
 
 type CalendarTab = 'month' | 'week' | 'day' | 'content';
@@ -24,6 +25,8 @@ const TYPE_META = {
 
 export default function CalendarioPage() {
   const { language } = useAppLanguage();
+  const { selectionReady, selectedOrganizationId, getTenantHeaders, handleTenantResponse } =
+    useTenantOrganization();
   const [tab, setTab] = useState<CalendarTab>('month');
   const [monthDate, setMonthDate] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState(() => new Date());
@@ -32,11 +35,18 @@ export default function CalendarioPage() {
   const [newEventTitle, setNewEventTitle] = useState('');
 
   useEffect(() => {
+    if (!selectionReady || !selectedOrganizationId) return;
+    const headers = getTenantHeaders();
     const token = localStorage.getItem('token');
-    if (!token) return;
+    if (!headers || !token) return;
+    setEvents([]);
 
     void Promise.all([
-      fetch('/api/crm/leads', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }).then((res) => res.json()),
+      fetch('/api/crm/leads', { headers, cache: 'no-store' }).then(async (res) => {
+        const data = await res.json().catch(() => ({ leads: [] }));
+        if (handleTenantResponse(res.status, data)) return { leads: [] };
+        return data;
+      }),
       fetch('/api/ai/studio', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }).then((res) => res.json()).catch(() => ({ jobs: [] })),
       fetch('/api/crm/calendar/events', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }).then((res) => res.json()).catch(() => ({ events: [] })),
     ])
@@ -61,7 +71,7 @@ export default function CalendarioPage() {
         setEvents([...leadEvents, ...campaignEvents, ...manualEvents]);
       })
       .catch(() => setEvents([]));
-  }, []);
+  }, [selectionReady, selectedOrganizationId, getTenantHeaders, handleTenantResponse]);
 
   const monthGrid = useMemo(() => {
     const year = monthDate.getFullYear();

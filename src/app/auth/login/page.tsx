@@ -48,6 +48,11 @@ export default function Login() {
         if (!res.ok) throw new Error(data.error || 'Error con Google');
 
         localStorage.setItem('token', data.token);
+        try {
+          localStorage.removeItem('nexora_selected_organization_id');
+        } catch {
+          // ignore
+        }
         router.replace('/dashboard');
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error con Google Sign-In');
@@ -122,6 +127,11 @@ export default function Login() {
       }
 
       localStorage.setItem('token', data.token);
+      try {
+        localStorage.removeItem('nexora_selected_organization_id');
+      } catch {
+        // ignore
+      }
       router.replace('/dashboard');
     } catch {
       setError('Problema de conexion. Intenta nuevamente.');

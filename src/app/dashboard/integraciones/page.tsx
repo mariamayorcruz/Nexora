@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { useTenantOrganization } from '@/components/TenantOrganizationProvider';
 import { useAppLanguage } from '@/hooks/use-app-language';
 
 type Integration = {
@@ -22,6 +23,8 @@ export default function IntegracionesPage() {
   const router = useRouter();
   const { language } = useAppLanguage();
   const en = language === 'en';
+  const { selectionReady, selectedOrganizationId, getTenantHeaders, handleTenantResponse } =
+    useTenantOrganization();
   const [mounted, setMounted] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [connecting, setConnecting] = useState<string | null>(null);
@@ -32,18 +35,21 @@ export default function IntegracionesPage() {
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
+    if (!selectionReady || !selectedOrganizationId) return;
+    const headers = getTenantHeaders();
+    if (!headers) return;
 
     void fetch('/api/users/me', {
-      headers: { Authorization: `Bearer ${token}` },
+      headers,
+      cache: 'no-store',
     })
-      .then((res) => res.json())
-      .then((data) => {
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (handleTenantResponse(res.status, data)) return;
         setIsAdmin(Boolean(data?.user?.isAdmin));
       })
       .catch(() => {});
-  }, []);
+  }, [selectionReady, selectedOrganizationId, getTenantHeaders, handleTenantResponse]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
