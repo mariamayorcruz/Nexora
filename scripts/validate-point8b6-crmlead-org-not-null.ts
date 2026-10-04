@@ -423,7 +423,9 @@ async function main() {
 
     pass('22 no production mutation (disposable only)');
     pass('23 apply to prisma/migrations + schema NOT NULL remains unauthorized');
-    pass('24 Point 8B-3 production backfill remains a hard prerequisite gate');
+    // 8B-3 tooling may already be merged; disposable still proves the null→backfill→NOT NULL gate.
+    // Production 8B-3 --apply / 8B-6 SET NOT NULL remain separately authorized.
+    pass('24 zero-null preflight (8B-3 dependency / hosted SELECT-only) remains a hard gate before SET NOT NULL');
 
     console.log(`[point8b6] ALL_PASS count=${passed}`);
   } finally {
