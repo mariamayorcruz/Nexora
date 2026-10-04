@@ -131,8 +131,10 @@ async function main() {
       },
     });
     assert(leadA.organizationId !== null, 'fixture lead must be non-null org');
-    const nullCount = await prisma.crmLead.count({ where: { organizationId: null } });
-    assert(nullCount === 0, 'no null organizationId rows in fixture');
+    const nullRows = await prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint AS count FROM "CrmLead" WHERE "organizationId" IS NULL
+    `;
+    assert(Number(nullRows[0]?.count || 0) === 0, 'no null organizationId rows in fixture');
     pass('3 production-style backfilled data requires no null fallback');
 
     const tokenA = signUserToken({ userId: userA.id, email: userA.email });

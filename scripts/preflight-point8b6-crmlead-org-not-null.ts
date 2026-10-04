@@ -48,7 +48,11 @@ function assertUrlPolicy(url: string) {
 
 export async function collectPoint8b6PreflightCounts(prisma: PrismaClient): Promise<PreflightCounts> {
   const totalCrmLeads = await prisma.crmLead.count();
-  const nullOrganizationId = await prisma.crmLead.count({ where: { organizationId: null } });
+  // Raw SQL: Prisma client rejects `organizationId: null` filters after schema NOT NULL.
+  const nullRows = await prisma.$queryRaw<Array<{ count: bigint }>>`
+    SELECT COUNT(*)::bigint AS count FROM "CrmLead" WHERE "organizationId" IS NULL
+  `;
+  const nullOrganizationId = Number(nullRows[0]?.count || 0);
 
   const orphanRows = await prisma.$queryRaw<Array<{ count: bigint }>>`
     SELECT COUNT(*)::bigint AS count
@@ -135,10 +139,9 @@ export function evaluatePoint8b6PreflightGates(counts: PreflightCounts): {
  * (deterministic legacy org backfill). NOT a production backfill tool.
  */
 export async function simulateDisposableLegacyOrgBackfill(prisma: PrismaClient): Promise<number> {
-  const nullLeads = await prisma.crmLead.findMany({
-    where: { organizationId: null },
-    select: { id: true, userId: true },
-  });
+  const nullLeads = await prisma.$queryRaw<Array<{ id: string; userId: string }>>`
+    SELECT id, "userId" AS "userId" FROM "CrmLead" WHERE "organizationId" IS NULL
+  `;
   let updated = 0;
   for (const lead of nullLeads) {
     const organizationId = buildLegacyOrganizationId(lead.userId);

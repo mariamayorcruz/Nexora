@@ -371,8 +371,11 @@ async function main() {
     pass('43 no second membership auto-creation');
     assert(!/RBAC|permissions table|capability matrix/i.test(providerSrc), 'no Point 30');
     pass('44 no Point 30 RBAC');
-    assert(/organizationId\s+String\?/.test(crmLeadBlock), 'no 8B-6 NOT NULL');
-    pass('45 no Point 8B-6 hardening');
+    assert(
+      /organizationId\s+String\b/.test(crmLeadBlock) && !/organizationId\s+String\?/.test(crmLeadBlock),
+      'Point 8B-6 NOT NULL present'
+    );
+    pass('45 Point 8B-6 organizationId NOT NULL activated');
 
     const crmLeadsRoute = readFile('src/app/api/crm/leads/route.ts');
     assert(/omitCrmLeadOrganizationId/.test(crmLeadsRoute), 'public omit org');

@@ -254,15 +254,14 @@ async function main() {
     );
     assert(columnNullable(url, 'CrmLead', 'organizationId'), 'disposable DROP NOT NULL for regression');
 
-    // Historical null (pre-8B-3 shape)
-    await prisma.crmLead.create({
-      data: {
-        userId: user.id,
-        organizationId: null,
-        name: 'HISTORICAL NULL',
-        source: 'manual',
-      },
-    });
+    // Historical null (pre-8B-3 shape) — raw insert bypasses Prisma NOT NULL client typing
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO "CrmLead" (id, "userId", "organizationId", name, source, stage, status, value, confidence, "createdAt", "updatedAt")
+       VALUES ($1, $2, NULL, $3, 'manual', 'lead', 'nuevo', 0, 25, NOW(), NOW())`,
+      `cl_hist_${user.id.slice(-8)}`,
+      user.id,
+      'HISTORICAL NULL'
+    );
     // Dual-written modern lead
     await prisma.crmLead.create({
       data: {
