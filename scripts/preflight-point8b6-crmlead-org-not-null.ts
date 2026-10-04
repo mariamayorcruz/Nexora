@@ -114,7 +114,9 @@ export function evaluatePoint8b6PreflightGates(counts: PreflightCounts): {
 } {
   const failures: string[] = [];
   if (counts.nullOrganizationId !== 0) {
-    failures.push(`nullOrganizationId=${counts.nullOrganizationId} (Point 8B-3 backfill incomplete)`);
+    failures.push(
+      `nullOrganizationId=${counts.nullOrganizationId} (zero-null gate failed; 8B-3 dependency not satisfied for this DB)`
+    );
   }
   if (counts.orphanOrganizationId !== 0) {
     failures.push(`orphanOrganizationId=${counts.orphanOrganizationId}`);
