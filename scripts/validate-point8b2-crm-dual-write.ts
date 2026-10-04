@@ -299,8 +299,16 @@ async function main() {
     pass('21 superseded userId-only read assertion retired (covered by Point 8B-4 validator)');
 
     // 22–24 process invariants
-    assert(!fs.existsSync(path.join(process.cwd(), 'scripts', 'backfill-crmlead-organization.ts')), 'no new backfill script');
-    pass('22 no backfill script added for CrmLead organizationId');
+    // Point 8B-3 owns historical CrmLead.organizationId backfill (authorized separately).
+    // 8B-2 only forbids opportunistic runtime backfill on UPDATE paths (covered above).
+    if (fs.existsSync(path.join(process.cwd(), 'scripts', 'backfill-crmlead-organization.ts'))) {
+      const backfillSrc = readFile('scripts/backfill-crmlead-organization.ts');
+      assert(/--apply/.test(backfillSrc), '8B-3 backfill must require explicit --apply');
+      assert(!/ensureUserOrganization/.test(backfillSrc), '8B-3 backfill must not repair tenants');
+      pass('22 Point 8B-3 backfill script present (dry-run/--apply; non-repairing)');
+    } else {
+      pass('22 no CrmLead organizationId backfill script yet (pre-8B-3)');
+    }
     pass('23 no production mutation (disposable DB only)');
     assert(!/console\.(log|info|error)\([^\n]*password|secret|token/i.test(readFile('src/lib/tenancy/resolve-legacy-crm-write-organization.ts')), 'helper must not log secrets');
     pass('24 helper does not log secret values');
