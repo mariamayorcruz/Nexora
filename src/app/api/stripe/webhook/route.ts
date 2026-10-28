@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { processStripeEvent } from '@/lib/billing/stripe-webhook-sync';
+import { processStripeEvent, StripeWebhookTieError } from '@/lib/billing/stripe-webhook-sync';
 import { prisma } from '@/lib/prisma';
 import { getStripeClient } from '@/lib/stripe';
 
@@ -42,19 +42,39 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid Stripe signature.' }, { status: 400 });
   }
 
+  let checkoutSubscription: Stripe.Subscription | undefined;
   try {
-    let subscription: Stripe.Subscription | undefined;
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as Stripe.Checkout.Session;
       const subscriptionId = subscriptionIdFromSession(session);
       if (subscriptionId) {
-        subscription = await getStripeClient().subscriptions.retrieve(subscriptionId);
+        checkoutSubscription = await getStripeClient().subscriptions.retrieve(subscriptionId);
       }
     }
 
-    const result = await processStripeEvent(event, { subscription });
+    const result = await processStripeEvent(event, { subscription: checkoutSubscription });
     return NextResponse.json({ received: true, duplicate: result.duplicate });
-  } catch {
+  } catch (error) {
+    if (error instanceof StripeWebhookTieError) {
+      try {
+        const stripe = getStripeClient();
+        const result =
+          error.resource === 'subscription'
+            ? await processStripeEvent(event, {
+                subscription: checkoutSubscription,
+                canonicalSubscription: await stripe.subscriptions.retrieve(error.resourceId),
+                tieResolution: true,
+              })
+            : await processStripeEvent(event, {
+                canonicalInvoice: await stripe.invoices.retrieve(error.resourceId),
+                tieResolution: true,
+              });
+        return NextResponse.json({ received: true, duplicate: result.duplicate, tie: true });
+      } catch {
+        console.error('Stripe webhook tie resolution failed');
+        return NextResponse.json({ error: 'Webhook processing failed.' }, { status: 500 });
+      }
+    }
     console.error('Stripe webhook processing failed');
     return NextResponse.json({ error: 'Webhook processing failed.' }, { status: 500 });
   }

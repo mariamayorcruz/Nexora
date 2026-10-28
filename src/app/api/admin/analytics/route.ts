@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { summarizePlatformRevenue } from '@/lib/billing/revenue-metrics';
+import { collectedRevenueByMonth, summarizePlatformRevenue } from '@/lib/billing/revenue-metrics';
 import { prisma } from '@/lib/prisma';
 import { verifyAdmin } from '@/lib/admin';
 
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
   try {
     const paidInvoices = await prisma.invoice.findMany({
       where: { status: 'paid' },
-      select: { userId: true, status: true, amountMinor: true, currency: true, createdAt: true },
+      select: { userId: true, status: true, amountMinor: true, currency: true, createdAt: true, paidAt: true },
     });
     const revenue = summarizePlatformRevenue({ subscriptions: [], invoices: paidInvoices });
 
@@ -29,26 +29,7 @@ export async function GET(request: NextRequest) {
     // Get total campaigns
     const totalCampaigns = await prisma.campaign.count();
 
-    const twelveMonthsAgo = new Date();
-    twelveMonthsAgo.setUTCMonth(twelveMonthsAgo.getUTCMonth() - 12);
-    const monthly = new Map<string, Map<string, bigint>>();
-    for (const invoice of paidInvoices) {
-      if (invoice.createdAt < twelveMonthsAgo || invoice.amountMinor == null || !invoice.currency) continue;
-      const month = invoice.createdAt.toISOString().slice(0, 7);
-      const currency = invoice.currency.trim().toUpperCase();
-      const byCurrency = monthly.get(month) ?? new Map<string, bigint>();
-      byCurrency.set(currency, (byCurrency.get(currency) ?? 0n) + invoice.amountMinor);
-      monthly.set(month, byCurrency);
-    }
-    const revenueByMonth = [...monthly.entries()]
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .flatMap(([month, byCurrency]) =>
-        [...byCurrency.entries()].map(([currency, amountMinor]) => ({
-          month,
-          currency,
-          amountMinor: amountMinor.toString(),
-        }))
-      );
+    const revenueByMonth = collectedRevenueByMonth(paidInvoices);
 
     // Get users by month (last 12 months)
     const usersByMonth = await prisma.$queryRaw`

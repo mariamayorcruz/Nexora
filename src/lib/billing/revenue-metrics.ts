@@ -32,6 +32,8 @@ export type InvoiceProjectionInput = {
   amountMinor: bigint | number | null;
   currency: string | null;
   createdAt: Date;
+  /** Null means the paid month is unknown. createdAt is not a substitute. */
+  paidAt?: Date | null;
 };
 
 export type RevenueSnapshot = {
@@ -45,6 +47,8 @@ export type RevenueSnapshot = {
   pendingInvoiceCount: number;
   legacyInvoiceCount: number;
   monthlyLegacyInvoiceCount: number;
+  /** Paid invoices whose paidAt is null. They are not placed in a month. */
+  monthlyPaidAtUnknownCount: number;
   churnRate: null;
   trialToPaid: null;
 };
@@ -85,6 +89,14 @@ function linesFrom(map: Map<string, Bucket>): MoneyLine[] {
 
 export function startOfUtcMonth(now: Date): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
+}
+
+export function startOfNextUtcMonth(now: Date): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0));
+}
+
+function paidInUtcMonth(paidAt: Date | null | undefined, monthStart: Date, monthEnd: Date): boolean {
+  return paidAt != null && paidAt >= monthStart && paidAt < monthEnd;
 }
 
 export type MrrClass =
@@ -159,16 +171,21 @@ export function summarizePlatformRevenue(input: {
     }
   }
 
-  const monthStart = startOfUtcMonth(input.now ?? new Date());
+  const now = input.now ?? new Date();
+  const monthStart = startOfUtcMonth(now);
+  const monthEnd = startOfNextUtcMonth(now);
   const collected = new Map<string, Bucket>();
   const monthlyCollected = new Map<string, Bucket>();
   let legacyInvoiceCount = 0;
   let monthlyLegacyInvoiceCount = 0;
+  let monthlyPaidAtUnknownCount = 0;
 
   for (const invoice of input.invoices) {
     if (invoice.status !== 'paid') continue;
+    const paidAt = invoice.paidAt ?? null;
+    if (paidAt == null) monthlyPaidAtUnknownCount += 1;
+    const inMonth = paidInUtcMonth(paidAt, monthStart, monthEnd);
     const amount = asMinor(invoice.amountMinor);
-    const inMonth = invoice.createdAt >= monthStart;
     if (amount == null || !invoice.currency || !/^[A-Z]{3}$/.test(invoice.currency.trim().toUpperCase())) {
       legacyInvoiceCount += 1;
       if (inMonth) monthlyLegacyInvoiceCount += 1;
@@ -196,9 +213,61 @@ export function summarizePlatformRevenue(input: {
     pendingInvoiceCount: input.pendingInvoiceCount ?? 0,
     legacyInvoiceCount,
     monthlyLegacyInvoiceCount,
+    monthlyPaidAtUnknownCount,
     churnRate: null,
     trialToPaid: null,
   };
+}
+
+export type MonthlyCollectedLine = {
+  month: string;
+  currency: string;
+  amountMinor: string;
+};
+
+/**
+ * Paid invoices grouped by the UTC month of paidAt.
+ * A null paidAt is omitted. createdAt is not used.
+ * A paidAt after `now` stays in its own future month when it is inside the
+ * trailing window; it is not folded into the current month.
+ */
+export function collectedRevenueByMonth(
+  invoices: InvoiceProjectionInput[],
+  now = new Date()
+): MonthlyCollectedLine[] {
+  const windowStart = new Date(
+    Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth() - 12,
+      now.getUTCDate(),
+      now.getUTCHours(),
+      now.getUTCMinutes(),
+      now.getUTCSeconds(),
+      now.getUTCMilliseconds()
+    )
+  );
+  const monthly = new Map<string, Map<string, bigint>>();
+  for (const invoice of invoices) {
+    if (invoice.status !== 'paid' || invoice.paidAt == null || invoice.paidAt < windowStart) continue;
+    const amount = asMinor(invoice.amountMinor);
+    const currency = invoice.currency?.trim().toUpperCase() || '';
+    if (amount == null || !/^[A-Z]{3}$/.test(currency)) continue;
+    const month = invoice.paidAt.toISOString().slice(0, 7);
+    const byCurrency = monthly.get(month) ?? new Map<string, bigint>();
+    byCurrency.set(currency, (byCurrency.get(currency) ?? 0n) + amount);
+    monthly.set(month, byCurrency);
+  }
+  return [...monthly.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .flatMap(([month, byCurrency]) =>
+      [...byCurrency.entries()]
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([currency, amountMinor]) => ({
+          month,
+          currency,
+          amountMinor: minorToString(amountMinor),
+        }))
+    );
 }
 
 export function collectedForUser(invoices: InvoiceProjectionInput[]): UserCollected {

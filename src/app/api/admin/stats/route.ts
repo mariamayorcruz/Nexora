@@ -114,6 +114,7 @@ export async function GET(request: NextRequest) {
           currency: true,
           status: true,
           createdAt: true,
+          paidAt: true,
         },
       }),
     ]);
@@ -733,6 +734,7 @@ export async function GET(request: NextRequest) {
         excludedFromMrr: revenueSnapshot.excludedFromMrr,
         legacyInvoiceCount: revenueSnapshot.legacyInvoiceCount,
         monthlyLegacyInvoiceCount: revenueSnapshot.monthlyLegacyInvoiceCount,
+        monthlyPaidAtUnknownCount: revenueSnapshot.monthlyPaidAtUnknownCount,
         pendingInvoiceCount: revenueSnapshot.pendingInvoiceCount,
         totalCampaigns: campaigns.length,
         activeCampaigns: campaigns.filter((campaign) => campaign.status === 'active').length,

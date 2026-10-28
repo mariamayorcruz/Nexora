@@ -164,17 +164,29 @@ async function main() {
   assert(executableSql.includes('StripeWebhookEvent'), '8C migration creates the event table')
   assert(executableSql.includes('PendingStripeInvoice'), '8C migration creates the pending invoice table')
 
-  const { currencyExponent, divRoundHalfUp } = await import('../src/lib/billing/money')
+  const { currencyExponent, divRoundHalfUp, formatMinorUnits, compatibilityMajorAmount } = await import(
+    '../src/lib/billing/money'
+  )
   assert(currencyExponent('jpy') === 0, 'JPY exponent 0')
   assert(currencyExponent('USD') === 2, 'USD exponent 2')
   assert(currencyExponent('ugx') === 2, 'UGX stays exponent 2 in the Stripe API')
   assert(currencyExponent('isk') === 2, 'ISK exponent 2')
   assert(currencyExponent('huf') === 2, 'HUF charge exponent 2')
   assert(currencyExponent('twd') === 2, 'TWD charge exponent 2')
-  assert(currencyExponent('BHD') === 2, 'do not invent exponent 3')
+  assert(currencyExponent('BHD') === 3, 'BHD exponent 3')
+  assert(currencyExponent('JOD') === 3, 'JOD exponent 3')
+  assert(currencyExponent('KWD') === 3, 'KWD exponent 3')
+  assert(currencyExponent('OMR') === 3, 'OMR exponent 3')
+  assert(currencyExponent('TND') === 3, 'TND exponent 3')
+  assert(currencyExponent('ZZZ') === null, 'unknown currency is not exponent 2')
   assert(currencyExponent('us') === null, 'short code has no exponent')
   assert(currencyExponent('USDX') === null, 'long code has no exponent')
+  assert(formatMinorUnits(5124, 'KWD', 3) === '5.124 KWD', 'three-decimal minor units')
+  assert(compatibilityMajorAmount(5120n, 'KWD') === 5.12, 'three-decimal legacy mirror')
+  assert(compatibilityMajorAmount(5124n, 'ZZZ') === 5124, 'unknown currency is not divided by 100')
   assert(divRoundHalfUp(101n, 2n) === 51n, 'half-up 101/2 = 51')
+  assert(divRoundHalfUp(100n, 12n) === 8n, 'annual 100 rounds half-up to 8')
+  assert(divRoundHalfUp(200n, 12n) === 17n, 'sum-then-divide would be 17')
 
   resetPublic(url)
   const deploy = runPrisma(['migrate', 'deploy'], { ...process.env, DATABASE_URL: url })
@@ -187,8 +199,69 @@ async function main() {
   assert(orgOnSubscription === '0', 'Subscription must not gain organizationId')
 
   const { prisma } = await import('../src/lib/prisma')
-  const { processStripeEvent, projectSubscriptionPrice } = await import('../src/lib/billing/stripe-webhook-sync')
-  const { summarizePlatformRevenue } = await import('../src/lib/billing/revenue-metrics')
+  const { processStripeEvent, projectSubscriptionPrice, StripeWebhookTieError } = await import(
+    '../src/lib/billing/stripe-webhook-sync'
+  )
+  const { summarizePlatformRevenue, collectedRevenueByMonth } = await import('../src/lib/billing/revenue-metrics')
+  const october = new Date('2026-10-15T12:00:00.000Z')
+  const paidInvoice = (paidAt: Date | null, amountMinor: bigint, createdAt: Date) => ({
+    userId: 'user_paid_at',
+    status: 'paid' as const,
+    amountMinor,
+    currency: 'USD',
+    createdAt,
+    paidAt,
+  })
+  const paidAtSummary = summarizePlatformRevenue({
+    subscriptions: [],
+    now: october,
+    invoices: [
+      paidInvoice(new Date('2026-10-02T00:00:00.000Z'), 500n, new Date('2026-09-01T00:00:00.000Z')),
+      paidInvoice(new Date('2026-09-20T00:00:00.000Z'), 800n, new Date('2026-10-03T00:00:00.000Z')),
+      paidInvoice(new Date('2026-11-01T00:00:00.000Z'), 900n, new Date('2026-10-04T00:00:00.000Z')),
+      paidInvoice(null, 700n, new Date('2026-10-05T00:00:00.000Z')),
+    ],
+  })
+  assert(paidAtSummary.monthlyCollectedByCurrency.length === 1, 'only the October paidAt is this month')
+  assert(paidAtSummary.monthlyCollectedByCurrency[0].amountMinor === '500', 'created last month and paid now counts now')
+  assert(paidAtSummary.monthlyCollectedByCurrency[0].count === 1, 'replay and future and unknown are outside this month')
+  assert(paidAtSummary.collectedByCurrency[0].amountMinor === '2900', 'all-time collected still includes every paid amount')
+  assert(paidAtSummary.monthlyPaidAtUnknownCount === 1, 'null paidAt is explicit and not invented from createdAt')
+  const byMonth = collectedRevenueByMonth(
+    [
+      paidInvoice(new Date('2026-09-20T00:00:00.000Z'), 800n, new Date('2026-10-03T00:00:00.000Z')),
+      paidInvoice(new Date('2026-11-01T00:00:00.000Z'), 900n, new Date('2026-10-04T00:00:00.000Z')),
+      paidInvoice(null, 700n, new Date('2026-10-05T00:00:00.000Z')),
+    ],
+    october
+  )
+  assert(byMonth.some((line) => line.month === '2026-09' && line.amountMinor === '800'), 'late replay stays in the paidAt month')
+  assert(byMonth.some((line) => line.month === '2026-11' && line.amountMinor === '900'), 'future paidAt stays in its own month')
+  assert(!byMonth.some((line) => line.month === '2026-10'), 'unknown paidAt is not bucketed by createdAt')
+  const perRow = summarizePlatformRevenue({
+    subscriptions: [
+      {
+        userId: 'annual_a',
+        stripeStatus: 'active',
+        billingInterval: 'year',
+        billingIntervalCount: 1,
+        recurringAmountMinor: 100n,
+        currency: 'USD',
+      },
+      {
+        userId: 'annual_b',
+        stripeStatus: 'active',
+        billingInterval: 'year',
+        billingIntervalCount: 1,
+        recurringAmountMinor: 100n,
+        currency: 'USD',
+      },
+    ],
+    invoices: [],
+  })
+  assert(perRow.mrrByCurrency[0].amountMinor === '16', 'annual MRR rounds each row before summing')
+  assert(perRow.arrByCurrency[0].amountMinor === '192', 'ARR is the rounded monthly sum times 12')
+  assert(perRow.mrrByCurrency[0].exponent === 2, 'USD line keeps exponent 2')
   const { POST } = await import('../src/app/api/stripe/webhook/route')
   const { GET: getAdminRevenue } = await import('../src/app/api/admin/revenue/route')
   const { GET: getBillingInvoices } = await import('../src/app/api/billing/invoices/route')
@@ -206,6 +279,9 @@ async function main() {
     subId: string
     status: string
     items: PriceInput[]
+    afterAggregateLock?: () => Promise<void> | void
+    canonicalSubscription?: Stripe.Subscription
+    tieResolution?: boolean
   }) {
     const subscription = subscriptionFixture({
       id: input.subId,
@@ -220,8 +296,21 @@ async function main() {
         created: input.created,
         type: 'customer.subscription.updated',
         object: subscription,
-      })
+      }),
+      {
+        afterAggregateLock: input.afterAggregateLock,
+        canonicalSubscription: input.canonicalSubscription,
+        tieResolution: input.tieResolution,
+      }
     )
+  }
+
+  function deferred() {
+    let resolve: () => void = () => {}
+    const promise = new Promise<void>((done) => {
+      resolve = done
+    })
+    return { promise, resolve }
   }
 
   await createUser('user_month', 'month@example.com')
@@ -560,7 +649,7 @@ async function main() {
 
   await createUser('user_equal', 'equal@example.com')
   await sendSub({
-    eventId: 'evt_equal_a',
+    eventId: 'evt_z_same_second',
     created: 50,
     userId: 'user_equal',
     customer: 'cus_equal',
@@ -568,17 +657,244 @@ async function main() {
     status: 'active',
     items: [{ id: 'price_equal', unit: 1000, currency: 'usd', interval: 'month' }],
   })
+  let tieError: unknown
+  try {
+    await sendSub({
+      eventId: 'evt_a_same_second',
+      created: 50,
+      userId: 'user_equal',
+      customer: 'cus_equal',
+      subId: 'sub_equal',
+      status: 'trialing',
+      items: [{ id: 'price_equal', unit: 2000, currency: 'usd', interval: 'month' }],
+    })
+  } catch (error) {
+    tieError = error
+  }
+  assert(tieError instanceof StripeWebhookTieError, 'same-second inversion does not apply the later arrival')
+  assert((await prisma.stripeWebhookEvent.count({ where: { id: 'evt_a_same_second' } })) === 0, 'unresolved tie is not processed')
+  const equal = await prisma.subscription.findUniqueOrThrow({ where: { userId: 'user_equal' } })
+  assert(equal.stripeStatus === 'active', 'lexical event.id does not make the second event older or newer')
+  assert(equal.recurringAmountMinor === 1000n, 'same-second payload does not replace the stored amount')
+
+  const canonicalActive = subscriptionFixture({
+    id: 'sub_equal',
+    customer: 'cus_equal',
+    userId: 'user_equal',
+    status: 'active',
+    items: [{ id: 'price_equal', unit: 1000, currency: 'usd', interval: 'month' }],
+  })
+  const tied = await sendSub({
+    eventId: 'evt_a_same_second',
+    created: 50,
+    userId: 'user_equal',
+    customer: 'cus_equal',
+    subId: 'sub_equal',
+    status: 'trialing',
+    items: [{ id: 'price_equal', unit: 2000, currency: 'usd', interval: 'month' }],
+    tieResolution: true,
+    canonicalSubscription: canonicalActive,
+  })
+  assert(tied.tie === true, 'canonical resolution records the tie')
+  const equalCanonical = await prisma.subscription.findUniqueOrThrow({ where: { userId: 'user_equal' } })
+  assert(equalCanonical.stripeStatus === 'active', 'canonical active state is kept')
+  assert(equalCanonical.recurringAmountMinor === 1000n, 'canonical amount wins over the tied payload')
+
+  const canonicalCanceled = subscriptionFixture({
+    id: 'sub_equal',
+    customer: 'cus_equal',
+    userId: 'user_equal',
+    status: 'canceled',
+    items: [{ id: 'price_equal', unit: 1000, currency: 'usd', interval: 'month' }],
+  })
   await sendSub({
-    eventId: 'evt_equal_b',
+    eventId: 'evt_equal_cancel',
+    created: 50,
+    userId: 'user_equal',
+    customer: 'cus_equal',
+    subId: 'sub_equal',
+    status: 'trialing',
+    items: [{ id: 'price_equal', unit: 2000, currency: 'usd', interval: 'month' }],
+    tieResolution: true,
+    canonicalSubscription: canonicalCanceled,
+  })
+  const equalCanceled = await prisma.subscription.findUniqueOrThrow({ where: { userId: 'user_equal' } })
+  assert(equalCanceled.stripeStatus === 'canceled', 'canonical cancellation is a forward transition')
+
+  await sendSub({
+    eventId: 'evt_equal_uncancel',
     created: 50,
     userId: 'user_equal',
     customer: 'cus_equal',
     subId: 'sub_equal',
     status: 'active',
-    items: [{ id: 'price_equal', unit: 2000, currency: 'usd', interval: 'month' }],
+    items: [{ id: 'price_equal', unit: 3000, currency: 'usd', interval: 'month' }],
+    tieResolution: true,
+    canonicalSubscription: canonicalActive,
   })
-  const equal = await prisma.subscription.findUniqueOrThrow({ where: { userId: 'user_equal' } })
-  assert(equal.recurringAmountMinor === 2000n, 'equal event.created may apply')
+  const equalKept = await prisma.subscription.findUniqueOrThrow({ where: { userId: 'user_equal' } })
+  assert(equalKept.stripeStatus === 'canceled', 'same-second canonical state does not uncancel')
+  assert(equalKept.recurringAmountMinor === 1000n, 'rejected regression does not change the amount')
+  assert(
+    (await prisma.stripeWebhookEvent.findUnique({ where: { id: 'evt_equal_uncancel' } }))?.status === 'processed',
+    'a refused same-second regression is still processed'
+  )
+
+  await processStripeEvent(
+    stripeEvent({
+      id: 'evt_invoice_paid_tie',
+      created: 60,
+      type: 'invoice.payment_succeeded',
+      object: invoiceFixture({ id: 'in_tie', customer: 'cus_equal', amountPaid: 4000, currency: 'usd', status: 'paid' }),
+    })
+  )
+  let invoiceTie: unknown
+  try {
+    await processStripeEvent(
+      stripeEvent({
+        id: 'evt_invoice_open_tie',
+        created: 60,
+        type: 'invoice.payment_failed',
+        object: invoiceFixture({ id: 'in_tie', customer: 'cus_equal', amountPaid: 0, currency: 'usd', status: 'open' }),
+      })
+    )
+  } catch (error) {
+    invoiceTie = error
+  }
+  assert(invoiceTie instanceof StripeWebhookTieError, 'same-second invoice inversion is not applied')
+  const paidTie = await prisma.invoice.findUniqueOrThrow({ where: { stripeInvoiceId: 'in_tie' } })
+  assert(paidTie.status === 'paid' && paidTie.amountMinor === 4000n, 'paid invoice stays paid without a canonical read')
+  await processStripeEvent(
+    stripeEvent({
+      id: 'evt_invoice_open_tie',
+      created: 60,
+      type: 'invoice.payment_failed',
+      object: invoiceFixture({ id: 'in_tie', customer: 'cus_equal', amountPaid: 0, currency: 'usd', status: 'open' }),
+    }),
+    {
+      tieResolution: true,
+      canonicalInvoice: invoiceFixture({ id: 'in_tie', customer: 'cus_equal', amountPaid: 0, currency: 'usd', status: 'open' }),
+    }
+  )
+  const paidKept = await prisma.invoice.findUniqueOrThrow({ where: { stripeInvoiceId: 'in_tie' } })
+  assert(paidKept.status === 'paid' && paidKept.amountMinor === 4000n, 'canonical open does not regress a paid invoice')
+
+  await createUser('user_race', 'race@example.com')
+  const olderRelease = deferred()
+  const olderHolding = deferred()
+  const olderWrite = sendSub({
+    eventId: 'evt_race_old',
+    created: 700,
+    userId: 'user_race',
+    customer: 'cus_race',
+    subId: 'sub_race',
+    status: 'trialing',
+    items: [{ id: 'price_race', unit: 1000, currency: 'usd', interval: 'month' }],
+    afterAggregateLock: async () => {
+      olderHolding.resolve()
+      await olderRelease.promise
+    },
+  })
+  await olderHolding.promise
+  const newerWrite = sendSub({
+    eventId: 'evt_race_new',
+    created: 800,
+    userId: 'user_race',
+    customer: 'cus_race',
+    subId: 'sub_race',
+    status: 'active',
+    items: [{ id: 'price_race', unit: 9000, currency: 'usd', interval: 'month' }],
+  })
+  await new Promise((resolve) => setTimeout(resolve, 150))
+  olderRelease.resolve()
+  const [olderResult, newerResult] = await Promise.all([olderWrite, newerWrite])
+  assert(olderResult.stale === false && newerResult.stale === false, 'the newer event is not stale')
+  const raced = await prisma.subscription.findUniqueOrThrow({ where: { userId: 'user_race' } })
+  assert(raced.sourceEventCreated === 800, 'the older commit cannot overwrite the newer event')
+  assert(raced.stripeStatus === 'active', 'distinct event ids stay ordered by event.created')
+  assert(raced.recurringAmountMinor === 9000n, 'the slower older event does not keep its stale read')
+
+  await createUser('user_overlap_sub', 'overlap-sub@example.com')
+  const subRelease = deferred()
+  const subHolding = deferred()
+  const overlapSub = sendSub({
+    eventId: 'evt_overlap_sub',
+    created: 900,
+    userId: 'user_overlap_sub',
+    customer: 'cus_overlap_sub',
+    subId: 'sub_overlap_sub',
+    status: 'active',
+    items: [{ id: 'price_overlap_sub', unit: 2200, currency: 'usd', interval: 'month' }],
+    afterAggregateLock: async () => {
+      subHolding.resolve()
+      await subRelease.promise
+    },
+  })
+  await subHolding.promise
+  const overlapInvoice = processStripeEvent(
+    stripeEvent({
+      id: 'evt_overlap_invoice',
+      created: 910,
+      type: 'invoice.payment_succeeded',
+      object: invoiceFixture({ id: 'in_overlap_sub', customer: 'cus_overlap_sub', amountPaid: 2200, currency: 'usd' }),
+    })
+  )
+  await new Promise((resolve) => setTimeout(resolve, 150))
+  assert(
+    (await prisma.pendingStripeInvoice.count({ where: { stripeInvoiceId: 'in_overlap_sub' } })) === 0,
+    'invoice waits for the subscription lock instead of saving a pending row'
+  )
+  subRelease.resolve()
+  await Promise.all([overlapSub, overlapInvoice])
+  assert(
+    (await prisma.invoice.findUnique({ where: { stripeInvoiceId: 'in_overlap_sub' } }))?.userId === 'user_overlap_sub',
+    'subscription-first overlap writes the invoice'
+  )
+  assert(
+    (await prisma.pendingStripeInvoice.count({ where: { stripeInvoiceId: 'in_overlap_sub' } })) === 0,
+    'subscription-first overlap leaves no pending row'
+  )
+
+  await createUser('user_overlap_inv', 'overlap-inv@example.com')
+  const invoiceRelease = deferred()
+  const invoiceHolding = deferred()
+  const earlyOverlap = processStripeEvent(
+    stripeEvent({
+      id: 'evt_overlap_early_invoice',
+      created: 920,
+      type: 'invoice.payment_succeeded',
+      object: invoiceFixture({ id: 'in_overlap_inv', customer: 'cus_overlap_inv', amountPaid: 3300, currency: 'usd' }),
+    }),
+    {
+      afterAggregateLock: async () => {
+        invoiceHolding.resolve()
+        await invoiceRelease.promise
+      },
+    }
+  )
+  await invoiceHolding.promise
+  const lateOverlapSub = sendSub({
+    eventId: 'evt_overlap_late_sub',
+    created: 930,
+    userId: 'user_overlap_inv',
+    customer: 'cus_overlap_inv',
+    subId: 'sub_overlap_inv',
+    status: 'active',
+    items: [{ id: 'price_overlap_inv', unit: 3300, currency: 'usd', interval: 'month' }],
+  })
+  await new Promise((resolve) => setTimeout(resolve, 150))
+  assert(
+    (await prisma.subscription.count({ where: { userId: 'user_overlap_inv' } })) === 0,
+    'subscription waits for the invoice customer lock'
+  )
+  invoiceRelease.resolve()
+  await Promise.all([earlyOverlap, lateOverlapSub])
+  const overlapInv = await prisma.invoice.findUnique({ where: { stripeInvoiceId: 'in_overlap_inv' } })
+  assert(overlapInv?.userId === 'user_overlap_inv' && overlapInv.amountMinor === 3300n, 'invoice-first overlap is promoted')
+  assert(
+    (await prisma.pendingStripeInvoice.count({ where: { stripeInvoiceId: 'in_overlap_inv' } })) === 0,
+    'invoice-first overlap does not leave an orphan pending row'
+  )
 
   await prisma.stripeWebhookEvent.create({
     data: {
@@ -605,7 +921,8 @@ async function main() {
   const processing = await prisma.stripeWebhookEvent.findUniqueOrThrow({ where: { id: 'evt_processing' } })
   assert(processing.status === 'processing', 'a non-terminal event is not marked processed')
   const equalAfter = await prisma.subscription.findUniqueOrThrow({ where: { userId: 'user_equal' } })
-  assert(equalAfter.stripeStatus === 'active', 'in-progress event does not change subscription state')
+  assert(equalAfter.stripeStatus === 'canceled', 'in-progress event does not change subscription state')
+  assert(equalAfter.recurringAmountMinor === 1000n, 'in-progress event does not change the amount')
 
   const fractional = invoiceFixture({ id: 'in_fraction', customer: 'cus_equal', amountPaid: 10.5, currency: 'usd' })
   await expectThrow(
@@ -756,11 +1073,13 @@ async function main() {
     subscriptions: [],
     invoices: await prisma.invoice.findMany({
       where: { description: 'legacy-float' },
-      select: { userId: true, status: true, amountMinor: true, currency: true, createdAt: true },
+      select: { userId: true, status: true, amountMinor: true, currency: true, createdAt: true, paidAt: true },
     }),
   })
   assert(legacyInvoiceSummary.collectedByCurrency.length === 0, 'legacy float invoice is not collected revenue')
   assert(legacyInvoiceSummary.legacyInvoiceCount === 1, 'legacy float invoice is counted')
+  assert(legacyInvoiceSummary.monthlyPaidAtUnknownCount === 1, 'legacy invoice without paidAt is not assigned a month')
+  assert(legacyInvoiceSummary.monthlyCollectedByCurrency.length === 0, 'legacy invoice is not monthly collected revenue')
 
   await prisma.$disconnect()
   console.log('[point8c] PASS')

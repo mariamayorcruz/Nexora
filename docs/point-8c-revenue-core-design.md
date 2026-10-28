@@ -46,9 +46,25 @@ Se guardan el status crudo de Stripe (`status` y `stripeStatus`), el ciclo, `int
 
 Si la factura llega antes de que exista la suscripción local del customer, se guarda en `PendingStripeInvoice`. Cuando llega la suscripción de ese customer, la misma transacción la promueve a `Invoice` con el `userId` y borra la pendiente. No se descarta en silencio.
 
-### Orden
+### Orden y concurrencia
 
-Una mutación cuyo `event.created` es estrictamente menor que `sourceEventCreated` no pisa la suscripción ni la factura. El evento igual queda `processed`: ignorarlo es el efecto. Una marca de tiempo igual sí puede aplicar.
+Cada evento de suscripción o factura toma `pg_advisory_xact_lock` dentro de la misma transacción, antes de leer la versión y antes de escribir. La clave del customer es `stripe-customer:{id}` y la del usuario es `stripe-user:{id}`. Se adquieren en orden lexicográfico. Como el prefijo del customer ordena antes que el del usuario, la factura puede bloquear primero el customer, descubrir el usuario y bloquearlo después sin invertir el orden. El lock cubre la suscripción, la factura, la pendiente y la promoción. Dos `event.id` distintos ya no pueden leer la misma versión y dejar que el evento viejo haga commit al final. Una colisión de `hashtext` solo añade espera; no pierde la actualización. El lock se suelta al commit o al rollback. No se llama a Stripe mientras el lock está tomado.
+
+Una mutación cuyo `event.created` es estrictamente menor que `sourceEventCreated` no pisa la suscripción ni la factura. El evento igual queda `processed`: ignorarlo es el efecto.
+
+### Empate de `event.created`
+
+Un `event.created` igual no es más nuevo. `event.id` no se usa como orden: no es cronológico. El payload que llega después, dentro del mismo segundo, no se aplica.
+
+Si no hay una lectura canónica, la transacción lanza `StripeWebhookTieError` y revierte la fila del evento. Stripe puede reintentar. La ruta, ya fuera del lock, recupera la suscripción o la factura en Stripe y vuelve a procesar el mismo evento con ese objeto. Las pruebas pasan el objeto canónico en mock y no llaman a la red.
+
+Esa lectura es el estado actual de Stripe, no una prueba de cuál de los dos eventos ocurrió primero. Puede ser posterior a ambos. Se aplica solo si no retrocede un estado terminal o activo:
+
+- Una factura `paid` no pasa a otro status.
+- Una suscripción `canceled` no pasa a otro status.
+- Una suscripción `active` no pasa a `trialing`, `incomplete` ni `incomplete_expired`.
+
+Si el canónico retrocedería, no se escribe y el evento queda `processed`. Un `event.created` estrictamente mayor sí aplica, aunque el status parezca un retroceso: ese orden sí está observado. Sin lectura canónica no se afirma que el segundo evento sea más viejo ni más nuevo.
 
 ### MRR
 
@@ -61,13 +77,16 @@ Una mutación cuyo `event.created` es estrictamente menor que `sourceEventCreate
 | `active` mensual | `roundHalfUp(importe / interval_count)` |
 | `active` anual | `roundHalfUp(importe / (12 * interval_count))` |
 
-El redondeo positivo es `(numerador + denominador / 2) / denominador` en enteros menores. ARR es ese mensual por 12, por moneda. Las monedas no se suman.
+El redondeo positivo es `(numerador + denominador / 2) / denominador` en enteros menores. Se redondea cada suscripción y después se suman esas filas. Dos anuales de 100 unidades menores dan MRR 8 + 8 = 16. Redondear la suma una sola vez daría `round(200 / 12) = 17`, y esa cifra no se usa. ARR es el mensual ya redondeado por 12, por moneda, así que puede diferir de la suma de los precios anuales de lista (en el ejemplo, ARR 192 frente a 200). Las monedas no se suman.
 
-El exponente sale de la documentación de monedas de Stripe para importes de API, no de “dividir siempre entre 100”:
+El exponente sale de una tabla explícita. Un código de tres letras que no está en la tabla no se convierte. La fuente de exponente 0 y de las excepciones de cargo es https://docs.stripe.com/currencies, leída el 28 de octubre de 2026. La lista de tres decimales es la sección «Three-decimal currencies» de la misma guía archivada el 31 de diciembre de 2022 (https://web.archive.org/web/20221231002856/https://stripe.com/docs/currencies): BHD, JOD, KWD, OMR y TND. El importe es milésimas. Stripe pedía que el último dígito fuera 0 en PaymentIntents, reembolsos y disputas. Aquí no se re-redondea el entero guardado. La exportación markdown actual de la guía ya no imprime esa sección; por eso estos cinco códigos no caen en el exponente 2. El artículo https://support.stripe.com/questions/which-payments-methods-and-products-are-available-in-the-uae habla de monedas de tres decimales para cuentas de EAU; su cuerpo renderizado no estuvo disponible como texto en esta revisión.
 
 - Exponente 0: BIF, CLP, DJF, GNF, JPY, KMF, KRW, MGA, PYG, RWF, VND, VUV, XAF, XOF, XPF.
-- Exponente 2 aunque sean casos especiales de Stripe: UGX, ISK, HUF y TWD, y el resto de códigos de tres letras.
-- Un código que no tiene tres letras no tiene exponente y no se divide.
+- Exponente 2: ISK y UGX, aunque Stripe los mencione junto a las monedas sin decimales. El cargo sigue siendo un entero de dos decimales con fracción `00`. HUF y TWD se cobran con dos decimales; el caso especial de payout no se usa para facturas ni suscripciones. El resto del exponente 2 son monedas de presentment nombradas en la guía actual o en la de 2022 y que no están en las listas de cero o tres decimales.
+- Exponente 3: BHD, JOD, KWD, OMR, TND.
+- Cualquier otro código, incluido `ZZZ`, tiene exponente `null` y no se divide.
+
+El cobrado mensual usa `paidAt`, en UTC, con el intervalo `[inicio de mes, inicio del mes siguiente)`. `createdAt` local no decide el mes. Una factura creada el mes anterior y pagada ahora entra en el mes de `paidAt`. Un replay tardío permanece en el mes en que se pagó. Un `paidAt` futuro no entra en el mes actual; en la serie mensual queda en su propio mes. Si `paidAt` es nulo, el cobrado de todo el periodo sí puede incluir el importe, pero el mes queda en `monthlyPaidAtUnknownCount` y la UI dice «No calculado». No se inventa la fecha.
 
 Churn y trial a pago no se calculan. La API devuelve `null` y la UI dice «No calculado».
 
@@ -117,7 +136,7 @@ No se edita esta migración ni `_prisma_migrations` a mano.
 
 `npm run tenancy:validate-point8c` exige `FR004_DATABASE_URL` de un Postgres desechable. No acepta `DATABASE_URL` como respaldo. Rechaza hosts alojados. No llama a la red de Stripe: la firma de prueba usa `generateTestHeaderString` con un secreto local.
 
-Cubre mensual, anual, `interval_count`, redondeo, JPY, monedas separadas, trial, `past_due`, semana, precio desconocido, fila legacy, duplicado, concurrencia, reintento tras un usuario ausente, factura temprana, evento viejo, empate de `event.created`, evento atascado en `processing`, `amount_paid` no entero, checkout sin suscripción recuperada, firma inválida, auth de admin y aislamiento por `userId`.
+Cubre mensual, anual, `interval_count`, redondeo por fila, JPY, BHD/JOD/KWD/OMR/TND, moneda desconocida, monedas separadas, trial, `past_due`, semana, precio desconocido, fila legacy, duplicado del mismo `event.id`, dos eventos distintos con barrera de lock, factura y suscripción solapadas en los dos órdenes, reintento tras un usuario ausente, factura temprana, evento viejo, empate del mismo segundo sin canónico y con mock canónico, factura `paid` que no regresa, evento atascado en `processing`, `paidAt` de otro mes, futuro y nulo, `amount_paid` no entero, checkout sin suscripción recuperada, firma inválida, auth de admin y aislamiento por `userId`.
 
 ## 6. Limitaciones
 
@@ -126,7 +145,11 @@ Cubre mensual, anual, `interval_count`, redondeo, JPY, monedas separadas, trial,
 - Los cupones no bajan el MRR.
 - `day` y `week` no tienen fórmula de MRR.
 - Churn y conversión de trial no están calculados.
-- El corte de mes del cobrado admin es UTC.
+- El corte de mes del cobrado admin es UTC y usa `paidAt`. Sin `paidAt` el mes no se calcula.
+- Dos eventos con el mismo `event.created` no se ordenan por `event.id` ni por el orden de llegada. Sin una lectura canónica de Stripe no se elige un ganador. La lectura canónica es el estado actual, no la reconstrucción del segundo empatado, y no deshace `paid`, `canceled` ni un `active` que volvería a `trialing` o `incomplete`.
+- El MRR anual se redondea por suscripción. ARR = suma de esos mensuales × 12. No es la suma de los precios anuales.
+- BHD, JOD, KWD, OMR y TND se muestran con tres decimales. No se fuerza el último dígito a 0. Una moneda ausente de la tabla no se divide.
+- La serialización es por customer y usuario mediante advisory lock de la transacción. No es aislamiento serializable de toda la base.
 - `sourceEventCreated` es un entero de 32 bits.
 - El ingreso sigue siendo del usuario, no de la organización.
 - RLS, RBAC y el CRM no cambian.

@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
           amountMinor: true,
           currency: true,
           createdAt: true,
+          paidAt: true,
         },
       }),
       prisma.pendingStripeInvoice.count(),

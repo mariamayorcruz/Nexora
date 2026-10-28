@@ -65,6 +65,7 @@ type AdminStats = {
   };
   legacyInvoiceCount?: number;
   monthlyLegacyInvoiceCount?: number;
+  monthlyPaidAtUnknownCount?: number;
   alerts: AdminAlert[];
   recentUsers: Array<{ id: string; email: string; name?: string | null; createdAt: string }>;
   business?: BusinessMetrics;
@@ -382,7 +383,7 @@ export default function AdminOperacionPage() {
             <span>
               {stats?.monthlyCollectedByCurrency?.length
                 ? formatMoneyLines(stats.monthlyCollectedByCurrency, '0')
-                : (stats?.monthlyLegacyInvoiceCount || 0) > 0
+                : (stats?.monthlyLegacyInvoiceCount || 0) > 0 || (stats?.monthlyPaidAtUnknownCount || 0) > 0
                   ? 'No calculado'
                   : '0'}{' '}
               cobrados este mes
