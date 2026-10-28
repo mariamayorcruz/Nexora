@@ -101,7 +101,8 @@ async function main() {
     pass('1 CrmLead.organizationId NOT NULL; userId required');
 
     const migrations = listMigrationDirs();
-    assert(migrations.length === 4, `expected exactly 4 migrations, got ${migrations.length}`);
+    assert(migrations.length === 5, `expected exactly 5 migrations, got ${migrations.length}`);
+    assert(migrations.includes('20261028040000_point8c_revenue_projection'), 'Point 8C migration must stay in the active chain');
     assert(
       !migrations.some((m) => /8b4|read.?cutover/i.test(m)),
       'no Point 8B-4 migration directory'

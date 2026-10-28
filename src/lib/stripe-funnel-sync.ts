@@ -1,5 +1,8 @@
+import { Prisma, PrismaClient } from '@prisma/client';
 import type Stripe from 'stripe';
 import { prisma } from '@/lib/prisma';
+
+type Db = Prisma.TransactionClient | PrismaClient;
 
 function isPaidSubscriptionStatus(status: Stripe.Subscription.Status) {
   return status === 'active' || status === 'trialing';
@@ -14,7 +17,7 @@ function isPaidSubscriptionStatus(status: Stripe.Subscription.Status) {
  *
  * No toca CrmLead, `LeadCapture.userId` ni asignación a CRM por email.
  */
-export async function syncPaidLeadCapturesForAdmin(subscription: Stripe.Subscription) {
+export async function syncPaidLeadCapturesForAdmin(subscription: Stripe.Subscription, db: Db = prisma) {
   if (!isPaidSubscriptionStatus(subscription.status)) {
     return;
   }
@@ -24,7 +27,7 @@ export async function syncPaidLeadCapturesForAdmin(subscription: Stripe.Subscrip
     return;
   }
 
-  const user = await prisma.user.findUnique({
+  const user = await db.user.findUnique({
     where: { id: userId },
     select: { email: true },
   });
@@ -40,7 +43,7 @@ export async function syncPaidLeadCapturesForAdmin(subscription: Stripe.Subscrip
 
   const now = new Date();
 
-  await prisma.$executeRaw`
+  await db.$executeRaw`
     UPDATE "LeadCapture"
     SET
       "paid" = true,

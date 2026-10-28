@@ -150,7 +150,8 @@ async function main() {
     pass('1 active migration SQL is minimal NOT NULL hardening');
 
     const migrations = listMigrationDirs();
-    assert(migrations.length === 4, `active prisma/migrations must be 4 including 8B-6 (got ${migrations.length})`);
+    assert(migrations.length === 5, `active prisma/migrations must be 5 including 8B-6 and 8C (got ${migrations.length})`);
+    assert(migrations.includes('20261028040000_point8c_revenue_projection'), 'Point 8C migration must stay in the active chain');
     assert(migrations.includes(ACTIVE_MIGRATION_NAME), '8B-6 migration must be active in prisma/migrations');
     pass('2 8B-6 migration activated in prisma/migrations');
 

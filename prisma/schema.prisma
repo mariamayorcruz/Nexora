@@ -108,6 +108,18 @@ model Subscription {
   cancelAtPeriodEnd Boolean      @default(false)
   stripeCustomerId  String?      @unique
   stripeSubId       String?      @unique
+  /// Raw Stripe status. Null means Point 8C has not projected this row.
+  stripeStatus         String?
+  /// Stripe Price.recurring.interval (day, week, month, year). Null if the price is incomplete.
+  billingInterval      String?
+  billingIntervalCount Int?
+  /// List price in Stripe minor units (unit_amount * quantity). Coupons are not applied.
+  recurringAmountMinor BigInt?
+  /// Uppercase ISO currency. Null if the price projection is incomplete.
+  currency             String?
+  stripePriceId        String?
+  /// Unix seconds of the last Stripe event applied to this row.
+  sourceEventCreated   Int?
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 }
@@ -180,8 +192,44 @@ model Invoice {
   paidAt             DateTime?
   hostedInvoiceUrl   String?
   invoicePdfUrl      String?
+  /// Stripe amount_paid in minor units. Null on rows written before Point 8C.
+  amountMinor        BigInt?
+  /// Unix seconds of the last Stripe event applied to this invoice.
+  sourceEventCreated Int?
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
+}
+
+/// Idempotency record for a Stripe webhook. The row commits only with its effects.
+model StripeWebhookEvent {
+  id            String    @id
+  type          String
+  livemode      Boolean
+  stripeCreated Int
+  status        String
+  processedAt   DateTime?
+  createdAt     DateTime  @default(now())
+}
+
+/// Paid or failed invoice seen before the local subscription exists. Promoted later.
+model PendingStripeInvoice {
+  stripeInvoiceId    String    @id
+  stripeCustomerId   String
+  amountMinor        BigInt
+  currency           String
+  status             String
+  description        String?
+  periodStart        DateTime
+  periodEnd          DateTime
+  dueDate            DateTime?
+  paidAt             DateTime?
+  hostedInvoiceUrl   String?
+  invoicePdfUrl      String?
+  sourceEventCreated Int
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([stripeCustomerId])
 }
 
 model CrmLead {

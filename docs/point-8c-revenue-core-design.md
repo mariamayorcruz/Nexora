@@ -1,192 +1,156 @@
-# Point 8C — Revenue Core: diseño para revisión
+# Point 8C — Revenue Core
 
-Este documento es una revisión de diseño. **No autoriza implementación, migración ni cambios de producción.**
+Este documento describe el comportamiento implementado en la rama de Point 8C y el despliegue que **aún no está autorizado**.
 
-Cada sección marca **Hecho** (lo que el código y los documentos del repositorio muestran hoy) o **Propuesta** (un orden posible para una revisión posterior). Las preguntas abiertas no tienen decisión de negocio.
+Point 8B-6 en producción sigue **COMPLETE**. Esta fase no lo repite, no usa `DATABASE_URL` de producción y no mueve la facturación a `Organization`.
 
-Base de trabajo: `main` `324e4e9b7f57f740a7869ff86d1006648b54b196`, más la corrección del validador 8B-1 en esta rama. No hay especificación previa de Point 8C en el repositorio. Los documentos 8B solo nombran «Point 8C / RLS / RBAC» como exclusión.
+## 1. Decisiones aprobadas
 
-## 1. Estado de Point 8B-6 y del validador 8B-1
+El usuario autorizó estas reglas. Ya no son preguntas abiertas.
 
-**Hecho.** Point 8B-6 en producción está **COMPLETE**.
+1. El MRR sale de la proyección local de suscripciones Stripe, no del catálogo (`29` / `79` / `199`) y no de `Analytics.revenue` ni de `CrmLead.value`.
+2. Un precio anual se divide entre 12. `interval_count` entra en el divisor: mes usa `interval_count`; año usa `12 * interval_count`.
+3. `trialing` no entra en el MRR. Solo `stripeStatus = active` con precio completo de mes o año.
+4. El ingreso cobrado es la suma de facturas `paid` con `amountMinor`. No es el MRR y no reemplaza a un campo `totalRevenue`.
+5. La facturación sigue por `User` en esta fase. `Subscription.userId` e `Invoice.userId` se conservan. No se añade `organizationId`.
+6. La idempotencia es persistente por `event.id`.
 
-- `prisma migrate deploy` registró `20261004120000_crmlead_organization_id_not_null`.
-- `CrmLead.organizationId` quedó `NOT NULL`. `userId` sigue presente y `NOT NULL`.
-- La FK `CrmLead_organizationId_fkey` sigue `ON DELETE RESTRICT`.
-- Siguen los índices `(organizationId, updatedAt)`, `(organizationId, stage)` y `(userId)`.
-- Antes del registro, la columna ya era `NOT NULL` y faltaba la fila de migración. El deploy autorizado repitió el `SET NOT NULL` versionado y Prisma escribió la fila. Las seis filas legacy documentadas no se modificaron.
+## 2. Proyección que escribe el webhook
 
-**Hecho.** El validador `tenancy:validate-point8b1` era incompatible con ese estado final: desplegaba la cadena completa, exigía `NOT NULL` y después insertaba un `CrmLead` sin `organizationId` esperando `NULL`.
+El webhook sigue verificando la firma sobre el cuerpo crudo (`request.text()` + `constructEvent`). Una firma inválida responde `400` y no inserta fila.
 
-**Hecho, en esta rama.** El validador ahora tiene dos fases sobre Postgres desechable:
+Después de la firma, `processStripeEvent` abre una transacción:
 
-1. Copia temporal de migraciones hasta Point 8B-1, sin `20261004120000_crmlead_organization_id_not_null`. Ahí se conservan la nulabilidad, la ausencia de backfill, la FK `RESTRICT` y el `ON DELETE CASCADE` de `userId`.
-2. Deploy de `prisma/migrations` real. Ahí `organizationId` debe ser `NOT NULL`, y fallan el insert sin organización y el `SET NULL`.
+1. `INSERT` de `StripeWebhookEvent` con `ON CONFLICT (id) DO NOTHING`.
+2. Si la fila ya estaba `processed`, responde duplicado y no reaplica.
+3. Si la fila existe en otro estado, lanza error. La petición responde `500` para que Stripe reintente. No se marca `processed`.
+4. Aplica el efecto y solo entonces pasa la fila a `processed`.
+5. Si el efecto falla, la transacción revierte el insert. El `event.id` puede reintentarse.
 
-La carpeta `prisma/migrations` y `prisma/schema.prisma` no se reescriben. No hay cambio de producto. La simulación `--before-point8b1` se mantiene.
+`checkout.session.completed` recupera la suscripción en Stripe antes de abrir la transacción. Si esa lectura falla, no hay fila de evento.
 
-## 2. Qué es Revenue Core hoy
+### Suscripción
 
-**Hecho.** No existe un módulo con ese nombre. El núcleo de ingresos de plataforma que sí está en el código es la suscripción de Nexora cobrada por Stripe y reflejada en tablas locales. Hay otras cifras monetarias que no son ese núcleo.
+Se guardan el status crudo de Stripe (`status` y `stripeStatus`), el ciclo, `interval_count`, la suma `unit_amount * quantity` en unidades menores, la moneda en mayúsculas y `event.created`.
 
-| Superficie | Qué representa | Límite de tenencia hoy |
-|---|---|---|
-| `Subscription` | Plan de la cuenta, 1:1 con `User` | `userId`. Sin `organizationId` |
-| `Invoice` | Factura Stripe copiada al usuario de la suscripción | `userId`. Sin `organizationId` |
-| `LeadCapture.paid` | Marca de funnel admin por email del pagador | Sin organización. No escribe `CrmLead` |
-| `PaymentSettings` | Secreto de webhook, PayPal, comisión y payout mínimo | Fila global, no por tenant |
-| `Analytics.revenue` | Ingreso atribuido a una campaña publicitaria | `Campaign` → `userId`. Sin `organizationId` |
-| `CrmLead.value` | Valor comercial del lead | El lead ya es de `organizationId`; el valor no es MRR |
+- Un price id del catálogo de `billing.ts` conserva su plan.
+- Un price id desconocido queda `unrecognized`. No se convierte en `starter` ni en 29.
+- Cupones y descuentos no se restan. El MRR usa el precio de lista.
+- Varios ítems se suman solo si comparten moneda, intervalo e `interval_count` y todos tienen `unit_amount` y `recurring`. Si no, el precio queda incompleto y no hay suma parcial.
+- `day` y `week` se almacenan y quedan fuera del MRR. No se inventa un divisor.
+- Si `metadata.userId` falta, la transacción falla y Stripe puede reintentar.
 
-Fuentes: `prisma/schema.prisma`, `src/lib/billing.ts`, `src/app/api/stripe/checkout/route.ts`, `src/app/api/stripe/webhook/route.ts`, `src/lib/stripe-funnel-sync.ts`, `src/app/api/billing/invoices/route.ts`, `src/app/api/admin/revenue/route.ts`, `src/app/admin/revenue/page.tsx`, `src/app/dashboard/billing/page.tsx`.
+### Factura
 
-## 3. Fuentes de verdad
+`amount_paid` se guarda como entero menor en `Invoice.amountMinor`. No se divide entre 100. El `Float` `amount` queda solo como espejo de compatibilidad y no es la fuente de los totales.
 
-**Hecho.**
+Si la factura llega antes de que exista la suscripción local del customer, se guarda en `PendingStripeInvoice`. Cuando llega la suscripción de ese customer, la misma transacción la promueve a `Invoice` con el `userId` y borra la pendiente. No se descarta en silencio.
 
-- El catálogo de planes vive en `src/lib/billing.ts`: `starter`, `professional`, `enterprise`, con precio mensual y anual en unidades mayores (`29` / `79` / `199` y `300` / `790` / `1990`) y price ids de Stripe por entorno, con defaults en código.
-- Checkout crea o reutiliza un customer de Stripe y hace `upsert` de `Subscription` por `userId`. El metadata de la sesión lleva `userId`, `plan` y `billingCycle`. Hay un price id fijo de fee de trial en `src/app/api/stripe/checkout/route.ts`.
-- El webhook verifica firma con `STRIPE_WEBHOOK_SECRET` o, si falta, con `PaymentSettings.stripeWebhookSecret`.
-- `syncSubscriptionRecord` exige `subscription.metadata.userId`. Si no está, no escribe. Mapea el price id al plan y, si no lo reconoce, guarda `starter`. Traduce `active` y `trialing` de Stripe al status local `active`. El resto de status de Stripe se copia tal cual.
-- `syncInvoiceRecord` busca `Subscription` por `stripeCustomerId`. Si no hay fila local, **no guarda la factura**. El `upsert` es por `stripeInvoiceId`.
-- `GET /api/admin/revenue` no llama a Stripe. Suma suscripciones locales con `status = 'active'` usando otro mapa de precios: `starter 29`, `professional 79`, `enterprise 199`, `scale 199`, `growth 79`. `arr` es `mrr * 12`. `totalRevenue` es el mismo MRR, no la suma de facturas. `churnRate` y `trialToPaid` están fijos en `0`.
-- La página admin dice que los datos se calculan desde Stripe. El route que consume no lo hace.
-- `GET /api/billing/invoices` lista hasta 50 facturas del `userId` del JWT. No lee el header de organización.
-- La página `/dashboard/billing` envía headers de tenant a `/api/users/me` y a `/api/billing/invoices`, pero el route de facturas ignora ese header.
-- `GET /api/admin/subscriptions` lista todas las suscripciones con email y nombre. Es global y de admin.
+### Orden y concurrencia
 
-**Propuesta, no decidida.** Tratar a Stripe como fuente de los importes cobrados y del ciclo, y a las tablas locales como proyección. El catálogo de `billing.ts` seguiría siendo la fuente de los planes que el producto ofrece, no del dinero ya cobrado. Hace falta una decisión explícita antes de cambiar el MRR admin.
+Cada evento de suscripción o factura toma `pg_advisory_xact_lock` dentro de la misma transacción, antes de leer la versión y antes de escribir. La clave del customer es `stripe-customer:{id}` y la del usuario es `stripe-user:{id}`. Se adquieren en orden lexicográfico. Como el prefijo del customer ordena antes que el del usuario, la factura puede bloquear primero el customer, descubrir el usuario y bloquearlo después sin invertir el orden. El lock cubre la suscripción, la factura, la pendiente y la promoción. Dos `event.id` distintos ya no pueden leer la misma versión y dejar que el evento viejo haga commit al final. Una colisión de `hashtext` solo añade espera; no pierde la actualización. El lock se suelta al commit o al rollback. No se llama a Stripe mientras el lock está tomado.
 
-## 4. Flujo de ingresos
+Una mutación cuyo `event.created` es estrictamente menor que `sourceEventCreated` no pisa la suscripción ni la factura. El evento igual queda `processed`: ignorarlo es el efecto.
 
-**Hecho.**
+### Empate de `event.created`
 
-1. El usuario autenticado pide checkout con plan y ciclo.
-2. Stripe cobra. El webhook recibe `checkout.session.completed`, `customer.subscription.created|updated|deleted` o `invoice.payment_succeeded|payment_failed|finalized`.
-3. La suscripción local se crea o se actualiza por `userId`.
-4. Si el status de Stripe es `active` o `trialing`, `syncPaidLeadCapturesForAdmin` marca `LeadCapture.paid = true` en filas cuyo email coincide con el del usuario, y escribe `convertedToPaidAt` solo si estaba vacío.
-5. `onPayingSubscriptionSynced` escribe `User.onboardingStartedAt` la primera vez que ve un status de pago.
-6. La factura local se escribe solo si ya existe una suscripción con ese customer.
+Un `event.created` igual no es más nuevo. `event.id` no se usa como orden: no es cronológico. El payload que llega después, dentro del mismo segundo, no se aplica.
 
-No hay tabla de eventos de Stripe. El route no guarda `event.id`.
+Si no hay una lectura canónica, la transacción lanza `StripeWebhookTieError` y revierte la fila del evento. Stripe puede reintentar. La ruta, ya fuera del lock, recupera la suscripción o la factura en Stripe y vuelve a procesar el mismo evento con ese objeto. Las pruebas pasan el objeto canónico en mock y no llaman a la red.
 
-## 5. Reconciliación e idempotencia
+Esa lectura es el estado actual de Stripe, no una prueba de cuál de los dos eventos ocurrió primero. Puede ser posterior a ambos. Se aplica solo si no retrocede un estado terminal o activo:
 
-**Hecho.**
+- Una factura `paid` no pasa a otro status.
+- Una suscripción `canceled` no pasa a otro status.
+- Una suscripción `active` no pasa a `trialing`, `incomplete` ni `incomplete_expired`.
 
-- Repetir un webhook de suscripción vuelve a hacer `upsert` por `userId`. No crea una segunda suscripción: `userId` es único.
-- Repetir un webhook de factura vuelve a hacer `upsert` por `stripeInvoiceId`.
-- `convertedToPaidAt` no se pisa gracias a `COALESCE`. `paid` pasa a `true` y el código actual no lo devuelve a `false` si la suscripción deja de estar pagada: la función sale antes.
-- Una factura que llega antes que la suscripción local se descarta.
-- Un price id desconocido se guarda como plan `starter` y el MRR admin le asigna 29 si el status local es `active`.
-- Una suscripción anual local sigue sumando el precio mensual del mapa admin, porque ese mapa no distingue ciclo. El modelo `Subscription` tampoco guarda el ciclo.
-- `trialing` de Stripe queda como `active` local, así que entra en el MRR admin igual que una suscripción cobrada.
-- `totalRevenue`, `churnRate` y `trialToPaid` no se reconcilian con facturas ni con bajas.
+Si el canónico retrocedería, no se escribe y el evento queda `processed`. Un `event.created` estrictamente mayor sí aplica, aunque el status parezca un retroceso: ese orden sí está observado. Sin lectura canónica no se afirma que el segundo evento sea más viejo ni más nuevo.
 
-**Propuesta, no decidida.** Una reconciliación mínima, antes de cualquier cambio de tenencia, sería de solo lectura y desechable:
+### MRR
 
-- contar suscripciones `active` cuyo plan no está en `billing.ts`;
-- contar facturas `paid` cuya suma no puede compararse con el MRR del catálogo, y mostrar por qué (ciclo ausente, `amount_paid` frente a precio de lista);
-- contar eventos de webhook que hoy se perderían si la suscripción aún no existe.
+| Condición | Tratamiento |
+|---|---|
+| `stripeStatus` nulo, o sin importe, ciclo, moneda o `interval_count` | Legacy o precio incompleto. No entra como 0 ni como precio de catálogo |
+| `trialing` | Excluido |
+| Otro status distinto de `active` | Excluido (`past_due`, `canceled`, `incomplete`, etc.) |
+| `active` con intervalo `day` o `week` | Excluido |
+| `active` mensual | `roundHalfUp(importe / interval_count)` |
+| `active` anual | `roundHalfUp(importe / (12 * interval_count))` |
 
-Eso no escribe producción. No está implementado en esta rama.
+El redondeo positivo es `(numerador + denominador / 2) / denominador` en enteros menores. Se redondea cada suscripción y después se suman esas filas. Dos anuales de 100 unidades menores dan MRR 8 + 8 = 16. Redondear la suma una sola vez daría `round(200 / 12) = 17`, y esa cifra no se usa. ARR es el mensual ya redondeado por 12, por moneda, así que puede diferir de la suma de los precios anuales de lista (en el ejemplo, ARR 192 frente a 200). Las monedas no se suman.
 
-## 6. Aislamiento `organizationId`
+El exponente sale de una tabla explícita. Un código de tres letras que no está en la tabla no se convierte. La fuente de exponente 0 y de las excepciones de cargo es https://docs.stripe.com/currencies, leída el 28 de octubre de 2026. La lista de tres decimales es la sección «Three-decimal currencies» de la misma guía archivada el 31 de diciembre de 2022 (https://web.archive.org/web/20221231002856/https://stripe.com/docs/currencies): BHD, JOD, KWD, OMR y TND. El importe es milésimas. Stripe pedía que el último dígito fuera 0 en PaymentIntents, reembolsos y disputas. Aquí no se re-redondea el entero guardado. La exportación markdown actual de la guía ya no imprime esa sección; por eso estos cinco códigos no caen en el exponente 2. El artículo https://support.stripe.com/questions/which-payments-methods-and-products-are-available-in-the-uae habla de monedas de tres decimales para cuentas de EAU; su cuerpo renderizado no estuvo disponible como texto en esta revisión.
 
-**Hecho.** El corte de lectura y escritura por `organizationId` existe en CRM (`CrmLead`). No existe en `Subscription`, `Invoice`, `PaymentSettings` ni `LeadCapture`. La membresía y la organización existen desde Point 7 / 8B, y el CRM ya exige `organizationId` no nulo.
+- Exponente 0: BIF, CLP, DJF, GNF, JPY, KMF, KRW, MGA, PYG, RWF, VND, VUV, XAF, XOF, XPF.
+- Exponente 2: ISK y UGX, aunque Stripe los mencione junto a las monedas sin decimales. El cargo sigue siendo un entero de dos decimales con fracción `00`. HUF y TWD se cobran con dos decimales; el caso especial de payout no se usa para facturas ni suscripciones. El resto del exponente 2 son monedas de presentment nombradas en la guía actual o en la de 2022 y que no están en las listas de cero o tres decimales.
+- Exponente 3: BHD, JOD, KWD, OMR, TND.
+- Cualquier otro código, incluido `ZZZ`, tiene exponente `null` y no se divide.
 
-La UI de billing ya tiene organización seleccionada. La API de facturas sigue autorizando solo al usuario del JWT.
+El cobrado mensual usa `paidAt`, en UTC, con el intervalo `[inicio de mes, inicio del mes siguiente)`. `createdAt` local no decide el mes. Una factura creada el mes anterior y pagada ahora entra en el mes de `paidAt`. Un replay tardío permanece en el mes en que se pagó. Un `paidAt` futuro no entra en el mes actual; en la serie mensual queda en su propio mes. Si `paidAt` es nulo, el cobrado de todo el periodo sí puede incluir el importe, pero el mes queda en `monthlyPaidAtUnknownCount` y la UI dice «No calculado». No se inventa la fecha.
 
-**Propuesta, no decidida.** No añadir `organizationId` a tablas de ingreso en el primer corte de 8C. El modelo actual es una suscripción por usuario, no por organización. Copiar el patrón de `CrmLead` implicaría elegir si el pagador es el usuario o la organización, qué pasa con varias membresías y si una factura histórica sin organización puede volverse `NOT NULL`. Esas decisiones no están en el repositorio.
+Churn y trial a pago no se calculan. La API devuelve `null` y la UI dice «No calculado».
 
-## 7. Contratos y datos monetarios
+## 3. Contrato de lectura
 
-**Hecho.**
+`GET /api/admin/revenue` exige admin. Devuelve `mrrByCurrency`, `arrByCurrency`, `collectedByCurrency`, conteos de exclusión, facturas pendientes y facturas legacy sin `amountMinor`. No devuelve un MRR escalar ni un `totalRevenue` igual al MRR.
 
-- `Invoice.amount`, `Analytics.revenue`, `Analytics.spend`, `CrmLead.value`, `Campaign.budget`, `PaymentSettings.commissionRate` y `PaymentSettings.minimumPayout` son `Float`.
-- El webhook guarda `invoice.amount_paid / 100`. No guarda `amount_due`, descuentos ni el fee de trial como línea propia.
-- La moneda de la factura pasa a mayúsculas. El default del esquema es `USD`.
-- Los precios de lista y el MRR admin están en unidades mayores, no en centavos.
-- No hay un tipo dinero compartido ni redondeo explícito.
+`GET /api/admin/stats` y la analítica dejan de sumar el `Float` entre monedas. Un desglose por plan o por fuente solo aparece cuando todas las facturas pagadas comparten moneda y tienen `amountMinor`. Si no, el ingreso por lead y el desglose no se presentan como cero.
 
-**Propuesta, no decidida.** No cambiar `Float` a entero en esta fase de diseño. Si más adelante se aprueba, sería una migración propia, con backfill revisado y sin mezclarla con tenencia.
+`GET /api/billing/invoices` sigue filtrando por el `userId` del JWT. Devuelve `amountMinor` como string. La página de billing usa ese entero y el exponente. Una factura vieja sin `amountMinor` se muestra como histórica, no como cifra verificada.
 
-## 8. Alcance y exclusiones
+## 4. Migración
 
-**Propuesta de alcance para una implementación futura, sujeta a aprobación.** Reconciliar la proyección local de suscripción y factura con Stripe, y hacer que las cifras admin dejen de contradecir el catálogo, sin mover el límite de tenant.
+Solo se añade `prisma/migrations/20261028040000_point8c_revenue_projection`.
 
-**Hecho como exclusiones ya escritas en 8B, y que este diseño mantiene.**
+- Columnas nuevas de `Subscription` e `Invoice`, todas nulables.
+- Tablas `StripeWebhookEvent` y `PendingStripeInvoice`.
+- No altera `CrmLead`, no añade `organizationId` y no edita migraciones históricas.
 
-- RLS y políticas de Supabase. Siguen fuera de Prisma. Ver `docs/database/fr-004-migration-integrity-runbook.md`.
-- RBAC granular. Point 30. El comentario de `resolve-crm-write-organization.ts` lo deja así.
-- Borrar `userId`.
-- Migrar `Campaign`, `LeadCapture`, `AdAccount` o `TenantAutomationConfig` a `organizationId`.
-- Renombrar Company / Contact, conversaciones, Point 9 o Cleaning Pack.
+Los validadores de tenencia esperan la cadena de cinco migraciones activas. La fase histórica de 8B-1 sigue copiando solo baseline, Slice 0 y 8B-1.
 
-**Propuesta de exclusión adicional hasta una decisión aparte.**
+### Preflight antes de un deploy de producción
 
-- No tratar `Analytics.revenue` ni `CrmLead.value` como MRR.
-- No cambiar el match por email de `LeadCapture.paid`.
-- No desplegar nada a producción dentro de 8C-diseño.
+Este preflight no se ejecutó contra producción. Hace falta una autorización aparte.
 
-## 9. Secuencia incremental
+1. Confirmar que el único pendiente es `20261028040000_point8c_revenue_projection`.
+2. Confirmar que no hay migraciones fallidas ni filas legacy reescritas.
+3. Leer, sin escribir, cuántas filas hay en `Subscription` e `Invoice`.
+4. Confirmar que las columnas y tablas nuevas todavía no existen.
+5. No usar `db push`, `migrate dev`, `migrate resolve` ni SQL manual.
 
-**Propuesta.** Cada paso necesita su propia autorización. Esta rama solo entrega el paso 0.
+### Rollout
 
-| Paso | Contenido | Escritura |
-|---|---|---|
-| 0 | Este diseño y la corrección del validador 8B-1 | Ninguna en producción |
-| 1 | Inventario de solo lectura de las contradicciones de la sección 5, en Postgres desechable | No |
-| 2 | Definir, por escrito, la fórmula de MRR/ARR y si `trialing` cuenta | No |
-| 3 | Si se aprueba, ajustar la lectura admin para usar esa fórmula sin nueva tabla | Código de lectura, sin DDL |
-| 4 | Si se aprueba, guardar `event.id` o dejar de descartar facturas que llegan antes de la suscripción | Migración nueva y autorizada aparte |
-| 5 | Tenencia de ingresos por organización, solo si la decisión abierta 6 tiene respuesta | Fuera de este diseño hasta una revisión nueva |
+1. `npx prisma migrate deploy` de esta migración aditiva.
+2. Desplegar la aplicación que lee las columnas nuevas.
+3. Los eventos nuevos de Stripe rellenan la proyección. Las filas viejas siguen fuera del MRR hasta que llegue un evento.
 
-## 10. Riesgos y decisiones abiertas
+### Rollback
 
-**Hecho, riesgos visibles en el código actual.**
+No se edita esta migración ni `_prisma_migrations` a mano.
 
-- El MRR admin puede contar un trial como ingreso de lista mensual.
-- Una suscripción anual se valora como un mes.
-- `totalRevenue` no es dinero cobrado.
-- Una factura temprana se pierde.
-- Dos mapas de nombres de plan (`professional` en billing, `growth` / `scale` en el route admin) no coinciden con el comentario del esquema (`pro`).
-- El webhook puede leer el secreto desde la base si falta la variable de entorno.
-- Marcar `LeadCapture.paid` por email puede tocar varias capturas del mismo email.
+- La aplicación anterior tolera columnas y tablas extra porque no las lee.
+- Quitar el esquema, si hiciera falta, sería otra migración nueva que borra las tablas y columnas añadidas.
+- Revertir la aplicación antes de esa migración de rollback deja de escribir la proyección, pero no recupera el MRR de catálogo: ese cálculo ya no está en esta rama.
 
-**Decisiones abiertas. No resueltas aquí.**
+## 5. Prueba local
 
-1. ¿El MRR sale del catálogo, de los ítems de Stripe o de las facturas pagadas?
-2. ¿`trialing` cuenta como MRR?
-3. ¿El ciclo anual debe guardarse en `Subscription`?
-4. ¿La factura que llega antes que la suscripción se reintenta, se encola o se sigue descartando?
-5. ¿Hace falta idempotencia por `event.id`, o basta el `upsert` actual?
-6. ¿El ingreso de plataforma sigue siendo del `User` o pasa a `Organization`?
-7. ¿`LeadCapture.paid` entra en Revenue Core o se queda en el funnel admin?
-8. ¿Los importes pasan a unidades menores enteras o se documenta el `Float` actual como contrato?
+`npm run tenancy:validate-point8c` exige `FR004_DATABASE_URL` de un Postgres desechable. No acepta `DATABASE_URL` como respaldo. Rechaza hosts alojados. No llama a la red de Stripe: la firma de prueba usa `generateTestHeaderString` con un secreto local.
 
-## 11. Criterios de aceptación propuestos
+Cubre mensual, anual, `interval_count`, redondeo por fila, JPY, BHD/JOD/KWD/OMR/TND, moneda desconocida, monedas separadas, trial, `past_due`, semana, precio desconocido, fila legacy, duplicado del mismo `event.id`, dos eventos distintos con barrera de lock, factura y suscripción solapadas en los dos órdenes, reintento tras un usuario ausente, factura temprana, evento viejo, empate del mismo segundo sin canónico y con mock canónico, factura `paid` que no regresa, evento atascado en `processing`, `paidAt` de otro mes, futuro y nulo, `amount_paid` no entero, checkout sin suscripción recuperada, firma inválida, auth de admin y aislamiento por `userId`.
 
-Para una implementación futura, no para esta rama:
+## 6. Limitaciones
 
-- Ningún route de lectura de ingresos usa el secreto de producción en pruebas.
-- El MRR admin usa una fórmula escrita y unos fixtures desechables que cubren mensual, anual, trial y plan desconocido.
-- Repetir el mismo webhook de suscripción y de factura no duplica filas.
-- Una factura sin suscripción local tiene un comportamiento definido y probado.
-- `userId` de `Subscription` e `Invoice` sigue presente.
-- No aparece RLS ni RBAC de Point 30.
-- `npx prisma validate`, `npx tsc --noEmit` y los validadores de tenencia ya verdes siguen verdes.
-- Cualquier DDL nuevo tiene migración versionada, validador desechable y autorización de producción separada.
-
-## 12. Plan de pruebas y migración
-
-**Hecho en esta rama.** No hay migración 8C. Las pruebas son las del validador 8B-1 corregido, `tenancy:validate-point8b6` y las regresiones de tenencia ya existentes, contra Postgres local. `DATABASE_URL` de producción no entra en ese proceso.
-
-**Propuesta.** Si un paso futuro añade columnas o una tabla de eventos:
-
-- migración nueva bajo `prisma/migrations`, sin editar las cuatro actuales;
-- validador desechable que rehúsa hosts alojados;
-- `prisma migrate deploy` de producción solo con autorización explícita, después de un preflight de solo lectura;
-- prohibido `db push`, `migrate dev` contra producción y SQL manual.
-
-No hay CI en `.github/`. Los validadores se ejecutan a mano con `FR004_DATABASE_URL` local.
+- No hay conciliación en vivo con Stripe ni backfill de filas viejas. Una suscripción anterior a esta proyección no tiene MRR verificable.
+- Una factura vieja con solo `amount` Float no entra en el cobrado.
+- Los cupones no bajan el MRR.
+- `day` y `week` no tienen fórmula de MRR.
+- Churn y conversión de trial no están calculados.
+- El corte de mes del cobrado admin es UTC y usa `paidAt`. Sin `paidAt` el mes no se calcula.
+- Dos eventos con el mismo `event.created` no se ordenan por `event.id` ni por el orden de llegada. Sin una lectura canónica de Stripe no se elige un ganador. La lectura canónica es el estado actual, no la reconstrucción del segundo empatado, y no deshace `paid`, `canceled` ni un `active` que volvería a `trialing` o `incomplete`.
+- El MRR anual se redondea por suscripción. ARR = suma de esos mensuales × 12. No es la suma de los precios anuales.
+- BHD, JOD, KWD, OMR y TND se muestran con tres decimales. No se fuerza el último dígito a 0. Una moneda ausente de la tabla no se divide.
+- La serialización es por customer y usuario mediante advisory lock de la transacción. No es aislamiento serializable de toda la base.
+- `sourceEventCreated` es un entero de 32 bits.
+- El ingreso sigue siendo del usuario, no de la organización.
+- RLS, RBAC y el CRM no cambian.
+- El deploy de producción de esta migración no está autorizado.

@@ -6,8 +6,9 @@ import {
   buildAutomationPlays,
   buildEmailCenterSummary,
   calculateHealthScore,
-  calculateMrr,
 } from '@/lib/admin-ops';
+import { divRoundHalfUp, minorToString } from '@/lib/billing/money';
+import { collectedForUser, collectedScope, summarizePlatformRevenue } from '@/lib/billing/revenue-metrics';
 import { CRM_ALLOWED_STAGES } from '@/lib/sales-playbook';
 
 export const dynamic = 'force-dynamic';
@@ -91,6 +92,11 @@ export async function GET(request: NextRequest) {
           userId: true,
           plan: true,
           status: true,
+          stripeStatus: true,
+          billingInterval: true,
+          billingIntervalCount: true,
+          recurringAmountMinor: true,
+          currency: true,
           currentPeriodStart: true,
           currentPeriodEnd: true,
           cancelAtPeriodEnd: true,
@@ -100,7 +106,16 @@ export async function GET(request: NextRequest) {
       }),
       prisma.invoice.findMany({
         orderBy: { createdAt: 'desc' },
-        select: { id: true, userId: true, amount: true, status: true, createdAt: true },
+        select: {
+          id: true,
+          userId: true,
+          amount: true,
+          amountMinor: true,
+          currency: true,
+          status: true,
+          createdAt: true,
+          paidAt: true,
+        },
       }),
     ]);
     const [campaigns, paymentSettings] = await Promise.all([
@@ -199,17 +214,12 @@ export async function GET(request: NextRequest) {
       }),
     ]);
     const activeSubscriptions = subscriptions.filter((subscription) => subscription.status === 'active').length;
-    const totalRevenue = invoices
-      .filter((invoice) => invoice.status === 'paid')
-      .reduce((sum, invoice) => sum + invoice.amount, 0);
-
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-
-    const monthlyRevenue = invoices
-      .filter((invoice) => invoice.status === 'paid' && invoice.createdAt >= startOfMonth)
-      .reduce((sum, invoice) => sum + invoice.amount, 0);
+    const pendingInvoiceCount = await prisma.pendingStripeInvoice.count();
+    const revenueSnapshot = summarizePlatformRevenue({
+      subscriptions,
+      invoices,
+      pendingInvoiceCount,
+    });
 
     const paymentReady = Boolean(
       process.env.STRIPE_SECRET_KEY &&
@@ -472,12 +482,13 @@ export async function GET(request: NextRequest) {
       if (!ek) continue;
       userIdByEmailLower.set(ek, u.id);
     }
-    const revenueByUserId = new Map<string, number>();
+    const invoicesByUserId = new Map<string, typeof invoices>();
     for (const inv of invoices) {
-      if (inv.status === 'paid') {
-        revenueByUserId.set(inv.userId, (revenueByUserId.get(inv.userId) || 0) + inv.amount);
-      }
+      const list = invoicesByUserId.get(inv.userId) ?? [];
+      list.push(inv);
+      invoicesByUserId.set(inv.userId, list);
     }
+    const collected = collectedScope(invoices);
 
     const uniqueLeadEmails = new Set<string>();
     for (const capture of allCapturesForBusiness) {
@@ -495,27 +506,40 @@ export async function GET(request: NextRequest) {
         ? Math.round((wonLeadEmails.size / uniqueLeadEmails.size) * 1e6) / 1e6
         : 0;
     const revenuePerLead =
-      leadCaptureTotal > 0 ? Math.round((totalRevenue / leadCaptureTotal) * 100) / 100 : 0;
+      collected.status === 'ok' && collected.currency && leadCaptureTotal > 0
+        ? {
+            amountMinor: minorToString(divRoundHalfUp(collected.totalMinor, BigInt(leadCaptureTotal))),
+            currency: collected.currency,
+            exponent: collected.exponent,
+          }
+        : null;
 
-    /** Ingresos facturados (paid) por plan de suscripción actual del usuario. */
-    const revenueByPlanAgg = new Map<string, { plan: string; totalRevenue: number; count: number }>();
-    for (const u of users) {
-      const rev = revenueByUserId.get(u.id) ?? 0;
-      if (rev <= 0) continue;
-      const sub = subscriptions.find((s) => s.userId === u.id);
-      const plan = (sub?.plan && String(sub.plan).trim()) || 'unknown';
-      const cur = revenueByPlanAgg.get(plan) ?? { plan, totalRevenue: 0, count: 0 };
-      cur.totalRevenue += rev;
-      cur.count += 1;
-      revenueByPlanAgg.set(plan, cur);
+    /** Ingresos facturados (paid) por plan. Solo si todas las facturas pagadas comparten moneda y amountMinor. */
+    const revenueByPlanAgg = new Map<string, { plan: string; amountMinor: bigint; count: number }>();
+    if (collected.status === 'ok' && collected.currency) {
+      for (const [userId, amountMinor] of collected.byUserId) {
+        const sub = subscriptions.find((s) => s.userId === userId);
+        const plan = (sub?.plan && String(sub.plan).trim()) || 'unknown';
+        const cur = revenueByPlanAgg.get(plan) ?? { plan, amountMinor: 0n, count: 0 };
+        cur.amountMinor += amountMinor;
+        cur.count += 1;
+        revenueByPlanAgg.set(plan, cur);
+      }
     }
     const revenueByPlan = [...revenueByPlanAgg.values()]
       .map((row) => ({
         plan: row.plan,
-        totalRevenue: Math.round(row.totalRevenue * 100) / 100,
+        amountMinor: minorToString(row.amountMinor),
+        currency: collected.currency,
+        exponent: collected.exponent,
         count: row.count,
       }))
-      .sort((a, b) => b.totalRevenue - a.totalRevenue);
+      .sort((a, b) => {
+        const left = BigInt(a.amountMinor);
+        const right = BigInt(b.amountMinor);
+        if (left === right) return 0;
+        return left < right ? 1 : -1;
+      });
 
     /** Primera captura por email (createdAt asc) → bucket UTM para atribución de ingresos (solo métrica). */
     const firstTouchBucketByEmail = new Map<string, string>();
@@ -531,14 +555,14 @@ export async function GET(request: NextRequest) {
 
     const sourceMetrics = new Map<
       string,
-      { source: string; campaign: string; leads: Set<string>; conversions: Set<string>; revenue: number }
+      { source: string; campaign: string; leads: Set<string>; conversions: Set<string>; amountMinor: bigint }
     >();
     const touchKey = (source: string, campaign: string) => `${source}\t${campaign}`;
     const ensureBucket = (source: string, campaign: string) => {
       const k = touchKey(source, campaign);
       let b = sourceMetrics.get(k);
       if (!b) {
-        b = { source, campaign, leads: new Set(), conversions: new Set(), revenue: 0 };
+        b = { source, campaign, leads: new Set(), conversions: new Set(), amountMinor: 0n };
         sourceMetrics.set(k, b);
       }
       return b;
@@ -555,28 +579,40 @@ export async function GET(request: NextRequest) {
       if (funnelClosedEmails.has(ek)) b.conversions.add(ek);
     }
 
-    for (const u of users) {
-      const rev = revenueByUserId.get(u.id) ?? 0;
-      if (rev <= 0) continue;
-      const ek = safeNormEmail(u.email);
-      if (!ek) continue;
-      const k = firstTouchBucketByEmail.get(ek) ?? touchKey('(none)', '(none)');
-      const b = sourceMetrics.get(k) ?? ensureBucket('(none)', '(none)');
-      b.revenue += rev;
+    if (collected.status === 'ok') {
+      for (const u of users) {
+        const rev = collected.byUserId.get(u.id);
+        if (rev == null) continue;
+        const ek = safeNormEmail(u.email);
+        if (!ek) continue;
+        const k = firstTouchBucketByEmail.get(ek) ?? touchKey('(none)', '(none)');
+        const b = sourceMetrics.get(k) ?? ensureBucket('(none)', '(none)');
+        b.amountMinor += rev;
+      }
     }
 
     const revenueBySource = [...sourceMetrics.values()]
       .map((b) => ({
         source: b.source,
         campaign: b.campaign,
-        revenue: Math.round(b.revenue * 100) / 100,
+        amountMinor: collected.status === 'ok' ? minorToString(b.amountMinor) : null,
+        currency: collected.status === 'ok' ? collected.currency : null,
+        exponent: collected.status === 'ok' ? collected.exponent : null,
         leads: b.leads.size,
         conversions: b.conversions.size,
       }))
-      .sort((a, b) => b.revenue - a.revenue || b.leads - a.leads);
+      .sort((a, b) => {
+        if (a.amountMinor != null && b.amountMinor != null) {
+          const left = BigInt(a.amountMinor);
+          const right = BigInt(b.amountMinor);
+          if (left !== right) return left < right ? 1 : -1;
+        }
+        return b.leads - a.leads;
+      });
 
     const business = {
       conversionRate,
+      collectedStatus: collected.status,
       revenuePerLead,
       revenueByPlan,
       revenueBySource,
@@ -629,7 +665,15 @@ export async function GET(request: NextRequest) {
       const resolvedStage = paidEffective ? 'won' : baseStage;
 
       const uid = em ? userIdByEmailLower.get(em) : undefined;
-      const revenue = uid != null ? revenueByUserId.get(uid) ?? 0 : 0;
+      const userCollected = uid ? collectedForUser(invoicesByUserId.get(uid) ?? []) : { status: 'none' as const };
+      const revenue =
+        userCollected.status === 'verified'
+          ? {
+              amountMinor: minorToString(userCollected.amountMinor),
+              currency: userCollected.currency,
+              exponent: userCollected.exponent,
+            }
+          : null;
 
       return {
         id: capture.id,
@@ -678,13 +722,35 @@ export async function GET(request: NextRequest) {
       stats: {
         totalUsers: users.length,
         activeSubscriptions,
-        totalRevenue,
-        monthlyRevenue,
+        totalRevenue: null,
+        monthlyRevenue: null,
+        mrr: null,
+        churnRate: null,
+        trialToPaid: null,
+        mrrByCurrency: revenueSnapshot.mrrByCurrency,
+        arrByCurrency: revenueSnapshot.arrByCurrency,
+        collectedByCurrency: revenueSnapshot.collectedByCurrency,
+        monthlyCollectedByCurrency: revenueSnapshot.monthlyCollectedByCurrency,
+        excludedFromMrr: revenueSnapshot.excludedFromMrr,
+        legacyInvoiceCount: revenueSnapshot.legacyInvoiceCount,
+        monthlyLegacyInvoiceCount: revenueSnapshot.monthlyLegacyInvoiceCount,
+        monthlyPaidAtUnknownCount: revenueSnapshot.monthlyPaidAtUnknownCount,
+        pendingInvoiceCount: revenueSnapshot.pendingInvoiceCount,
         totalCampaigns: campaigns.length,
         activeCampaigns: campaigns.filter((campaign) => campaign.status === 'active').length,
         recentUsers: users.slice(0, 5),
-        recentPayments: invoices.filter((invoice) => invoice.status === 'paid').slice(0, 5),
-        mrr: calculateMrr(subscriptions),
+        recentPayments: invoices
+          .filter((invoice) => invoice.status === 'paid')
+          .slice(0, 5)
+          .map((invoice) => ({
+            id: invoice.id,
+            userId: invoice.userId,
+            status: invoice.status,
+            createdAt: invoice.createdAt,
+            currency: invoice.currency,
+            amount: invoice.amountMinor == null ? invoice.amount : null,
+            amountMinor: invoice.amountMinor == null ? null : invoice.amountMinor.toString(),
+          })),
         healthScore,
         alerts,
         automationPlays,

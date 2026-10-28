@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { collectedRevenueByMonth, summarizePlatformRevenue } from '@/lib/billing/revenue-metrics';
 import { prisma } from '@/lib/prisma';
 import { verifyAdmin } from '@/lib/admin';
 
@@ -9,16 +10,11 @@ export async function GET(request: NextRequest) {
   if (adminCheck instanceof NextResponse) return adminCheck;
 
   try {
-    // Get total revenue
-    const totalRevenueResult = await prisma.invoice.aggregate({
-      _sum: {
-        amount: true,
-      },
-      where: {
-        status: 'paid',
-      },
+    const paidInvoices = await prisma.invoice.findMany({
+      where: { status: 'paid' },
+      select: { userId: true, status: true, amountMinor: true, currency: true, createdAt: true, paidAt: true },
     });
-    const totalRevenue = totalRevenueResult._sum.amount || 0;
+    const revenue = summarizePlatformRevenue({ subscriptions: [], invoices: paidInvoices });
 
     // Get total users
     const totalUsers = await prisma.user.count();
@@ -33,17 +29,7 @@ export async function GET(request: NextRequest) {
     // Get total campaigns
     const totalCampaigns = await prisma.campaign.count();
 
-    // Get revenue by month (last 12 months)
-    const revenueByMonth = await prisma.$queryRaw`
-      SELECT
-        DATE_TRUNC('month', "createdAt") as month,
-        SUM(amount) as revenue
-      FROM "Invoice"
-      WHERE "status" = 'paid'
-        AND "createdAt" >= NOW() - INTERVAL '12 months'
-      GROUP BY DATE_TRUNC('month', "createdAt")
-      ORDER BY month
-    `;
+    const revenueByMonth = collectedRevenueByMonth(paidInvoices);
 
     // Get users by month (last 12 months)
     const usersByMonth = await prisma.$queryRaw`
@@ -113,7 +99,9 @@ export async function GET(request: NextRequest) {
     }));
 
     return NextResponse.json({
-      totalRevenue,
+      totalRevenue: null,
+      collectedByCurrency: revenue.collectedByCurrency,
+      legacyPaidInvoiceCount: revenue.legacyInvoiceCount,
       totalUsers,
       activeSubscriptions,
       totalCampaigns,

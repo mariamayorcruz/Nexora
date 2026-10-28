@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const invoices = await prisma.invoice.findMany({
+    const rows = await prisma.invoice.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
       take: 50,
@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
         createdAt: true,
         paidAt: true,
         amount: true,
+        amountMinor: true,
         currency: true,
         status: true,
         description: true,
@@ -27,6 +28,12 @@ export async function GET(request: NextRequest) {
         invoicePdfUrl: true,
       },
     });
+
+    const invoices = rows.map((row) => ({
+      ...row,
+      amount: row.amountMinor == null ? row.amount : null,
+      amountMinor: row.amountMinor == null ? null : row.amountMinor.toString(),
+    }));
 
     return NextResponse.json({ invoices });
   } catch (error) {

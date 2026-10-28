@@ -97,7 +97,8 @@ async function main() {
     pass('1 schema organizationId NOT NULL after 8B-6 (part A)');
 
     const migrations = listMigrationDirs();
-    assert(migrations.length === 4, `expected exactly 4 migrations, got ${migrations.length}`);
+    assert(migrations.length === 5, `expected exactly 5 migrations, got ${migrations.length}`);
+    assert(migrations.includes('20261028040000_point8c_revenue_projection'), 'Point 8C migration must stay in the active chain');
     assert(!migrations.some((m) => /8b.?5c|tenant.?selection/i.test(m)), 'no 8B-5C migration');
     assert(migrations.includes('20261004120000_crmlead_organization_id_not_null'), '8B-6 migration required');
     pass('1 no 8B-5C migration directory (8B-6 present)');

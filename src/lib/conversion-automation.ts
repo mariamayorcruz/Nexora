@@ -1,5 +1,8 @@
+import { Prisma, PrismaClient } from '@prisma/client';
 import type Stripe from 'stripe';
 import { prisma } from '@/lib/prisma';
+
+type Db = Prisma.TransactionClient | PrismaClient;
 
 /** Alineado con embudo admin / Stripe: suscripción que cuenta como “pagando”. */
 export function isPayingSubscriptionDbStatus(status: string | null | undefined): boolean {
@@ -49,19 +52,21 @@ export async function shouldExcludeRecipientFromSalesFollowup(email: string): Pr
 export async function onPayingSubscriptionSynced(args: {
   userId: string;
   stripeSubscriptionStatus: Stripe.Subscription.Status;
+  db?: Db;
 }): Promise<void> {
+  const db = args.db ?? prisma;
   if (!isPaidStripeSubscriptionStatus(args.stripeSubscriptionStatus)) {
     return;
   }
 
-  const user = await prisma.user.findUnique({
+  const user = await db.user.findUnique({
     where: { id: args.userId },
     select: { id: true, email: true, onboardingStartedAt: true },
   });
   if (!user?.email) return;
 
   if (!user.onboardingStartedAt) {
-    await prisma.user.update({
+    await db.user.update({
       where: { id: user.id },
       data: { onboardingStartedAt: new Date() },
     });
@@ -72,7 +77,7 @@ export async function onPayingSubscriptionSynced(args: {
     });
   }
 
-  await prisma.leadCapture.updateMany({
+  await db.leadCapture.updateMany({
     where: { email: { equals: user.email, mode: 'insensitive' } },
     data: { needsSalesFollowup: false },
   });

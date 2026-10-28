@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { AlertCircle, BarChart3, Command, Rocket, TrendingUp, Zap } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { formatMinorUnits, formatMoneyLines } from '@/lib/billing/money';
 
 type AdminAlert = {
   id: string;
@@ -13,11 +14,26 @@ type AdminAlert = {
   actionHref?: string;
 };
 
+type MoneyAmount = {
+  amountMinor: string;
+  currency: string;
+  exponent: number | null;
+};
+
 type BusinessMetrics = {
   conversionRate: number;
-  revenuePerLead: number;
-  revenueByPlan: Array<{ plan: string; totalRevenue: number; count: number }>;
-  revenueBySource: Array<{ source: string; campaign: string; revenue: number; leads: number; conversions: number }>;
+  collectedStatus?: string;
+  revenuePerLead: MoneyAmount | null;
+  revenueByPlan: Array<MoneyAmount & { plan: string; count: number }>;
+  revenueBySource: Array<{
+    source: string;
+    campaign: string;
+    amountMinor: string | null;
+    currency: string | null;
+    exponent: number | null;
+    leads: number;
+    conversions: number;
+  }>;
 };
 
 type ConversionAutomationStats = {
@@ -35,9 +51,21 @@ type ConversionAutomationStats = {
 };
 
 type AdminStats = {
-  totalRevenue: number;
-  monthlyRevenue: number;
-  mrr: number;
+  totalRevenue: null;
+  monthlyRevenue: null;
+  mrr: null;
+  mrrByCurrency?: Array<MoneyAmount & { count: number }>;
+  monthlyCollectedByCurrency?: Array<MoneyAmount & { count: number }>;
+  excludedFromMrr?: {
+    legacyUnverified: number;
+    trialing: number;
+    nonActive: number;
+    incompletePrice: number;
+    unsupportedInterval: number;
+  };
+  legacyInvoiceCount?: number;
+  monthlyLegacyInvoiceCount?: number;
+  monthlyPaidAtUnknownCount?: number;
   alerts: AdminAlert[];
   recentUsers: Array<{ id: string; email: string; name?: string | null; createdAt: string }>;
   business?: BusinessMetrics;
@@ -62,7 +90,7 @@ type AdminStats = {
       convertedToPaidAt?: string | null;
       plan?: string | null;
       subscriptionStatus?: string | null;
-      revenue?: number;
+      revenue?: MoneyAmount | null;
       attribution?: FunnelAttribution | null;
     }>;
   };
@@ -106,16 +134,19 @@ function formatAttributionOneLine(a: FunnelAttribution | null | undefined) {
   return '—';
 }
 
-const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
-
 function formatConversionRate(rate: number | undefined) {
   if (rate == null || Number.isNaN(rate)) return '—';
   return `${(rate * 100).toFixed(1)}%`;
 }
 
-function formatRevenuePerLead(value: number | undefined) {
-  if (value == null || Number.isNaN(value)) return '—';
-  return usd.format(value);
+function formatRevenuePerLead(value: MoneyAmount | null | undefined) {
+  if (!value) return 'No calculado';
+  return formatMinorUnits(value.amountMinor, value.currency, value.exponent);
+}
+
+function formatOptionalMoney(amountMinor: string | null | undefined, currency: string | null | undefined, exponent: number | null | undefined) {
+  if (amountMinor == null || !currency) return 'No calculado';
+  return formatMinorUnits(amountMinor, currency, exponent ?? null);
 }
 
 function formatAdminShortDate(iso: string | null | undefined) {
@@ -237,7 +268,9 @@ export default function AdminOperacionPage() {
                   <p className="mt-1 truncate text-lg font-bold capitalize text-white" title={topPlan.plan}>
                     {topPlan.plan}
                   </p>
-                  <p className="mt-1 text-2xl font-semibold text-cyan-400">{usd.format(topPlan.totalRevenue)}</p>
+                  <p className="mt-1 text-2xl font-semibold text-cyan-400">
+                    {formatOptionalMoney(topPlan.amountMinor, topPlan.currency, topPlan.exponent)}
+                  </p>
                   <p className="mt-1 text-xs text-slate-500">{topPlan.count} cliente{topPlan.count !== 1 ? 's' : ''}</p>
                 </>
               ) : (
@@ -257,7 +290,9 @@ export default function AdminOperacionPage() {
                       <span className="block truncate text-sm font-normal text-slate-400">{topSource.campaign}</span>
                     ) : null}
                   </p>
-                  <p className="mt-1 text-2xl font-semibold text-cyan-400">{usd.format(topSource.revenue)}</p>
+                  <p className="mt-1 text-2xl font-semibold text-cyan-400">
+                    {formatOptionalMoney(topSource.amountMinor, topSource.currency, topSource.exponent)}
+                  </p>
                   <p className="mt-1 text-xs text-slate-500">
                     {topSource.leads} leads · {topSource.conversions} conversiones
                   </p>
@@ -332,10 +367,27 @@ export default function AdminOperacionPage() {
 
         <section className="col-span-12 rounded-xl border border-slate-800 bg-gradient-to-br from-cyan-600 to-blue-700 p-5 text-white xl:col-span-3">
           <p className="text-sm opacity-80">MRR Mensual</p>
-          <p className="mt-1 text-3xl font-bold">${(stats?.mrr ?? 0).toLocaleString()}</p>
+          <p className="mt-1 text-3xl font-bold">
+            {stats?.mrrByCurrency?.length
+              ? formatMoneyLines(stats.mrrByCurrency, '0')
+              : (stats?.excludedFromMrr?.legacyUnverified ||
+                  stats?.excludedFromMrr?.trialing ||
+                  stats?.excludedFromMrr?.nonActive ||
+                  stats?.excludedFromMrr?.incompletePrice ||
+                  stats?.excludedFromMrr?.unsupportedInterval)
+                ? 'Sin precio Stripe verificable'
+                : '0'}
+          </p>
           <div className="mt-2 flex items-center gap-2 text-sm">
             <TrendingUp size={16} />
-            <span>${(stats?.monthlyRevenue ?? 0).toLocaleString()} cobrados este mes</span>
+            <span>
+              {stats?.monthlyCollectedByCurrency?.length
+                ? formatMoneyLines(stats.monthlyCollectedByCurrency, '0')
+                : (stats?.monthlyLegacyInvoiceCount || 0) > 0 || (stats?.monthlyPaidAtUnknownCount || 0) > 0
+                  ? 'No calculado'
+                  : '0'}{' '}
+              cobrados este mes
+            </span>
           </div>
         </section>
 
@@ -385,7 +437,10 @@ export default function AdminOperacionPage() {
                           {lead.email} · {lead.source} · {statusLabel} · {lead.paid ? 'Pagado' : 'Sin pago'} · {elapsed}h
                         </p>
                         <p className="text-[11px] text-slate-600">
-                          Plan: {lead.plan ?? '—'} · Facturado (pagado): ${(lead.revenue ?? 0).toLocaleString()}
+                          Plan: {lead.plan ?? '—'} · Facturado (pagado):{' '}
+                          {lead.revenue
+                            ? formatMinorUnits(lead.revenue.amountMinor, lead.revenue.currency, lead.revenue.exponent)
+                            : 'No calculado'}
                           {lead.subscriptionStatus ? ` · Sub: ${lead.subscriptionStatus}` : ''}
                         </p>
                         <p className="text-[10px] text-slate-500" title={lead.attribution?.referrer || lead.attribution?.landingPath || undefined}>

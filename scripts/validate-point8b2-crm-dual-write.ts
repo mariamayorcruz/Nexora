@@ -113,8 +113,9 @@ async function main() {
       !migrations.some((m) => /point.?8b.?2|dual.?write/i.test(m)),
       'unexpected new Point 8B-2 migration directory'
     );
-    assert(migrations.length === 4, `expected exactly 4 migration dirs, got ${migrations.length}`);
-    pass('2 migration set includes 8B-1 foundation + 8B-6 NOT NULL (exactly 4)');
+    assert(migrations.length === 5, `expected exactly 5 migration dirs, got ${migrations.length}`);
+    assert(migrations.includes('20261028040000_point8c_revenue_projection'), 'Point 8C migration must stay in the active chain');
+    pass('2 migration set includes 8B-1 foundation + 8B-6 NOT NULL + 8C revenue projection (exactly 5)');
 
     await resetPublic(prisma);
     await prisma.$disconnect();
