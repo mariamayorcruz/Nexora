@@ -1,5 +1,15 @@
 # Point 8B-6 — `CrmLead.organizationId` NOT NULL hardening
 
+## Production status
+
+**COMPLETE.** Production `prisma migrate deploy` recorded `20261004120000_crmlead_organization_id_not_null`. `CrmLead.organizationId` is `NOT NULL`. `userId` remains. FK `CrmLead_organizationId_fkey` stays `ON DELETE RESTRICT`. Indexes `(organizationId, updatedAt)`, `(organizationId, stage)`, and `(userId)` stay in place.
+
+Before that deploy, the physical column was already `NOT NULL` while the migration row was absent. The authorized deploy repeated the versioned `SET NOT NULL` and Prisma recorded the row normally. The six documented legacy `_prisma_migrations` rows were left unchanged.
+
+The authorization and GO/NO-GO sections below are the design-time record from before that apply. They are not a second production gate.
+
+Follow-up, repository only: `tenancy:validate-point8b1` deployed the full chain and then inserted a null `organizationId`. That check now runs only against a temporary migration set that stops at Point 8B-1. The final chain is checked for `NOT NULL` separately. Schema, migrations, and product code are unchanged.
+
 ## Authorization boundary (current)
 
 **Authorized now:** PRE-FLIGHT + DESIGN + VALIDATION + **controlled migration activation/apply** (this PR).

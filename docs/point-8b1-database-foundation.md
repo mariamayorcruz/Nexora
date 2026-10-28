@@ -108,6 +108,12 @@ CrmLead.userId              NOT NULL   (runtime authoritative until later cutove
 CrmLead.organizationId      NULLABLE  (foundation only; unused by runtime in 8B-1)
 ```
 
+## Validator update after Point 8B-6
+
+`tenancy:validate-point8b1` keeps the historical nullable proof by deploying a temporary copy of the migrations through Point 8B-1 only. It then resets the disposable database and deploys the real chain, where `organizationId` must be `NOT NULL` and a null insert or `SET NULL` must fail. The copy is deleted afterwards. `prisma/migrations`, `prisma/schema.prisma`, and production are not rewritten.
+
+The production-gate text below is historical. Point 8B-1 and Point 8B-6 have since been applied on production. The completion record is in `docs/point-8c-revenue-core-design.md`.
+
 ## Validation
 
 Disposable DB only:
