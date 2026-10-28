@@ -1,14 +1,57 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { formatMoneyLines } from '@/lib/billing/money';
+
+type MoneyLine = {
+  currency: string;
+  amountMinor: string;
+  exponent: number | null;
+  count: number;
+};
+
+type Exclusions = {
+  legacyUnverified: number;
+  trialing: number;
+  nonActive: number;
+  incompletePrice: number;
+  unsupportedInterval: number;
+};
 
 interface RevenueData {
-  mrr: number;
-  arr: number;
-  totalRevenue: number;
-  activeSubscriptions: number;
-  churnRate: number;
-  trialToPaid: number;
+  mrrByCurrency: MoneyLine[];
+  arrByCurrency: MoneyLine[];
+  collectedByCurrency: MoneyLine[];
+  activeSubscriptionCount: number;
+  trialingSubscriptionCount: number;
+  excludedFromMrr: Exclusions;
+  pendingInvoiceCount: number;
+  legacyInvoiceCount: number;
+  churnRate: null;
+  trialToPaid: null;
+}
+
+function exclusionTotal(excluded: Exclusions | undefined) {
+  if (!excluded) return 0;
+  return (
+    excluded.legacyUnverified +
+    excluded.trialing +
+    excluded.nonActive +
+    excluded.incompletePrice +
+    excluded.unsupportedInterval
+  );
+}
+
+function recurringLabel(lines: MoneyLine[] | undefined, excluded: number) {
+  if (lines && lines.length > 0) return formatMoneyLines(lines, '0');
+  if (excluded > 0) return 'Sin precio Stripe verificable';
+  return '0';
+}
+
+function collectedLabel(lines: MoneyLine[] | undefined, legacyCount: number) {
+  if (lines && lines.length > 0) return formatMoneyLines(lines, '0');
+  if (legacyCount > 0) return 'No calculado';
+  return '0';
 }
 
 export default function AdminRevenuePage() {
@@ -17,7 +60,10 @@ export default function AdminRevenuePage() {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (!token) return;
+    if (!token) {
+      setLoading(false);
+      return;
+    }
     void fetch('/api/admin/revenue', {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -34,6 +80,8 @@ export default function AdminRevenuePage() {
     );
   }
 
+  const excluded = exclusionTotal(data?.excludedFromMrr);
+
   return (
     <div className="space-y-6">
       <div>
@@ -41,32 +89,41 @@ export default function AdminRevenuePage() {
         <h1 className="mt-2 text-[28px] font-semibold tracking-[-0.03em] text-white">
           Revenue & Suscripciones
         </h1>
-        <p className="mt-1 text-sm text-slate-500">MRR, ARR, churn y conversión de trials.</p>
+        <p className="mt-1 text-sm text-slate-500">
+          MRR desde la proyección local de suscripciones Stripe. Los cobros salen de facturas pagadas.
+        </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {[
-          { label: 'MRR', value: `$${(data?.mrr || 0).toLocaleString()}`, color: 'text-emerald-400' },
-          { label: 'ARR', value: `$${(data?.arr || 0).toLocaleString()}`, color: 'text-emerald-400' },
-          { label: 'Revenue total', value: `$${(data?.totalRevenue || 0).toLocaleString()}`, color: 'text-white' },
-          { label: 'Suscripciones activas', value: data?.activeSubscriptions || 0, color: 'text-cyan-400' },
-          { label: 'Churn rate', value: `${data?.churnRate || 0}%`, color: 'text-amber-400' },
-          { label: 'Trial → Paid', value: `${data?.trialToPaid || 0}%`, color: 'text-cyan-400' },
+          { label: 'MRR', value: recurringLabel(data?.mrrByCurrency, excluded), color: 'text-emerald-400' },
+          { label: 'ARR', value: recurringLabel(data?.arrByCurrency, excluded), color: 'text-emerald-400' },
+          {
+            label: 'Cobrado en facturas',
+            value: collectedLabel(data?.collectedByCurrency, data?.legacyInvoiceCount ?? 0),
+            color: 'text-white',
+          },
+          { label: 'Active en Stripe', value: data?.activeSubscriptionCount ?? 0, color: 'text-cyan-400' },
+          { label: 'Trials excluidos', value: data?.trialingSubscriptionCount ?? 0, color: 'text-cyan-400' },
+          { label: 'Churn rate', value: 'No calculado', color: 'text-amber-400' },
+          { label: 'Trial → Paid', value: 'No calculado', color: 'text-cyan-400' },
+          { label: 'Fuera de MRR', value: excluded, color: 'text-slate-300' },
         ].map((item) => (
           <div key={item.label} className="rounded-[20px] bg-[#040810] p-5">
             <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{item.label}</p>
-            <p className={`mt-3 text-3xl font-bold tracking-[-0.03em] ${item.color}`}>
-              {item.value}
-            </p>
+            <p className={`mt-3 text-3xl font-bold tracking-[-0.03em] ${item.color}`}>{item.value}</p>
           </div>
         ))}
       </div>
 
       <div className="rounded-[20px] bg-[#040810] p-5">
-        <p className="mb-4 text-[11px] uppercase tracking-[0.18em] text-slate-500">Nota</p>
+        <p className="mb-4 text-[11px] uppercase tracking-[0.18em] text-slate-500">Proyección</p>
         <p className="text-sm text-slate-400">
-          Los datos de revenue se calculan desde Stripe.
-          Conecta el webhook de Stripe para ver métricas en tiempo real.
+          Las cifras salen de la proyección local que escribe el webhook de Stripe. No son una consulta en vivo a
+          Stripe. Una suscripción sin importe, ciclo y moneda verificados no entra como cero ni con el precio de
+          catálogo. Las monedas no se suman entre sí. Churn y trial a pago no están calculados en esta fase.
+          Facturas pagadas anteriores a esta proyección: {data?.legacyInvoiceCount ?? 0}. Facturas en espera de
+          suscripción: {data?.pendingInvoiceCount ?? 0}.
         </p>
       </div>
     </div>

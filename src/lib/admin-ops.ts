@@ -1,5 +1,4 @@
 import { Campaign, Invoice, Subscription, User } from '@prisma/client';
-import { BILLING_PLANS, type BillingPlan } from '@/lib/billing';
 import { buildLifecycleTemplates } from '@/lib/customer-success';
 
 type CampaignWithAnalytics = Campaign & {
@@ -62,21 +61,17 @@ export interface EmailCenterSummary {
   checklist: string[];
 }
 
-/** Alineado con funnel admin / Stripe: suscripción que aporta MRR. */
+/** Local status active. Trialing is not an active subscription and is not MRR. */
 export function isSubscriptionMrrEligible(status: string) {
-  return status === 'active' || status === 'trialing';
+  return status === 'active';
 }
 
-export function calculateMrr(subscriptions: SubscriptionSummary[]) {
-  return subscriptions
-    .filter((s) => isSubscriptionMrrEligible(s.status))
-    .reduce((sum, s) => {
-      const key = String(s.plan || '')
-        .trim()
-        .toLowerCase() as BillingPlan;
-      const cfg = BILLING_PLANS[key];
-      return sum + (cfg?.monthlyPrice ?? 0);
-    }, 0);
+/**
+ * Catalog monthlyPrice is not MRR.
+ * Point 8C reads the Stripe projection. This stays null so a caller cannot render a fictitious total.
+ */
+export function calculateMrr(_subscriptions?: SubscriptionSummary[]): null {
+  return null;
 }
 
 export function buildAdminAlerts(params: {

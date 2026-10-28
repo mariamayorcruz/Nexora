@@ -164,7 +164,8 @@ async function main() {
       .filter((d) => d.isDirectory())
       .map((d) => d.name);
     assert(migrations.includes('20261004120000_crmlead_organization_id_not_null'), '8B-6 migration must be activated');
-    assert(migrations.length === 4, 'expected 4 active migrations including 8B-6');
+    assert(migrations.length === 5, 'expected 5 active migrations including 8B-6 and 8C');
+    assert(migrations.includes('20261028040000_point8c_revenue_projection'), 'Point 8C migration must stay in the active chain');
     pass('2 8B-6 NOT NULL activated; schema organizationId required');
 
     // Pure planner unit cases

@@ -110,7 +110,7 @@ function main(): void {
     const pending = derivePendingLocalActive(localActive, applied)
     console.log(`[fr004-pending-proof] pending=${pending.join(',') || '(none)'}`)
     assertPendingExactly(pending, PENDING_BEFORE_POINT8B1)
-    console.log('[fr004-pending-proof] CURRENT gate --before-point8b1 OK (pending=Point8B1 only)')
+    console.log('[fr004-pending-proof] CURRENT gate --before-point8b1 OK')
   } else if (mode === 'after-auth-a') {
     // HISTORICAL only: pre-Authorization B (Slice 0 absent).
     console.log(

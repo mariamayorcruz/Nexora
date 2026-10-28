@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { summarizePlatformRevenue } from '@/lib/billing/revenue-metrics';
 import { verifyAdmin } from '@/lib/admin';
+import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,34 +10,38 @@ export async function GET(request: NextRequest) {
     const adminCheck = await verifyAdmin(request);
     if (adminCheck instanceof NextResponse) return adminCheck;
 
-    const subscriptions = await prisma.subscription.findMany({
-      where: { status: 'active' },
-      include: { user: true },
+    const [subscriptions, invoices, pendingInvoiceCount] = await Promise.all([
+      prisma.subscription.findMany({
+        select: {
+          userId: true,
+          plan: true,
+          status: true,
+          stripeStatus: true,
+          billingInterval: true,
+          billingIntervalCount: true,
+          recurringAmountMinor: true,
+          currency: true,
+        },
+      }),
+      prisma.invoice.findMany({
+        select: {
+          userId: true,
+          status: true,
+          amountMinor: true,
+          currency: true,
+          createdAt: true,
+        },
+      }),
+      prisma.pendingStripeInvoice.count(),
+    ]);
+
+    const revenue = summarizePlatformRevenue({
+      subscriptions,
+      invoices,
+      pendingInvoiceCount,
     });
 
-    const planPrices: Record<string, number> = {
-      starter: 29,
-      professional: 79,
-      enterprise: 199,
-      scale: 199,
-      growth: 79,
-    };
-
-    const mrr = subscriptions.reduce((sum, sub) => {
-      const price = planPrices[sub.plan?.toLowerCase() || ''] || 0;
-      return sum + price;
-    }, 0);
-
-    return NextResponse.json({
-      revenue: {
-        mrr,
-        arr: mrr * 12,
-        totalRevenue: mrr,
-        activeSubscriptions: subscriptions.length,
-        churnRate: 0,
-        trialToPaid: 0,
-      },
-    });
+    return NextResponse.json({ revenue });
   } catch (error) {
     console.error('Error fetching revenue:', error);
     return NextResponse.json({ error: 'Error fetching revenue' }, { status: 500 });

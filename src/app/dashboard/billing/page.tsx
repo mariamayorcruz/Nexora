@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTenantOrganization } from '@/components/TenantOrganizationProvider';
 import { BILLING_PLANS, BillingCycle, BillingPlan, getBillingPlanLabel } from '@/lib/billing';
+import { currencyExponent, formatMinorUnits } from '@/lib/billing/money';
 import { useAppLanguage } from '@/hooks/use-app-language';
 
 interface SubscriptionState {
@@ -17,7 +18,8 @@ interface BillingInvoiceRow {
   id: string;
   createdAt: string;
   paidAt: string | null;
-  amount: number;
+  amount: number | null;
+  amountMinor?: string | number | null;
   currency: string;
   status: string;
   description: string | null;
@@ -427,10 +429,12 @@ export default function BillingPage() {
                 {invoices.map((inv) => {
                   const dateSrc = inv.paidAt || inv.createdAt;
                   const dateLabel = dateSrc ? new Date(dateSrc).toLocaleDateString('es-ES') : '—';
-                  const amountLabel = new Intl.NumberFormat('es-ES', {
-                    style: 'currency',
-                    currency: inv.currency || 'USD',
-                  }).format(inv.amount);
+                  const amountLabel =
+                    inv.amountMinor != null && inv.currency
+                      ? formatMinorUnits(inv.amountMinor, inv.currency, currencyExponent(inv.currency))
+                      : inv.amount != null
+                        ? `${inv.amount} ${inv.currency || ''} (histórico, sin unidades menores Stripe)`
+                        : 'No calculado';
                   return (
                     <tr key={inv.id} className="border-b border-white/[0.05] last:border-0">
                       <td className="py-3 pr-4 text-white">{dateLabel}</td>

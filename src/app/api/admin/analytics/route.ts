@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { summarizePlatformRevenue } from '@/lib/billing/revenue-metrics';
 import { prisma } from '@/lib/prisma';
 import { verifyAdmin } from '@/lib/admin';
 
@@ -9,16 +10,11 @@ export async function GET(request: NextRequest) {
   if (adminCheck instanceof NextResponse) return adminCheck;
 
   try {
-    // Get total revenue
-    const totalRevenueResult = await prisma.invoice.aggregate({
-      _sum: {
-        amount: true,
-      },
-      where: {
-        status: 'paid',
-      },
+    const paidInvoices = await prisma.invoice.findMany({
+      where: { status: 'paid' },
+      select: { userId: true, status: true, amountMinor: true, currency: true, createdAt: true },
     });
-    const totalRevenue = totalRevenueResult._sum.amount || 0;
+    const revenue = summarizePlatformRevenue({ subscriptions: [], invoices: paidInvoices });
 
     // Get total users
     const totalUsers = await prisma.user.count();
@@ -33,17 +29,26 @@ export async function GET(request: NextRequest) {
     // Get total campaigns
     const totalCampaigns = await prisma.campaign.count();
 
-    // Get revenue by month (last 12 months)
-    const revenueByMonth = await prisma.$queryRaw`
-      SELECT
-        DATE_TRUNC('month', "createdAt") as month,
-        SUM(amount) as revenue
-      FROM "Invoice"
-      WHERE "status" = 'paid'
-        AND "createdAt" >= NOW() - INTERVAL '12 months'
-      GROUP BY DATE_TRUNC('month', "createdAt")
-      ORDER BY month
-    `;
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setUTCMonth(twelveMonthsAgo.getUTCMonth() - 12);
+    const monthly = new Map<string, Map<string, bigint>>();
+    for (const invoice of paidInvoices) {
+      if (invoice.createdAt < twelveMonthsAgo || invoice.amountMinor == null || !invoice.currency) continue;
+      const month = invoice.createdAt.toISOString().slice(0, 7);
+      const currency = invoice.currency.trim().toUpperCase();
+      const byCurrency = monthly.get(month) ?? new Map<string, bigint>();
+      byCurrency.set(currency, (byCurrency.get(currency) ?? 0n) + invoice.amountMinor);
+      monthly.set(month, byCurrency);
+    }
+    const revenueByMonth = [...monthly.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .flatMap(([month, byCurrency]) =>
+        [...byCurrency.entries()].map(([currency, amountMinor]) => ({
+          month,
+          currency,
+          amountMinor: amountMinor.toString(),
+        }))
+      );
 
     // Get users by month (last 12 months)
     const usersByMonth = await prisma.$queryRaw`
@@ -113,7 +118,9 @@ export async function GET(request: NextRequest) {
     }));
 
     return NextResponse.json({
-      totalRevenue,
+      totalRevenue: null,
+      collectedByCurrency: revenue.collectedByCurrency,
+      legacyPaidInvoiceCount: revenue.legacyInvoiceCount,
       totalUsers,
       activeSubscriptions,
       totalCampaigns,

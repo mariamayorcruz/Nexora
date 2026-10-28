@@ -4,8 +4,9 @@
  * Two physical phases, plus the historical pending-gate simulation:
  *   1. Migrations through Point 8B-1 only (temporary copy; repo folder untouched):
  *      nullable organizationId, no backfill, FK RESTRICT, userId cascade.
- *   2. Real prisma/migrations chain, including Point 8B-6:
+ *   2. Real prisma/migrations chain, including Point 8B-6 and Point 8C:
  *      organizationId NOT NULL, null insert and SET NULL rejected.
+ *      The temporary copy still stops at Point 8B-1 and excludes 8B-6 and 8C.
  *   3. Synthetic baseline+Slice0 DB for `--before-point8b1` (Point 8B-1 absent).
  *
  * Does NOT modify runtime application code, schema, or migration files.
@@ -27,6 +28,7 @@ import {
   LEGACY_PRODUCTION_MIGRATION_NAMES,
   POINT8B1_NAME,
   POINT8B6_NAME,
+  POINT8C_NAME,
   SLICE0_NAME,
   assertActiveMigrationSet,
   assertDisposableDatabaseUrl,
@@ -181,7 +183,8 @@ function deployMigrationsThroughPoint8B1(env: NodeJS.ProcessEnv): string {
         copied[0] === BASELINE_NAME &&
         copied[1] === SLICE0_NAME &&
         copied[2] === POINT8B1_NAME &&
-        !copied.includes(POINT8B6_NAME),
+        !copied.includes(POINT8B6_NAME) &&
+        !copied.includes(POINT8C_NAME),
       `historical migration sandbox must be exactly through Point 8B-1, got ${copied.join(',')}`
     );
     return runPrisma(
@@ -229,6 +232,10 @@ function main(): void {
   assert(
     !historicalDeploy.includes(`Applying migration \`${POINT8B6_NAME}\``),
     'historical deploy must not apply Point 8B-6'
+  );
+  assert(
+    !historicalDeploy.includes(`Applying migration \`${POINT8C_NAME}\``),
+    'historical deploy must not apply Point 8C'
   );
   assertActiveMigrationSet();
 
@@ -323,14 +330,16 @@ function main(): void {
   const fullDeploy = runPrisma(['migrate', 'deploy'], env);
   console.log(fullDeploy);
   assert(fullDeploy.includes(POINT8B6_NAME), 'point8b6 applied');
+  assert(fullDeploy.includes(POINT8C_NAME), 'point8c applied');
 
   const fullRows = readMigrationRows(url).map((r) => r.migration_name);
   assert(
-    fullRows.length === 4 &&
+    fullRows.length === 5 &&
       fullRows[0] === BASELINE_NAME &&
       fullRows[1] === SLICE0_NAME &&
       fullRows[2] === POINT8B1_NAME &&
-      fullRows[3] === POINT8B6_NAME,
+      fullRows[3] === POINT8B6_NAME &&
+      fullRows[4] === POINT8C_NAME,
     `unexpected full-chain migration rows: ${fullRows.join(',')}`
   );
   assertFoundationShape(url, false);
@@ -443,9 +452,11 @@ function main(): void {
     encoding: 'utf8',
   });
   console.log(proofOut);
-  assert(proofOut.includes('pending=Point8B1 only') || proofOut.includes(POINT8B1_NAME), 'pending proof output missing Point8B1');
+  assert(proofOut.includes(POINT8B1_NAME), 'pending proof output missing Point 8B-1');
+  assert(proofOut.includes(POINT8B6_NAME), 'pending proof output missing Point 8B-6');
+  assert(proofOut.includes(POINT8C_NAME), 'pending proof output missing Point 8C');
   assert(proofOut.includes('[fr004-pending-proof] PASS'), 'before-point8b1 proof did not PASS');
-  console.log('[point8b1] PASS --before-point8b1 positive current-gate (pending=Point8B1 only)');
+  console.log('[point8b1] PASS --before-point8b1 positive current-gate');
 
   function expectGateFail(label: string, pattern: RegExp): void {
     let failed = false;

@@ -1,15 +1,31 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { formatMoneyLines } from '@/lib/billing/money';
+
+type MoneyLine = {
+  currency: string;
+  amountMinor: string;
+  exponent: number | null;
+  count: number;
+};
 
 type AdminStatsPayload = {
   stats?: {
-    mrr?: number;
+    mrr?: null;
+    mrrByCurrency?: MoneyLine[];
+    excludedFromMrr?: {
+      legacyUnverified: number;
+      trialing: number;
+      nonActive: number;
+      incompletePrice: number;
+      unsupportedInterval: number;
+    };
     activeSubscriptions?: number;
     totalUsers?: number;
-    monthlyRevenue?: number;
-    totalRevenue?: number;
+    monthlyRevenue?: null;
+    totalRevenue?: null;
     funnel?: {
       captured?: number;
       won?: number;
@@ -40,14 +56,18 @@ export default function AdminRootPage() {
   }, []);
 
   const stats = payload.stats;
-  const churnRate = useMemo(() => {
-    const total = Number(stats?.totalUsers || 0);
-    const active = Number(stats?.activeSubscriptions || 0);
-    if (!total) return 0;
-    return Math.max(0, Math.round(((total - active) / total) * 100));
-  }, [stats?.activeSubscriptions, stats?.totalUsers]);
-
-  const trialToPaid = Math.round(Number(stats?.business?.conversionRate || 0) * 100);
+  const excluded = stats?.excludedFromMrr
+    ? stats.excludedFromMrr.legacyUnverified +
+      stats.excludedFromMrr.trialing +
+      stats.excludedFromMrr.nonActive +
+      stats.excludedFromMrr.incompletePrice +
+      stats.excludedFromMrr.unsupportedInterval
+    : 0;
+  const mrrLabel = stats?.mrrByCurrency?.length
+    ? formatMoneyLines(stats.mrrByCurrency, '0')
+    : excluded > 0
+      ? 'Sin precio Stripe verificable'
+      : '0';
 
   return (
     <div className="space-y-5">
@@ -79,11 +99,11 @@ export default function AdminRootPage() {
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {[
-          { label: 'MRR', value: `$${Number(stats?.mrr || 0).toLocaleString()}`, tone: 'text-emerald-300' },
+          { label: 'MRR', value: mrrLabel, tone: 'text-emerald-300' },
           { label: 'Clientes activos', value: Number(stats?.activeSubscriptions || 0), tone: 'text-white' },
-          { label: 'Churn rate', value: `${churnRate}%`, tone: 'text-rose-300' },
+          { label: 'Churn rate', value: 'No calculado', tone: 'text-rose-300' },
           { label: 'AI calls/mes', value: Number(stats?.funnel?.captured || 0), tone: 'text-cyan-300' },
-          { label: 'Trial → Paid', value: `${trialToPaid}%`, tone: 'text-amber-300' },
+          { label: 'Trial → Paid', value: 'No calculado', tone: 'text-amber-300' },
         ].map((item) => (
           <div key={item.label} className="rounded-[24px] bg-[#040810] p-5">
             <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{item.label}</p>
