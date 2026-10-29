@@ -2,6 +2,8 @@
 
 Fecha: 2026-10-28 (America/Denver). Estado: **DISEÑO PROPUESTO PARA REVISIÓN; NO IMPLEMENTADO**.
 
+> **Actualización de alcance (2026-10-28):** leer primero [la revisión del master completo](gotnexora-master-plan-review.md). Esta es una baseline técnica parcial. Las propuestas antiguas de Company/Organization y la regla de no abordar eventos9 hasta implementar todos los dominios8 quedan reemplazadas por esa revisión. El usuario confirmó empresas propias/socios/agencia, permisos internos Nexora, entitlements, soporte remoto consentido y tres dominios financieros. No hay plazos de retención aprobados.
+
 ## 1. Base, método y límites de evidencia
 
 Base inspeccionada: main `b35b3a21afa48005eb49a2f7231e455eeeef35b6`, identificada por los resultados de búsqueda y base del PR18. PR17 está integrado. PR18 está abierto, sin merge, HEAD `60c178716bec6b40003365e0bdc06856e0a067f3`; sus tablas nuevas no pertenecen a main. No se consultó producción ni secretos.
