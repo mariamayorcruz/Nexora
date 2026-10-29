@@ -1,6 +1,8 @@
 # Punto 8 — Paso 1: identidad de cuenta cliente y empresas administradas
 
-Estado de este paso: **DISEÑADO / PENDIENTE DE REVISIÓN**.
+Estado de este paso: **DISEÑO CONCEPTUAL REVISADO — DECISIONES D1–D3 ADOPTADAS / SIN IMPLEMENTAR**.
+
+Registro de decisión: Codex adopta las alternativas recomendadas de D1–D3 bajo la delegación de criterio de la usuaria («confío en ti»), después de presentar esas tres recomendaciones. Esta decisión cierra la elección conceptual de este paso; no equivale a aprobar un esquema físico, una integración a main o un despliegue.
 
 No es implementación, no crea modelos y no cierra el punto 8. Los permisos detallados, el personal de Nexora, el soporte remoto y los tres dominios financieros quedan fuera: este documento solo señala su dependencia.
 
@@ -47,19 +49,19 @@ El campo NOT NULL y los dos resolutores CRM son posteriores y, para `CrmLead`, l
 
 ### Propuestas
 
-No hay propuesta implementada en los archivos leídos. Todo lo que sigue es diseño candidato para revisión. Los nombres nuevos no son tablas autorizadas.
+No hay propuesta implementada en los archivos leídos. D1–D3 son decisiones conceptuales adoptadas; los detalles de persistencia y los nombres nuevos siguen sujetos al diseño de implementación. Los nombres nuevos no son tablas autorizadas.
 
 ## 2. Glosario
 
 | Término | Significado en este paso | Qué no es |
 |---|---|---|
 | User / persona usuaria | Identidad humana que ya existe. Puede participar en varias empresas. | No es la cuenta cliente de Nexora, ni la empresa administrada, ni el cliente comercial del CRM. |
-| Cuenta cliente | Candidata. Relación comercial de un cliente con Nexora, capaz de reunir varias empresas administradas. | No es `User`, no es `Subscription` y no es la frontera de los datos. Agruparla no abre otras empresas. |
+| Cuenta cliente | Concepto adoptado. Relación comercial de un cliente con Nexora, capaz de reunir varias empresas administradas. | No es `User`, no es `Subscription` y no es la frontera de los datos. Agruparla no abre otras empresas. |
 | Organization / empresa administrada | Tenant actual. Frontera de aislamiento de una empresa operadora, propia, de un socio o de un tercero. | No es el cliente comercial escrito en un lead. No es el operador Nexora. No se renombra en este paso. |
 | Membership | Vínculo ya persistido entre una persona y una empresa, con rol y estado actuales. | No registra si esa relación comercial es propia, de socio o de agencia. El rol `OWNER` no se lee como título de propiedad comercial. |
 | Company / cliente comercial | A quién la empresa administrada vende o atiende. Hoy es el texto `CrmLead.company`. Un modelo futuro sería por empresa. | No es cuenta de Nexora, no inicia sesión y no es otra `Organization` por el hecho de existir. |
 | Contacto | Persona comercial atendida dentro de una empresa. Hoy no hay modelo Contact: nombre, email y teléfono van en el propio `CrmLead`, bajo su `organizationId`. | El mismo email en otro lead de otra empresa no une los leads ni las empresas. |
-| Agencia | Tipo candidato de vínculo comercial: una cuenta cliente administra una empresa de un tercero. | No es una `Organization` especial, no copia datos y no concede acceso. |
+| Agencia | Tipo de vínculo comercial adoptado en el diseño: una cuenta cliente administra una empresa de un tercero. | No es una `Organization` especial, no copia datos y no concede acceso. |
 | Operador Nexora | La plataforma que hospeda a las empresas administradas. En los archivos de este paso no hay una entidad de operador distinta de `User` y `Organization`. | No se modela aquí. Depende del punto posterior de personal interno. |
 
 Nombres candidatos, si más adelante se persiste el diseño: `CuentaCliente`, `RelacionDeAdministracion` y `Company`. Pueden cambiar. Este paso no los crea.
@@ -95,7 +97,7 @@ No hay cardinalidad propia, socio o agencia porque esa relación no existe.
 
 ### ¿Hace falta una cuenta cliente además de User y Organization?
 
-Se comparan tres lecturas. Ninguna queda aprobada por escribirla aquí.
+Se conservan las tres alternativas evaluadas. Se adopta la tercera como base conceptual; las otras dos quedan descartadas para esta etapa.
 
 | Lectura | Qué permite | Qué no cumple |
 |---|---|---|
@@ -103,7 +105,7 @@ Se comparan tres lecturas. Ninguna queda aprobada por escribirla aquí.
 | Sin cuenta nueva: `Organization` es el cliente de Nexora | Cada empresa ya tiene identidad estable. | El cliente de Nexora puede relacionarse con varias empresas. Si esa agrupación se mete dentro de una sola `Organization`, se pierde el aislamiento. |
 | Concepto nuevo `CuentaCliente` | Separa persona, cliente de Nexora y empresa administrada. La cuenta puede tener varias relaciones comerciales sin convertirse en la frontera de los datos. | Exige decidir, antes de cualquier tabla, dónde se ancla el vínculo y si una empresa admite varias relaciones. No responde quién paga. |
 
-Recomendación, pendiente de revisión: hace falta el concepto `CuentaCliente`. No sustituye a `User` ni a `Organization`. `Organization` sigue siendo la única frontera de aislamiento. La cuenta solo agrupa relaciones comerciales. Agrupar no da acceso de una empresa a otra, no copia CRM, contactos ni documentos, y no fusiona tenants.
+Decisión D1 adoptada: incorporar el concepto `CuentaCliente` al diseño. No sustituye a `User` ni a `Organization`. `Organization` sigue siendo la única frontera de aislamiento. La cuenta solo agrupa relaciones comerciales. Agrupar no da acceso de una empresa a otra, no copia CRM, contactos ni documentos, y no fusiona tenants.
 
 Cardinalidades candidatas de esa recomendación:
 
@@ -114,13 +116,17 @@ Cardinalidades candidatas de esa recomendación:
 | `RelacionDeAdministracion` | `Membership` | ninguna | El vínculo comercial no crea, modifica ni implica una membresía. |
 | `Organization` | `Company` | 1 a 0..N, en el futuro | Hoy sigue siendo texto por lead. Dos empresas pueden repetir el mismo nombre sin compartir fila. |
 
-Una empresa puede quedar sin cuenta cliente registrada. Su `Organization` no depende de la agencia que la atiende. Una persona puede estar asociada a varias cuentas sin que esas cuentas compartan empresas o leads.
+Una empresa puede quedar sin cuenta cliente registrada durante la transición. Su `Organization` no depende de la agencia que la atiende. Una persona puede estar asociada a varias cuentas sin que esas cuentas compartan empresas o leads. La asociación persona–cuenta tampoco concede acceso a las empresas relacionadas.
 
-Alternativa más pequeña, si la revisión rechaza la cuenta: guardar propia, socio y agencia como atributo nuevo de `Membership`. No es la recomendación. Obligaría a tener membresía para poder decir que existe un vínculo comercial, y el requisito separa esas dos cosas. También seguiría sin nombrar al cliente de Nexora.
+La cuenta representa al cliente de Nexora, que puede ser una persona o una entidad representada por varias personas; no obliga a crear una cuenta por cada empleado o socio. Los ejemplos con cuentas separadas son posibilidades, no una regla de alta. Los tipos propia, socio y agencia son descriptivos: no certifican propiedad legal ni porcentajes de participación. La agencia puede tener una `Organization` para sus propias operaciones y, a la vez, relaciones de administración con otras empresas; son funciones distintas.
+
+Antes del esquema físico hay que concretar la identidad y el ciclo de vida de estos vínculos, incluido cómo representar tipos simultáneos en un mismo par cuenta–empresa y cómo evitar duplicados. D3 permite varias cuentas relacionadas con una empresa, pero no resuelve esos detalles por sí sola.
+
+Alternativa evaluada y descartada en D2: guardar propia, socio y agencia como atributo nuevo de `Membership`. Obligaría a tener membresía para poder decir que existe un vínculo comercial, y el requisito separa esas dos cosas. También seguiría sin nombrar al cliente de Nexora.
 
 ## 5. Diagrama
 
-Leyenda: trazo continuo y clase `existente` = ya está en schema. Trazo discontinuo y clase `propuesto` = candidato, no implementado y no autorizado como tabla.
+Leyenda: trazo continuo y clase `existente` = ya está en schema. Trazo discontinuo y clase `propuesto` = diseño futuro, no implementado y no autorizado como tabla. D1–D3 fijan la separación conceptual; no aprueban los detalles físicos.
 
 ```mermaid
 flowchart TD
@@ -141,6 +147,7 @@ flowchart TD
   U --- INV
   O --- L
   L --- TX
+  U -.- CA
   CA -.- REL
   REL -.- O
   O -.- CO
@@ -222,7 +229,7 @@ Identidades inventadas. No son clientes reales. En todos, la relación comercial
 | Datos | cada lead en su empresa | no se copian, no se fusionan y no se mueven a la agencia |
 | Transferencia y retención | no decididas | este retiro no define borrado ni traspaso |
 
-Dependencia: si alguna persona de la agencia tenía `Membership` en org-c1, este documento no la revoca ni la conserva. Esa regla pertenece al punto de permisos y no puede deducirse del tipo `agencia`.
+Dependencia obligatoria del siguiente diseño: terminar la relación comercial y retirar acceso son operaciones distintas. Si la solicitud es retirar el acceso de la agencia, no basta con quitar su vínculo comercial: el flujo debe identificar y revocar los accesos otorgados por esa agencia a org-c1, incluidos los que dependan de ellos. Una membresía independiente de la misma persona requiere identificar su origen y tratarla explícitamente. Este documento no implementa esa regla ni afirma que el sistema actual la cumpla. No se puede declarar completado un retiro de acceso solo por modificar la relación comercial.
 
 ## 7. Invariantes y aceptación futura
 
@@ -258,11 +265,11 @@ Necesidades posibles de una migración futura, sin escribirla y sin autorizarla:
 - Un enlace futuro entre cuenta y empresa no debe borrar `Organization` ni `CrmLead` al retirarse. Hoy la empresa sobrevive al borrado de la persona, y un lead impide borrar su empresa.
 - Alinear los comentarios desfasados de la sección 1 sería un cambio de código, no de este documento.
 
-## 9. Decisiones pendientes
+## 9. Decisiones adoptadas y detalles pendientes
 
-Las recomendaciones no están aprobadas. La revisión puede rechazarlas.
+D1–D3 quedan adoptadas bajo la delegación de criterio descrita al inicio. La columna de recomendación conserva la justificación de la alternativa A elegida en los tres casos.
 
-### Necesarias antes de crear cualquier tabla de este diseño
+### D1–D3: base conceptual elegida
 
 | Id | Decisión | Alternativas | Recomendación |
 |---|---|---|---|
@@ -276,20 +283,20 @@ Las recomendaciones no están aprobadas. La revisión puede rechazarlas.
 |---|---|---|---|
 | D4 | Persistir `CuentaCliente`, la relación y `Company` | Este paso solo fija el concepto. | No hay DDL autorizado. |
 | D5 | Normalizar el cliente comercial frente al texto `company` | El texto ya aísla por lead y empresa. | No deduplicar entre empresas. |
-| D6 | Cuántas personas se asocian a una cuenta y con qué papel | La participación en la empresa ya es `Membership`. El papel dentro de la cuenta es permisos. | No diseñar roles de cuenta aquí. |
+| D6 | Persistencia, ciclo de vida y papel de la asociación persona–cuenta | Se propone capacidad N a N; la participación en la empresa sigue siendo `Membership`. Los roles de cuenta son otro corte. | Asociarse a la cuenta no concede acceso a empresas. |
 | D7 | Pagador, agrupación de suscripciones, transferencias y retención | El requisito prohíbe inventarlos. | Sin recomendación de reglas. Siguen en `User` mientras no exista otro diseño. |
-| D8 | Permisos, personal Nexora, soporte remoto y finanzas | Puntos posteriores. | Deben respetar D1–D3 si se aprueban. No pueden leer `OWNER` como propiedad comercial ni tratar la agencia como acceso. El operador Nexora no nace de este modelo. |
+| D8 | Permisos, personal Nexora, soporte remoto y finanzas | Puntos posteriores. | Deben respetar D1–D3 adoptadas. No pueden leer `OWNER` como propiedad comercial ni tratar la agencia como acceso. El operador Nexora no nace de este modelo. |
 
-D1–D3 son necesarias para un corte de esquema futuro. No impiden cerrar la revisión de este documento: la revisión acepta o cambia la recomendación.
+D1–D3 cierran la elección conceptual. Antes de crear tablas siguen siendo necesarios los detalles de identidad, unicidad, ciclo de vida y autorización de los vínculos. El siguiente encargo será acotado a participación y acceso dentro de una empresa, coordinado con el punto 30. Soporte, finanzas y personal interno tendrán sus propios cortes.
 
 ## 10. Cierre
 
 | Pieza | Estado |
 |---|---|
 | Distinción persona, cuenta cliente, empresa administrada y cliente comercial | Diseñada en este documento |
-| Recomendación de `CuentaCliente` y relación comercial separada | Pendiente de revisión; no aprobada |
+| `CuentaCliente`, relación comercial separada y múltiples vínculos por empresa | Decisiones conceptuales D1–D3 adoptadas bajo delegación |
 | Modelos, migraciones, permisos, facturación y resolutores | Sin cambios |
 | Paso 2 | No iniciado |
 | Punto 8 completo | No |
 
-Límites de la comprobación de esta entrega: las citas de archivo y rango caen dentro de los archivos de la sección 1. Las cardinalidades existentes se contrastaron con `Subscription.userId` único, `Invoice` sin `organizationId`, el par único de `Membership`, `company` como texto y `CrmLead.organizationId` obligatorio con `ON DELETE RESTRICT`. Los seis escenarios se recorrieron de forma lógica contra la sección 7: la relación comercial no crea membresía, no fusiona empresas ni leads y, al retirar la agencia de org-c1, org-c2 y sus leads no cambian. El diagrama se renderizó en local con `@mermaid-js/mermaid-cli` 11.12.0; el SVG temporal contiene los nodos existentes y los propuestos. Esa renderización comprueba la sintaxis, no el diseño de producto ni un flujo de la aplicación. No hubo build ni tests de permisos, porque este paso no cambia comportamiento.
+Límites de la comprobación de esta entrega: las citas de archivo y rango caen dentro de los archivos de la sección 1. Las cardinalidades existentes se contrastaron con `Subscription.userId` único, `Invoice` sin `organizationId`, el par único de `Membership`, `company` como texto y `CrmLead.organizationId` obligatorio con `ON DELETE RESTRICT`. Los seis escenarios se recorrieron de forma lógica contra la sección 7: la relación comercial no crea membresía, no fusiona empresas ni leads y, al retirar la agencia de org-c1, org-c2 y sus leads no cambian. La versión inicial del diagrama se renderizó en local con `@mermaid-js/mermaid-cli` 11.12.0. En la revisión se añadió la relación conceptual persona–cuenta que faltaba; esa revisión no se volvió a renderizar. La renderización inicial comprueba únicamente la sintaxis de aquella versión, no el diseño de producto ni un flujo de la aplicación. No hubo build ni tests de permisos, porque este paso no cambia comportamiento.
