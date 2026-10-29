@@ -1,6 +1,8 @@
 # Punto 8 — Paso 2: participación y permisos dentro de una empresa
 
-Estado de este paso: **DISEÑADO / PENDIENTE DE REVISIÓN CODEX**.
+Estado de este paso: **DISEÑO CONCEPTUAL REVISADO POR CODEX / SIN IMPLEMENTAR**.
+
+Codex adopta P1–P8, con los límites expresos de este documento, bajo la delegación de criterio de la usuaria. Esta revisión cierra el contrato conceptual del paso 2. No autoriza activar permisos en producción ni resuelve los procedimientos de alta de autoridad, recuperación, persistencia o transición necesarios antes de conectarlo a rutas.
 
 Es un contrato conceptual de acceso. No es implementación, no es una suite ejecutable y no es apto para producción. No crea modelos y no cierra el punto 8. El paso 1 ya adoptó la identidad de cuenta y empresa. Este paso fija quién puede hacer qué dentro de una sola empresa administrada.
 
@@ -110,7 +112,7 @@ El catálogo de este ejemplo tiene once capacidades. El perfil completo operativ
 
 ### Condiciones
 
-Todas se evalúan para la empresa de la petición, y solo cuando el modo de esa empresa es `contrato_activo`.
+Todas se evalúan para la empresa de la petición. El selector de transición acepta únicamente `legacy_actual` y `contrato_activo`: un modo desconocido o ausente deniega, nunca activa una compatibilidad implícita. El modo legacy mantiene el comportamiento existente; las reglas de este contrato se usan en `contrato_activo`.
 
 1. Hay una persona autenticada.
 2. La empresa está `ACTIVE`.
@@ -172,116 +174,102 @@ Otros módulos podrán reutilizar las mismas condiciones, la misma tupla y la mi
 
 ### Pseudocódigo
 
-Esto describe la decisión. No es código del repositorio y no se ejecuta.
+Esto describe una evaluación pura sobre un estado validado. Devuelve una decisión y obligaciones; no modifica concesiones, no escribe datos y no envía mensajes. El ejecutor futuro debe validar vigencia antes de materializar la decisión y aplicar las obligaciones de forma consistente. No es código del repositorio y no se ejecuta.
 
 ```text
-tupla = (accion, ambito, campo, modo)
-cobertura = (tupla, origen, vigencia, padre)
+solicitud = (operacion, accion, empresa, recurso, campos, consulta)
+recurso.tipo = empresa | membresia | lead | coleccion
+cobertura = (empresa, accion, ambito, campo, modo, origen, vigencia, padre)
+resultado = denegar(motivo) | permitir(obligaciones) | delegar_a_legacy
 
-decidir(persona, empresa, accion, registro, campos, modo, consulta):
-  si el modo de transicion de empresa no es contrato_activo:
-    este contrato no decide
-  si persona no está autenticada:
-    denegar motivo=identidad
-  si empresa.status no es ACTIVE:
-    denegar motivo=empresa_no_vigente
-  membresia = la única membresía de persona en empresa
-  si no existe:
-    denegar motivo=sin_membresia
-  si membresia.status no es ACTIVE:
-    denegar motivo=membresia_no_activa
-  si accion usa un lead:
-    si registro.organizationId no es empresa:
-      denegar motivo=registro_otra_empresa
-  si accion es crm.lead.create
-     o company.membership.admin
-     o company.permission.grant
-     o company.policy.restrict:
-    no leer registro
-    ambito = empresa, o la membresía destino si pertenece a empresa
-  si la oferta de plataforma para accion no es verdadera:
-    denegar motivo=plataforma
+decidir(estado, persona, solicitud):
+  si modo_transicion es desconocido o falta:
+    denegar modo_no_definido
+  si modo_transicion es legacy_actual:
+    delegar_a_legacy explícitamente; no devolver un permiso del contrato
+  verificar persona autenticada y existente, empresa ACTIVE
+  verificar Membership del par en estado ACTIVE
+  verificar accion conocida y ofrecida por plataforma
+  verificar tipo de recurso válido para esa accion
+  si recurso es lead o membresia:
+    verificar pertenencia a empresa sin exponer recursos de otra empresa
+  si recurso es empresa o coleccion:
+    usar empresa como ámbito; nunca leer un lead nulo
+  si falta un dato necesario de política o la operación no está definida:
+    denegar politica_incompleta
 
-  concesiones = expansiones vigentes del paquete asignado
-                unidas a las concesiones explícitas de esta empresa
-  concesiones = las que pasan cadena_vigente en esta decisión
+  coberturas = expandir asignaciones de paquetes con su origen y vigencia
+                junto con concesiones explícitas de esta membresía y empresa
+  conservar solo coberturas con cadena_vigente(estado, cobertura)
 
-  efectivo(tupla):
-    si una restricción vigente coincide con esa tupla:
-      devolver denegar motivo=restriccion_explicita
-    si una concesión vigente coincide entera con esa tupla:
-      devolver permitir
-    devolver denegar motivo=sin_permiso
+  efectivo(accion, recurso_o_ambito, campo, modo):
+    si campo o modo es desconocido para la accion:
+      denegar sin_politica
+    si restriccion vigente aplicable de esta empresa cubre la combinación:
+      denegar restriccion_explicita
+    si alguna cobertura coincide con TODA la combinación:
+      permitir
+    denegar sin_permiso
 
-  si accion es listar:
-    si efectivo(crm.lead.read, ambito pedido) no permite:
-      denegar motivo=sin_permiso
-    si consulta filtra, ordena o agrega un campo
-       y efectivo(lectura de ese campo, ambito pedido) no permite:
-      denegar motivo=campo_no_legible
-    visible = leads de empresa cuya tupla de lectura coincide entera
-    devolver visible, aunque esté vacío, con los campos no legibles proyectados fuera
+  si operacion es listar:
+    exigir una cobertura vigente de crm.lead.read para el ámbito solicitado
+    una restricción sobre un registro lo excluye, no abre ni mezcla otros ámbitos
+    exigir que filtros/ordenaciones/agregados solo usen campos legibles
+      en todo el ámbito sobre el que se evaluarán
+    devolver permitir con predicado de empresa + alcance + restricciones,
+      proyección de campos por registro y conteos del mismo conjunto
+    si el conjunto autorizado está vacío, el ejecutor devuelve []
+    no devolver permiso de listado para un ámbito mayor al concedido
 
-  si accion es crm.lead.create o crm.lead.update:
-    por cada campo pedido:
-      si modo es editar y efectivo(lectura de ese campo y registro) no permite:
-        denegar motivo=edicion_sin_lectura o el motivo de esa lectura
-      si efectivo(accion, ambito, campo, modo) no permite:
-        denegar motivo=mutacion_incompleta
-    si alguno falla, no escribir ningún campo
-    si todos pasan, escribir y proyectar la respuesta
+  si operacion es crear o editar:
+    exigir efectivo para cada campo aportado y para el ámbito de destino
+    en editar, exigir además lectura de cada campo del lead existente
+    en crear, evaluar capacidad de creación sobre empresa, sin lectura de lead nulo
+    rechazar campos inmutables, desconocidos o no soportados por esa operación
+    si falla cualquier campo, denegar toda la mutación
+    devolver permitir con validación de todos los campos antes de escribir,
+      escritura atómica y proyección posterior según permisos de lectura
 
-  si accion es crm.lead.message.send:
-    si efectivo(message.send, lead) no permite:
-      denegar motivo=envio_no_autorizado
-    si efectivo(lectura de f.canal, lead) no permite:
-      denegar motivo=envio_no_autorizado
-    si el contenido sale de un campo guardado
-       y efectivo(lectura de ese campo, lead) no permite:
-      denegar motivo=envio_no_autorizado
-    no hay efecto externo ni reescritura de notes cuando se deniega
-    solo si todo lo anterior permite, enviar
-    después, escritura interna acotada del contenido enviado y del resultado
-    esa escritura no concede crm.lead.update sobre notes
-    proyectar la respuesta
-    POST /api/crm/followups no usa esta capacidad
+  si operacion es enviar_mensaje:
+    exigir efectivo(crm.lead.message.send, lead, canal, enviar)
+    exigir lectura del destinatario y de cada campo almacenado usado en contenido
+    devolver permitir con autorización anterior a todo efecto externo,
+      registro interno acotado del resultado y proyección de respuesta
+    esta decisión no concede edición general de notes
+    no autoriza rutas legacy ni envíos sin contexto de empresa
 
-  si accion es crm.lead.export o crm.lead.share:
-    si efectivo(lectura de la misma tupla) no permite:
-      denegar motivo=exportacion_sin_lectura o compartir_sin_lectura
-    devolver efectivo(accion, misma tupla)
+  si operacion es exportar:
+    exigir lectura y crm.lead.export para cada registro/campo solicitado
+    si cualquiera no está autorizado, denegar la solicitud
+    devolver permitir con ámbito recortado y proyección
 
-  devolver efectivo(accion, ambito, campo, modo)
+  si operacion es compartir:
+    exigir crm.lead.share y lectura de cada combinación solicitada
+    aplicar además las reglas de compartir de las secciones 5 y 7
+    devolver permitir con concesiones dependientes de las coberturas comprobadas
 
-cadena_vigente(concesion):
-  si concesion.vigencia no es activa:
-    no
-  recorrer padre hasta la raíz:
-    si el padre no está ACTIVE o su vigencia no es activa:
-      no
-    si el padre ya no cubre esta misma tupla:
-      marcar la concesión vigencia=invalidada
-      no
-  cuando un padre se suspende, se revoca o pierde la tupla:
-    sus descendientes pasan a vigencia=invalidada
-  reactivar al padre, o devolverle la tupla, no pone vigencia=activa
+  si operacion es administrar, conceder, restringir, archivar o revocar:
+    exigir efectivo para el ámbito y acción específicos
+    aplicar la regla de transición correspondiente de las secciones 6 y 7
+    devolver una decisión, nunca ejecutar la transición aquí
 
-expandir(asignacion):
-  por cada capacidad del paquete, crear una concesión
-  origen = origen de la asignación, nunca el nombre del enum
-  si origen es legacy_snapshot, solo incluye read, create y update
-    de las rutas y campos que el inventario nombró para esa membresía
+  denegar operacion_no_definida
 
-alcance_contiene(cobertura, registro):
-  si la acción no usa lead:
-    el ámbito es la empresa o la membresía destino
-  si cobertura.alcance es empresa:
-    registro.organizationId es esa empresa
-  si cobertura.alcance es asignados:
-    existe asignación futura de ese registro a esta membresía
-  si cobertura.alcance es un registro concreto:
-    el identificador coincide
-  CrmLead.userId no se consulta
+cadena_vigente(estado, cobertura):
+  exigir origen conocido, vigencia activa y misma empresa en toda la cadena
+  recorrer padres sin ciclos; padre ausente o ciclo deniega
+  verificar que cada padre conserva la autoridad delegable y la combinación
+  verificar membresías vigentes y versiones de revocación aplicables
+  la raíz tiene que ser una autoridad validada de empresa o un snapshot validado
+  no inferir una raíz del enum OWNER/ADMIN ni de una relación comercial
+  devolver verdadero o falso; no mutar el estado durante esta lectura
+
+transiciones de origen (requisito para un futuro ejecutor, no parte de decidir):
+  reducir, suspender o revocar invalida los descendientes dependientes
+    de forma persistente y coherente antes de confirmar la transición
+  aumentar o reactivar al padre no elimina esa invalidación
+  si no hay evidencia vigente y consistente, cadena_vigente devuelve falso
+  nuevas concesiones requieren un nuevo acto autorizado
 ```
 
 Conceder, compartir, restringir y revocar están en las secciones 6 y 7. El diagrama resume el orden de una tupla. La lista vacía autorizada, la mutación completa y el envío previo al efecto externo están en el pseudocódigo.
@@ -347,12 +335,12 @@ Salen de columnas que ya tiene `CrmLead`. No se añaden columnas.
 
 | Clase | Columnas | Lectura y edición |
 |---|---|---|
-| `f.identidad` | `name` | Pueden separarse. Editar exige leer la misma tupla. |
+| `f.identidad` | `id`, `name` | `id` solo se lee y lo genera el sistema; no es editable. Editar `name` exige leer la misma combinación. |
 | `f.canal` | `email`, `phone` | Igual. El envío exige leer esta clase en ese lead. |
-| `f.gestion` | `company`, `source`, `stage`, `status`, `nextAction`, `lastContactedAt`, `confidence` | `status` hoy viaja en la lectura y el PATCH inspeccionado no lo escribe. Editar `status` no tiene ruta. |
+| `f.gestion` | `company`, `source`, `stage`, `status`, `nextAction`, `lastContactedAt`, `confidence`, `createdAt`, `updatedAt` | `createdAt` y `updatedAt` son de lectura y mantenimiento del sistema. `status` hoy viaja en la lectura y el PATCH inspeccionado no lo escribe. Una concesión no convierte un campo no soportado en editable. |
 | `f.reservado` | `value`, `notes` | Clase confidencial del ejemplo. Puede ocultarse sin ocultar el nombre. Editar `notes` no autoriza el envío. |
 
-La proyección ocurre en el servidor en la lista y también en la respuesta de crear, editar y registrar un envío. No se sustituye un campo oculto por un valor que confirme el dato. Un filtro, una ordenación o un agregado sobre una clase sin lectura se deniega entero. `GET /api/crm/stats` suma `value`; sin lectura de `f.reservado` se deniegan sus cifras. Las cuentas de registros solo incluyen el conjunto visible y no revelan el total de la empresa.
+La proyección usa una lista explícita de campos en el servidor, tanto en la lista como en la respuesta de crear, editar y registrar un envío. Todo campo no clasificado se omite por defecto y se rechaza en mutaciones. `userId`, `organizationId` y `campaignId` no adquieren acceso de lectura o escritura por caer fuera de la tabla: requieren una política explícita posterior antes de exponerse, y no se aceptan del cliente como cambios de pertenencia. Crear exige permisos de creación por campo, no lectura de un lead aún inexistente. No se sustituye un campo oculto por un valor que confirme el dato. Un filtro, una ordenación o un agregado sobre una clase sin lectura se deniega entero. `GET /api/crm/stats` suma `value`; sin lectura de `f.reservado` se deniegan sus cifras. Las cuentas de registros solo incluyen el conjunto visible y no revelan el total de la empresa.
 
 Una mutación se valida por todos los campos presentes. Si uno no está autorizado, no se escribe ninguno. Exportar exige `crm.lead.export` y la lectura de esa misma tupla. Pedir una clase oculta deniega la exportación completa.
 
@@ -371,37 +359,44 @@ La activación de una membresía comprueba persona autenticada, empresa y par. U
 
 ### Restricciones
 
-Solo `company.policy.restrict` impone o levanta restricciones. `company.permission.grant` no lo hace.
+Solo `company.policy.restrict`, limitado al conjunto de destinatarios y permisos que su autoridad de política puede gestionar, permite imponer o levantar restricciones. `company.permission.grant` no lo hace. Tener autoridad de política en A no permite cambiar B.
+
+La procedencia de una restricción es trazabilidad, no una concesión positiva dependiente de la presencia de su autor. Revocar o suspender al autor no elimina automáticamente sus restricciones ni amplía permisos de otros. Siguen vigentes hasta una retirada explícita autorizada. Un delegado no puede levantar límites de su cadena de autoridad; sí puede gestionar restricciones de otros destinatarios dentro de su autoridad expresa cuando ello no le beneficia directa ni indirectamente.
 
 ```text
-restringir(autoridad, destino, empresa, tupla):
-  decidir(autoridad, empresa, company.policy.restrict) debe permitir
-  destino tiene membresía en esa empresa
-  la autoridad no recibe derechos nuevos
-  origen de la restricción = autoridad
-  vigencia = activa
+restringir(autoridad, destino, empresa, combinacion):
+  verificar company.policy.restrict y su ámbito de destinatarios/combinaciones
+  destino pertenece a empresa
+  no permitir ampliar derechos de quien actúa ni neutralizar un límite superior
+  aplicar regla de continuidad ordinaria o retirada de seguridad, según proceda
+  devolver permitir con registro de autor, motivo, ámbito y vigencia
 
 levantar(autoridad, restriccion):
-  decidir(autoridad, empresa, company.policy.restrict) debe permitir
-  si la restricción limita a la autoridad o a un descendiente de su cadena:
-    denegar motivo=restriccion_propia
-  si levantarla ampliaría un derecho efectivo de la autoridad, directo o indirecto:
-    denegar motivo=ampliacion_propia
-  si quien actúa solo tiene company.permission.grant:
-    denegar motivo=sin_autoridad_de_politica
+  verificar company.policy.restrict para esta restricción y su destinatario
+  si la restricción limita a la autoridad o a su cadena ascendente:
+    denegar restriccion_propia
+  si levantarla ampliaría derechos efectivos de la autoridad directa o indirectamente:
+    denegar ampliacion_propia
+  si la restricción proviene de una autoridad superior fuera de su ámbito:
+    denegar fuera_de_autoridad
+  en los demás casos, permitir la retirada explícita y trazable
+  ser subordinado o descendiente no impide por sí solo que una autoridad
+    independiente gestione sus restricciones
 ```
 
 ### Último responsable y recuperación
 
 Hay dos operaciones distintas.
 
-Cambio administrativo ordinario. Suspender, retirar o estrechar `company.membership.admin` de un responsable exige un reemplazo ya efectivo, o una operación atómica que nombra al reemplazo y retira al anterior juntas. El reemplazo es elegible solo si su concesión de administración no depende del responsable que sale. Si eso no se cumple, la operación queda pendiente: el acceso anterior sigue vigente y no se presenta como revocado.
+Cambio administrativo ordinario. Suspender, retirar o estrechar `company.membership.admin` de un responsable exige un reemplazo ya efectivo, o una operación atómica que nombra al reemplazo y retira al anterior juntas. El reemplazo es elegible solo si su concesión de administración no depende del responsable que sale. Si eso no se cumple, la operación no se ejecuta: el resultado informa que requiere reemplazo; no se crea una cola que la ejecute después sin nueva validación. El acceso anterior sigue vigente y no se presenta como revocado.
 
-Retirada de seguridad. Cerrar un acceso indebido, incluida la agencia que es la única administradora, debe poder terminar aunque deje cero administradores. La empresa entra en recuperación controlada. Nadie asciende de forma automática y el personal de Nexora no recibe acceso por este estado. Los datos permanecen. El procedimiento para salir de la recuperación es un punto posterior; aquí solo queda la frontera. Las concesiones que dependían del acceso cerrado siguen inefectivas. Las de otro origen se tratan de forma explícita y no se convierten en administración.
+Retirada de seguridad. Exige una solicitud autenticada y una autoridad de revocación validada para esa empresa. No basta que el cliente envíe una bandera de «seguridad», pertenezca a la cuenta o declare ser dueño. La definición y comprobación de una autoridad de emergencia independiente cuando no queda un administrador confiable es una dependencia obligatoria del futuro procedimiento de recuperación: si esa autoridad no está validada, se deniega la operación. Con autoridad válida, cerrar un acceso indebido, incluida la agencia que es la única administradora, debe poder terminar aunque deje cero administradores. La empresa entra en recuperación controlada. Nadie asciende de forma automática y el personal de Nexora no recibe acceso por este estado. Los datos permanecen. El procedimiento para entrar por autoridad de emergencia y para salir de la recuperación es un punto posterior; aquí solo queda la frontera y no se puede habilitar ese flujo sin concretarla. Las concesiones que dependían del acceso cerrado siguen inefectivas. Las de otro origen se tratan de forma explícita y no se convierten en administración.
 
 ## 7. Delegación y revocación
 
 ### Conceder
+
+La delegación ordinaria mantiene dependencia del otorgante. Un nombramiento independiente de responsable es una transición de autoridad de empresa distinta: requiere verificar quién puede nombrarlo y por qué su autoridad sobrevivirá al saliente. No se obtiene borrando el padre de una concesión ni convirtiendo un rol de agencia en raíz directa. Ese procedimiento debe quedar especificado antes de implementarse; hasta entonces no se admite como reemplazo una concesión dependiente.
 
 ```text
 conceder(otorgante, destino, empresa, tupla):
@@ -414,17 +409,18 @@ conceder(otorgante, destino, empresa, tupla):
     denegar motivo=autoelevacion
   si la tupla incluye administracion, politica o borrado por medio de crm.lead.share:
     denegar motivo=administracion_no_implicita
-  si la operación levanta una restricción:
-    denegar motivo=sin_autoridad_de_politica
-  crear concesión con padre = cobertura del otorgante
-  origen = cadena del otorgante
+  si la operación levanta una restricción o amplía derechos propios indirectamente:
+    denegar motivo=sin_autoridad_o_ampliacion_propia
+  validar cobertura de TODO el ámbito y TODOS los campos pedidos, no una muestra
+  devolver permitir con obligación de crear concesión trazable dependiente
+  el ejecutor autorizado registra padre y origen; decidir no escribe
 ```
 
 Un administrador con lectura de asignados no puede conceder lectura de toda la empresa. Quien edita `notes` no puede conceder `crm.lead.message.send` si no lo posee. Una restricción sigue ganando aunque el paquete de origen sea amplio.
 
 ### Agencia retirada
 
-La relación comercial no es la concesión. Al cerrar el acceso de la agencia en una empresa, en modo seguridad:
+La relación comercial no es la concesión. Al cerrar el acceso de la agencia en una empresa, con autoridad de seguridad validada según la sección 6:
 
 1. Se toman las concesiones de esa empresa cuyo origen depende de esa relación, incluidos los paquetes expandidos que la agencia asignó y todos sus descendientes. No quedan convertidas en origen directo.
 2. Las concesiones de otro origen quedan fuera. Se listan para conservarlas o revocarlas con una decisión explícita. El silencio no las borra ni las vuelve acceso de agencia.
@@ -449,22 +445,27 @@ Recorrido lógico del pseudocódigo con la empresa en `contrato_activo` y la ofe
 | 5. Jefatura | Jefa activa, paquete vacío. Un subordinado tiene L1. | Consultar L1. | Denegar. | `sin_permiso`. La jerarquía no crea tupla ni origen. | Ninguno. |
 | 6. Un registro compartido | Paquete vacío y una concesión solo de L1, lectura de identidad y canal, origen del otorgante. | Consultar L1. Consultar L2. Exportar L1. Administrar miembros. | L1 se permite con esos campos. L2, la exportación y la administración se deniegan. | La tupla nombra L1 y esas clases. No hay lectura de empresa, ni exportar, ni administración implícita. | Identificador explícito del compartido. |
 | 7. Campos que no se cruzan | Concesión de lectura de R1 en `f.identidad` y otra de R2 en `f.canal`. | Leer R1 identidad, R1 canal, R2 canal y R2 identidad. | Solo R1 identidad y R2 canal se permiten. | Cada cobertura coincide entera. No se une el registro de una con el campo de la otra. | Dos concesiones distintas, no una tabla nueva en este paso. |
-| 8. Mutación completa | El perfil de ventas del caso 4, con L1 asignado. | PATCH con `stage` y `value` juntos. Crear un lead enviando `value` sin tupla de ese campo. | Las dos llamadas se deniegan y no escriben nada. | `mutacion_incompleta`: un campo no autorizado rechaza toda la petición. La respuesta no llega a proyectarse porque no hay escritura. | Asignación de L1 para el PATCH. |
+| 8. Mutación completa | Lectura y edición de gestión en L1 asignado; creación de identidad/gestión en empresa, sin permiso de value. | PATCH con stage y value; crear con value. | Ambas se deniegan sin escribir campos. | El PATCH carece de lectura/edición de value y la creación carece de permiso de creación de value. El motivo concreto corresponde al primer control fallido; no hay escritura parcial. | Asignación para L1 y concesión explícita de creación por empresa. |
 | 9. Envío separado | Lectura y edición de `notes` en L1. No hay `crm.lead.message.send`. | Editar `notes`. Llamar `POST .../message`. Llamar el seguimiento legacy. | La edición de `notes` se permite. El mensaje se deniega sin efecto externo y sin otra escritura. El seguimiento legacy no queda autorizado por estas tuplas. | `crm.lead.update` no incluye `crm.lead.message.send`. `POST /api/crm/followups` está fuera de este catálogo. | Ninguno para la denegación del envío. |
 | 10. Compartir | Otorgante con lectura de L1 en identidad y con `crm.lead.share`. Destino activo en la misma empresa. Otro destino está `SUSPENDED`. | Compartir esa tupla. Compartir también `company.membership.admin`. Compartir al destino suspendido. | La tupla de lectura se concede con padre en el otorgante. La administración se deniega. El destino suspendido se deniega. | Solo se comparte una tupla delegable poseída, con origen dependiente, hacia una membresía `ACTIVE`. | La concesión nueva y su padre. No su tabla física. |
 | 11. Autoelevación y restricción | Delegado con lectura y `company.permission.grant`. Una restricción de origen de política le niega exportar. | Concederse exportar. Levantar esa restricción. | Las dos se deniegan. La restricción sigue. | No posee exportar. El destino es él mismo. No tiene `company.policy.restrict`. Aunque lo tuviera, levantar una restricción propia deniega por `restriccion_propia`. | Origen de la restricción. |
 | 12. Suspensión de la cadena | La sesión sigue emitida. Quien otorgó la lectura de A está `SUSPENDED`. La membresía de B, con lectura de origen directo, está `ACTIVE`. | Consultar A. Consultar B. Reactivar después al otorgante de A. | A se deniega durante la suspensión y sigue denegada después de reactivar al otorgante. B se permite. No se borra la persona ni leads. | La cadena no está vigente. Reactivar no revive al descendiente. B es otra empresa y otro origen. | Marca de vigencia de la concesión hija. El resolver ya relee el estado de la membresía si no hay caché. |
 | 13. Agencia y permiso directo | En C1, la lectura de empresa y el rol operativo los asignó la agencia. L9 tiene lectura de origen directo, independiente. C2 tiene otra concesión de esa agencia. Hay un responsable cuyo origen no es la agencia. Se cierra el acceso de agencia en C1. | Consultar C1. Consultar L9. Consultar C2. | La lectura y el rol expandido de C1 quedan inefectivos, sin convertirse en origen directo. L9 sigue hasta una decisión explícita. C2 no cambia. Los leads siguen. | Se invalida la cadena dependiente, incluido el paquete expandido. El enum no conserva ese permiso. El origen directo no entra en el conjunto. | Origen de la asignación del rol y de cada concesión. La relación de agencia viene del paso 1 y no está persistida. |
 | 14. Retiro ordinario | Una sola concesión efectiva de `company.membership.admin`, de origen directo. No hay reemplazo. | Suspenderla o retirarla como cambio ordinario. | La operación queda pendiente. La concesión sigue vigente y no se muestra como revocada. | Falta un reemplazo independiente, o un retiro atómico que lo nombre. Una concesión que dependiera de este responsable no serviría como reemplazo. | Saber el padre de cada concesión de administración. |
-| 15. Agencia única administradora | La única concesión de `company.membership.admin` depende de la agencia. No hay reemplazo. Se pide retirada de seguridad. | Cerrar ese acceso. | El cierre se completa. Quedan cero administradores. La empresa entra en recuperación controlada. Nadie asciende. El personal de Nexora no recibe acceso. Los leads siguen. El cierre no queda descrito como pendiente. | La retirada de seguridad puede dejar la empresa sin administrador. El modo de salir de la recuperación no se define aquí. | La frontera de recuperación. El procedimiento posterior no forma parte de este paso. |
+| 15. Agencia única administradora | La única concesión de `company.membership.admin` depende de la agencia. No hay reemplazo. Se pide retirada de seguridad por una autoridad independiente validada para esa empresa. | Cerrar ese acceso. | El cierre se completa. Quedan cero administradores. La empresa entra en recuperación controlada. Nadie asciende. El personal de Nexora no recibe acceso. Los leads siguen. El cierre no queda descrito como pendiente. | La retirada de seguridad puede dejar la empresa sin administrador. El modo de salir de la recuperación no se define aquí. | Autoridad de emergencia y frontera de recuperación validadas. Sin esa autoridad, se deniega; el procedimiento posterior no forma parte de este paso. |
 | 16. Otra empresa | Miembro activo de A. El lead pertenece a B. | `PATCH` de ese id contra A. | Denegar, sin escritura. | `registro_otra_empresa`. La ruta actual responde que no existe cuando el id no está en la empresa. | Ninguno. `organizationId` ya existe. |
 | 17. Campo restringido | El perfil de ventas del caso 4, con L1 asignado. | Listar L1. Filtrar por `value`. Exportar incluyendo `value`. Pedir la suma de `value`. | La lista omite `value` y `notes`. El filtro y la suma se deniegan con `campo_no_legible`. La exportación se deniega con `exportacion_sin_lectura`. | No hay lectura de `f.reservado`. Aunque la hubiera, faltaría `crm.lead.export`. | Asignación de L1. La exportación sigue sin ruta. |
 | 18. Cutover | La empresa pasa a `contrato_activo` con un snapshot que nombra, por membresía, lectura, creación y edición de las rutas ya existentes. No nombra envío, exportación ni borrado. Otra empresa sigue en `legacy_actual` y no tiene filas de concesión. | Un `MEMBER` de la primera consulta, crea, edita, envía y exporta. La segunda sigue como hoy. | En la primera, lectura, creación y edición se permiten solo en las tuplas del snapshot. Envío, exportación y borrado se deniegan. La segunda no activa este contrato por tener cero filas. | El modo es explícito. El snapshot no es un permiso indiscriminado y su origen es `legacy_snapshot`, no el enum ni una agencia. | El inventario explícito. Este paso no define su persistencia. |
 | 19. Reactivar después de REMOVED | Una membresía vuelve de `REMOVED` a `ACTIVE`. Sus concesiones anteriores están revocadas. | Consultar con esas concesiones antiguas. | Denegar hasta que existan concesiones nuevas. | Reactivar no recupera permisos revocados. | Concesiones nuevas, no una resurrección. |
+| 20. Emergencia sin autoridad | Un miembro o una petición sin autorización marca seguridad=true. | Retirar al único administrador. | Denegar, sin cambiar accesos. | La bandera no acredita autoridad de revocación. | Procedimiento de autoridad validada antes de habilitar emergencias. |
+| 21. Restricción y autor retirado | Una restricción vigente oculta notes; su autor pierde acceso. | Leer notes; una autoridad independiente competente levanta después la restricción de otro usuario. | La primera lectura se deniega. La retirada posterior solo se permite dentro de su autoridad y sin beneficio propio. | Revocar al autor no revoca la restricción. La prohibición no bloquea toda gestión legítima de restricciones de subordinados. | Restricción persistente y ámbito explícito de autoridad de política. |
+| 22. Campo no clasificado | Permiso de lectura de identidad y gestión. Respuesta contiene además userId, campaignId o un nuevo campo. | Proyectar respuesta; enviar id/organizationId en una edición. | Omitir campos sin clasificación; denegar cambios de campos inmutables o no soportados. | Lista explícita de campos y política por operación. | Proyección por registro, nunca serialización indiscriminada del modelo. |
+| 23. Evaluación pura e invalidación | Una cadena tiene padre ausente, ciclo o versión revocada; o falta modo de transición. | Evaluar lectura y volver a activar al padre. | Denegar sin escribir estado; reactivar no revierte invalidaciones persistentes. | Datos de política incompletos no autorizan; el evaluador no ejecuta transiciones. | Estado y versiones coherentes provistos por el ejecutor futuro. |
+
 
 ## 9. Decisiones recomendadas y corte siguiente
 
-Estas decisiones forman una sola política. La revisión de Codex puede sustituirlas. No reabren D1–D3. No están aprobadas por estar escritas aquí.
+Codex adopta estas decisiones como contrato conceptual bajo la delegación de criterio de la usuaria, después de revisar las correcciones. No reabren D1–D3 ni autorizan activar la política en las rutas. Los procedimientos explícitamente pendientes siguen siendo requisitos previos para sus respectivas operaciones.
 
 | Id | Decisión recomendada | Razón | Depende de |
 |---|---|---|---|
@@ -477,14 +478,14 @@ Estas decisiones forman una sola política. La revisión de Codex puede sustitui
 | P7 | El cambio ordinario de administrador exige reemplazo independiente o retiro atómico. Si falta, queda pendiente y no se presenta como revocado. La retirada de seguridad cierra el acceso aunque deje cero administradores y pone la empresa en recuperación controlada, sin ascenso automático ni acceso universal de Nexora. La agencia revocada se lleva los paquetes que asignó. | Impedir siempre el retiro del último administrador puede dejar a la empresa atrapada con la agencia. Contar como reemplazo una concesión hija no crea independencia. | El procedimiento para salir de la recuperación queda para un punto posterior. |
 | P8 | Retirar acceso cambia vigencia de concesiones o estado de membresía. No borra `User` ni leads. | El borrado de `User` ya borra leads en cascada. | Estados ya existentes. |
 
-El corte de implementación más pequeño, después de la revisión y fuera de este PR, sería una función pura de `decidir`, `conceder`, `restringir` y del cierre de agencia, con el modo de transición y la cadena como argumentos de prueba. No se conectaría a las rutas, no habría migración y el comportamiento actual permanecería mientras el modo no sea `contrato_activo`. Este documento no escribe esa función.
+El corte de implementación más pequeño, fuera de este PR, será únicamente el evaluador puro de lectura CRM: identidad/membresía/empresa, origen validado, alcance, restricciones, proyección de campos y modo de transición como entradas explícitas, con casos sintéticos de aislamiento. No incluye crear concesiones, cambiar restricciones, recuperación, transición real ni efectos externos; estos necesitan sus propios cortes. No se conectará a rutas ni base de datos. Las operaciones desconocidas o no implementadas se denegarán; los datos de prueba no se usarán como autorización real. Este documento no escribe esa función.
 
 ## 10. Cierre y trazabilidad
 
 | Pieza | Estado |
 |---|---|
 | Contrato de acceso dentro de una empresa | Diseñado en este documento y corregido en la misma revisión |
-| Revisión Codex de P1–P8 | Pendiente. Incorporar estas correcciones no las da por aprobadas |
+| Revisión Codex de P1–P8 | Completada para el diseño conceptual, con límites y dependencias explícitas |
 | Aptitud para producción | No |
 | Identidad de cuenta, empresa y relación comercial | Adoptada en el paso 1, commit `34a19eb892a71f761f5f03a18494b8710d26b4de` |
 | Código, schema, migraciones, rutas y PR 20 | Sin cambios |
@@ -495,4 +496,4 @@ Requisitos cubiertos por la política: acceso completo, limitado o nulo; CRM com
 
 Pendientes ajenos a este diseño: persistir concesiones, restricciones, asignaciones, compartidos, orígenes y el modo de transición; decidir la duración antes de emitir invitaciones; escribir los estados de invitación; definir la oferta comercial de la plataforma; el procedimiento de salida de la recuperación; habilitar el borrado definitivo y su retención; conectar el contrato a las rutas; permisos de la cuenta cliente; personal interno; soporte; finanzas.
 
-Límites de la comprobación de esta revisión: las citas de la sección 1 se contrastaron con `main` `b35b3a21afa48005eb49a2f7231e455eeeef35b6`. Los diecinueve casos se recorrieron de forma lógica contra el pseudocódigo, la matriz y P1–P8. Las denegaciones y el cierre de seguridad no borran persona, leads ni otra empresa. El diagrama se renderizó en local con Mermaid CLI 11.12.0 y el SVG contiene los nodos de cadena, restricción y tupla. Esa renderización comprueba la sintaxis, no un flujo de la aplicación. No hubo build ni tests de aplicación. El contrato sigue pendiente de revisión Codex.
+Límites de la comprobación de esta revisión: las citas de la sección 1 se contrastaron con `main` `b35b3a21afa48005eb49a2f7231e455eeeef35b6`. Los primeros diecinueve casos fueron recorridos por Cursor de forma lógica contra el pseudocódigo, la matriz y P1–P8. Codex revisó su coherencia y añadió los casos 20–23 para los ajustes finales. Las denegaciones y el cierre de seguridad no borran persona, leads ni otra empresa. El diagrama se renderizó en local con Mermaid CLI 11.12.0 y el SVG contiene los nodos de cadena, restricción y tupla. Esa renderización comprueba la sintaxis, no un flujo de la aplicación. No hubo build ni tests de aplicación. Codex revisó además autoridad de revocación, permanencia de restricciones, separación entre evaluación y efectos, campos no clasificados y ausencia de política. Son comprobaciones documentales; todavía no hay evidencia de cumplimiento en una aplicación implementada.
