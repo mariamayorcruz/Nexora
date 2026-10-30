@@ -99,11 +99,12 @@ type ParsedGrant = {
   parentGrantId: string | null;
   version: string | null;
   requiredParentVersion: string | null;
-  validFrom: string | null;
-  validUntil: string | null;
+  validFrom: number | null;
+  validUntil: number | null;
 };
 
 type ParsedRestriction = {
+  membershipId: string;
   scope: Scope;
   fieldClasses: FieldClass[];
 };
@@ -134,7 +135,7 @@ type ParsedPolicy = {
   assignmentKeys: Set<string>;
   leads: ParsedLead[];
   memberships: ParsedMembership[];
-  evaluatedAt: string | null;
+  evaluatedAt: number | null;
 };
 
 const FIELD_CLASS: Record<string, FieldClass> = {};
@@ -185,12 +186,33 @@ const OUT_OF_CUT_OPERATIONS: ReadonlySet<string> = new Set([
   'recover',
 ]);
 
-const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
+const INSTANT_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{3}))?Z$/;
+const nativeDateUTC = Date.UTC;
+const NativeDate = Date;
+const nativeGetTime = Date.prototype.getTime;
+const nativeToISOString = Date.prototype.toISOString;
+const nativeGetUTCFullYear = Date.prototype.getUTCFullYear;
+const nativeGetUTCMonth = Date.prototype.getUTCMonth;
+const nativeGetUTCDate = Date.prototype.getUTCDate;
+const nativeGetUTCHours = Date.prototype.getUTCHours;
+const nativeGetUTCMinutes = Date.prototype.getUTCMinutes;
+const nativeGetUTCSeconds = Date.prototype.getUTCSeconds;
+const nativeGetUTCMilliseconds = Date.prototype.getUTCMilliseconds;
+const OBJECT_PROTOTYPE = Object.prototype;
+const ARRAY_PROTOTYPE = Array.prototype;
+const nativeGetPrototypeOf = Object.getPrototypeOf;
+const nativeGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+const nativeGetOwnPropertyNames = Object.getOwnPropertyNames;
+const nativeGetOwnPropertySymbols = Object.getOwnPropertySymbols;
+const nativeArrayIsArray = Array.isArray;
+const nativeToString = Object.prototype.toString;
+const nativeHasOwn = Object.prototype.hasOwnProperty;
 
 export function evaluateCrmLeadRead(state: unknown, request: unknown): CrmReadDecision {
-  if (!isRecord(state)) return deny('entrada_invalida');
+  const snapshot = ownDataRecord(state);
+  if (!snapshot) return deny('entrada_invalida');
 
-  const mode = readMode(state);
+  const mode = readMode(snapshot);
   if (mode === 'missing') return deny('modo_no_definido');
   if (mode === 'legacy_actual') {
     return {
@@ -200,32 +222,33 @@ export function evaluateCrmLeadRead(state: unknown, request: unknown): CrmReadDe
     };
   }
 
-  if (!isRecord(request)) return deny('entrada_invalida');
+  const call = ownDataRecord(request);
+  if (!call) return deny('entrada_invalida');
 
-  const principal = readPrincipal(state);
+  const principal = readPrincipal(snapshot);
   if (!principal.ok) return deny(principal.reason);
 
-  const organizationId = readOrganizationId(request);
+  const organizationId = readOrganizationId(call);
   if (!organizationId) return deny('entrada_invalida');
 
-  const organization = readOrganizations(state, organizationId);
+  const organization = readOrganizations(snapshot, organizationId);
   if (!organization.ok) return deny(organization.reason);
 
-  const membership = readMembership(state, organizationId, principal.userId);
+  const membership = readMembership(snapshot, organizationId, principal.userId);
   if (!membership.ok) return deny(membership.reason);
 
-  const operation = readOperation(request);
+  const operation = readOperation(call);
   if (!operation.ok) return deny(operation.reason);
 
-  if (state.platformOffersCrmLeadRead !== true) return deny('accion_no_ofrecida');
+  if (dataValue(snapshot, 'platformOffersCrmLeadRead') !== true) return deny('accion_no_ofrecida');
 
-  const policy = readPolicy(state, organizationId, membership.membership.id);
+  const policy = readPolicy(snapshot, organizationId);
   if (!policy.ok) return deny(policy.reason);
 
-  const requested = readRequestedScope(request, operation.operation);
+  const requested = readRequestedScope(call, operation.operation);
   if (requested === 'invalid') return deny('entrada_invalida');
 
-  const dependencies = readQueryDependencies(request);
+  const dependencies = readQueryDependencies(call);
   if (dependencies === 'invalid') return deny('entrada_invalida');
 
   return decideRead(policy.policy, membership.membership, organizationId, requested, dependencies);
@@ -243,33 +266,29 @@ function decideRead(
     return deny('sin_permiso');
   }
 
-  const candidates = leadsInScope(policy, organizationId, membership.id, requested);
+  const inScope = leadsInScope(policy, organizationId, membership.id, requested);
   if (requested.kind === 'record') {
-    if (candidates.length !== 1) return deny('sin_permiso');
-    const lead = candidates[0];
-    const classes = readableClasses(policy, effectiveGrants, membership.id, organizationId, lead);
+    if (inScope.length !== 1) return deny('sin_permiso');
+    const lead = inScope[0];
+    const classes = readableClasses(policy, effectiveGrants, lead);
     if (classes.size === 0) return deny('sin_permiso');
     if (
       dependencies.length > 0 &&
-      !dependenciesReadable(policy, effectiveGrants, membership.id, organizationId, requested, candidates, dependencies)
+      !dependenciesReadable(policy, effectiveGrants, requested, [lead], dependencies)
     ) {
       return deny('campo_no_legible');
     }
     return allow(requested.kind, [projectLead(lead, classes)], dependencies);
   }
 
-  if (
-    dependencies.length > 0 &&
-    !dependenciesReadable(policy, effectiveGrants, membership.id, organizationId, requested, candidates, dependencies)
-  ) {
+  const visible = inScope.filter((lead) => readableClasses(policy, effectiveGrants, lead).size > 0);
+  if (dependencies.length > 0 && !dependenciesReadable(policy, effectiveGrants, requested, visible, dependencies)) {
     return deny('campo_no_legible');
   }
 
   const records: CrmReadProjectedRecord[] = [];
-  for (const lead of candidates) {
-    const classes = readableClasses(policy, effectiveGrants, membership.id, organizationId, lead);
-    if (classes.size === 0) continue;
-    records.push(projectLead(lead, classes));
+  for (const lead of visible) {
+    records.push(projectLead(lead, readableClasses(policy, effectiveGrants, lead)));
   }
   return allow(requested.kind, records, dependencies);
 }
@@ -332,12 +351,11 @@ function versionMatches(child: ParsedGrant, parent: ParsedGrant): boolean {
   return parent.version === child.requiredParentVersion;
 }
 
-function withinWindow(grant: ParsedGrant, evaluatedAt: string | null): boolean {
+function withinWindow(grant: ParsedGrant, evaluatedAt: number | null): boolean {
   if (grant.validFrom === null && grant.validUntil === null) return true;
   if (evaluatedAt === null) return false;
-  const instant = Date.parse(evaluatedAt);
-  if (grant.validFrom !== null && instant < Date.parse(grant.validFrom)) return false;
-  if (grant.validUntil !== null && instant > Date.parse(grant.validUntil)) return false;
+  if (grant.validFrom !== null && evaluatedAt < grant.validFrom) return false;
+  if (grant.validUntil !== null && evaluatedAt > grant.validUntil) return false;
   return true;
 }
 
@@ -391,23 +409,35 @@ function leadsInScope(
   return inOrg.filter((lead) => lead.id === requested.leadId);
 }
 
-function readableClasses(
-  policy: ParsedPolicy,
-  grants: readonly ParsedGrant[],
-  membershipId: string,
-  organizationId: string,
-  lead: ParsedLead
-): Set<FieldClass> {
+function readableClasses(policy: ParsedPolicy, grants: readonly ParsedGrant[], lead: ParsedLead): Set<FieldClass> {
   const classes = new Set<FieldClass>();
   for (const grant of grants) {
-    if (!scopeIncludesLead(grant.scope, lead, membershipId, organizationId, policy)) continue;
     for (const fieldClass of grant.fieldClasses) {
-      if (!restrictionHits(policy, membershipId, organizationId, lead, fieldClass)) {
-        classes.add(fieldClass);
-      }
+      if (chainAllowsLeadField(policy, grant, lead, fieldClass)) classes.add(fieldClass);
     }
   }
   return classes;
+}
+
+function chainAllowsLeadField(
+  policy: ParsedPolicy,
+  grant: ParsedGrant,
+  lead: ParsedLead,
+  fieldClass: FieldClass
+): boolean {
+  let current: ParsedGrant | undefined = grant;
+  const seen = new Set<string>();
+  while (current) {
+    if (seen.has(current.id) || seen.size >= CRM_READ_MAX_CHAIN_DEPTH) return false;
+    seen.add(current.id);
+    if (current.organizationId !== grant.organizationId) return false;
+    if (!current.fieldClasses.includes(fieldClass)) return false;
+    if (!scopeIncludesLead(current.scope, lead, current.membershipId, current.organizationId, policy)) return false;
+    if (restrictionHits(policy, current.membershipId, current.organizationId, lead, fieldClass)) return false;
+    if (current.parentGrantId === null) return true;
+    current = policy.grants.get(current.parentGrantId);
+  }
+  return false;
 }
 
 function scopeIncludesLead(
@@ -431,6 +461,7 @@ function restrictionHits(
   fieldClass: FieldClass
 ): boolean {
   for (const restriction of policy.restrictions) {
+    if (restriction.membershipId !== membershipId) continue;
     if (!restriction.fieldClasses.includes(fieldClass)) continue;
     if (restriction.scope.kind === 'company') return true;
     if (restriction.scope.kind === 'assigned' && isAssigned(policy, organizationId, membershipId, lead.id)) {
@@ -444,48 +475,71 @@ function restrictionHits(
 function dependenciesReadable(
   policy: ParsedPolicy,
   grants: readonly ParsedGrant[],
-  membershipId: string,
-  organizationId: string,
   requested: Scope,
-  candidates: readonly ParsedLead[],
+  visible: readonly ParsedLead[],
   fields: readonly string[]
 ): boolean {
   for (const field of fields) {
     const fieldClass = FIELD_CLASS[field];
     if (!fieldClass) return false;
-    if (candidates.length === 0) {
-      if (!scopeGrantsClass(grants, requested, membershipId, organizationId, policy, fieldClass)) return false;
-      if (emptyScopeBlocked(policy, requested, fieldClass)) return false;
+    if (visible.length === 0) {
+      if (!grants.some((grant) => chainAllowsRequestedField(policy, grant, requested, fieldClass))) return false;
       continue;
     }
-    for (const lead of candidates) {
-      const classes = readableClasses(policy, grants, membershipId, organizationId, lead);
-      if (!classes.has(fieldClass)) return false;
+    for (const lead of visible) {
+      if (!readableClasses(policy, grants, lead).has(fieldClass)) return false;
     }
   }
   return true;
 }
 
-function scopeGrantsClass(
-  grants: readonly ParsedGrant[],
-  requested: Scope,
-  membershipId: string,
-  organizationId: string,
+function chainAllowsRequestedField(
   policy: ParsedPolicy,
+  grant: ParsedGrant,
+  requested: Scope,
   fieldClass: FieldClass
 ): boolean {
-  return grants.some(
-    (grant) =>
-      grant.fieldClasses.includes(fieldClass) &&
-      scopeCoversRequest(grant.scope, requested, membershipId, organizationId, policy)
-  );
+  let current: ParsedGrant | undefined = grant;
+  const seen = new Set<string>();
+  while (current) {
+    if (seen.has(current.id) || seen.size >= CRM_READ_MAX_CHAIN_DEPTH) return false;
+    seen.add(current.id);
+    if (current.organizationId !== grant.organizationId) return false;
+    if (!current.fieldClasses.includes(fieldClass)) return false;
+    if (!scopeCoversScope(current.scope, requested, current.membershipId, current.organizationId, policy)) return false;
+    if (linkBlocksRequestedField(policy, current, requested, fieldClass)) return false;
+    if (current.parentGrantId === null) return true;
+    current = policy.grants.get(current.parentGrantId);
+  }
+  return false;
 }
 
-function emptyScopeBlocked(policy: ParsedPolicy, requested: Scope, fieldClass: FieldClass): boolean {
+function linkBlocksRequestedField(
+  policy: ParsedPolicy,
+  grant: ParsedGrant,
+  requested: Scope,
+  fieldClass: FieldClass
+): boolean {
   for (const restriction of policy.restrictions) {
+    if (restriction.membershipId !== grant.membershipId) continue;
     if (!restriction.fieldClasses.includes(fieldClass)) continue;
     if (restriction.scope.kind === 'company') return true;
-    if (requested.kind === 'assigned' && restriction.scope.kind === 'assigned') return true;
+    if (requested.kind === 'company') continue;
+    if (restriction.scope.kind === 'assigned' && requested.kind === 'assigned') return true;
+    if (
+      requested.kind === 'record' &&
+      restriction.scope.kind === 'record' &&
+      restriction.scope.leadId === requested.leadId
+    ) {
+      return true;
+    }
+    if (
+      requested.kind === 'record' &&
+      restriction.scope.kind === 'assigned' &&
+      isAssigned(policy, grant.organizationId, grant.membershipId, requested.leadId)
+    ) {
+      return true;
+    }
   }
   return false;
 }
@@ -505,10 +559,10 @@ function copyScalar(value: unknown): CrmReadScalar | undefined {
   if (value == null) return null;
   if (typeof value === 'string' || typeof value === 'boolean') return value;
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-  if (value instanceof Date) {
-    const time = value.getTime();
-    if (Number.isNaN(time)) return null;
-    return new Date(time).toISOString();
+  if (nativeToString.call(value) === '[object Date]') {
+    const time = nativeGetTime.call(value);
+    if (typeof time !== 'number' || !Number.isFinite(time)) return null;
+    return nativeToISOString.call(new NativeDate(time));
   }
   return undefined;
 }
@@ -558,8 +612,9 @@ function deny(reason: CrmReadDenyReason): CrmReadDecision {
 
 function readMode(state: Record<string, unknown>): 'contrato_activo' | 'legacy_actual' | 'missing' {
   if (!hasOwn(state, 'transitionMode')) return 'missing';
-  if (state.transitionMode === 'contrato_activo') return 'contrato_activo';
-  if (state.transitionMode === 'legacy_actual') return 'legacy_actual';
+  const mode = dataValue(state, 'transitionMode');
+  if (mode === 'contrato_activo') return 'contrato_activo';
+  if (mode === 'legacy_actual') return 'legacy_actual';
   return 'missing';
 }
 
@@ -567,19 +622,21 @@ function readPrincipal(
   state: Record<string, unknown>
 ): { ok: true; userId: string } | { ok: false; reason: CrmReadDenyReason } {
   if (!hasOwn(state, 'principal')) return { ok: false, reason: 'entrada_invalida' };
-  const principal = state.principal;
+  const principal = dataValue(state, 'principal');
   if (!isRecord(principal)) return { ok: false, reason: 'entrada_invalida' };
-  if (principal.authenticated !== true) return { ok: false, reason: 'persona_no_autenticada' };
-  if (principal.exists !== true) return { ok: false, reason: 'persona_inexistente' };
-  if (typeof principal.userId !== 'string' || principal.userId.length === 0) {
+  if (dataValue(principal, 'authenticated') !== true) return { ok: false, reason: 'persona_no_autenticada' };
+  if (dataValue(principal, 'exists') !== true) return { ok: false, reason: 'persona_inexistente' };
+  const userId = dataValue(principal, 'userId');
+  if (typeof userId !== 'string' || userId.length === 0) {
     return { ok: false, reason: 'persona_no_autenticada' };
   }
-  return { ok: true, userId: principal.userId };
+  return { ok: true, userId };
 }
 
 function readOrganizationId(request: Record<string, unknown>): string | null {
-  if (typeof request.organizationId !== 'string' || request.organizationId.length === 0) return null;
-  return request.organizationId;
+  const organizationId = dataValue(request, 'organizationId');
+  if (typeof organizationId !== 'string' || organizationId.length === 0) return null;
+  return organizationId;
 }
 
 function readOrganizations(
@@ -592,11 +649,13 @@ function readOrganizations(
   let status: string | null = null;
   for (const row of rows.value) {
     if (!isRecord(row)) return { ok: false, reason: 'entrada_invalida' };
-    if (typeof row.id !== 'string' || row.id.length === 0) return { ok: false, reason: 'entrada_invalida' };
-    if (typeof row.status !== 'string') return { ok: false, reason: 'entrada_invalida' };
-    if (seen.has(row.id)) return { ok: false, reason: 'entrada_invalida' };
-    seen.add(row.id);
-    if (row.id === organizationId) status = row.status;
+    const id = dataValue(row, 'id');
+    const rowStatus = dataValue(row, 'status');
+    if (typeof id !== 'string' || id.length === 0) return { ok: false, reason: 'entrada_invalida' };
+    if (typeof rowStatus !== 'string') return { ok: false, reason: 'entrada_invalida' };
+    if (seen.has(id)) return { ok: false, reason: 'entrada_invalida' };
+    seen.add(id);
+    if (id === organizationId) status = rowStatus;
   }
   if (status !== 'ACTIVE') return { ok: false, reason: 'empresa_no_activa' };
   return { ok: true };
@@ -630,17 +689,18 @@ function readMembership(
 function readOperation(
   request: Record<string, unknown>
 ): { ok: true; operation: 'read_record' | 'list' } | { ok: false; reason: CrmReadDenyReason } {
-  const action = hasOwn(request, 'action') ? request.action : 'crm.lead.read';
+  const action = hasOwn(request, 'action') ? dataValue(request, 'action') : 'crm.lead.read';
   if (action !== 'crm.lead.read') {
     if (typeof action === 'string' && NON_READ_ACTIONS.has(action)) {
       return { ok: false, reason: 'accion_fuera_de_corte' };
     }
     return { ok: false, reason: 'operacion_no_definida' };
   }
-  if (request.operation === 'read_record' || request.operation === 'list') {
-    return { ok: true, operation: request.operation };
+  const operation = dataValue(request, 'operation');
+  if (operation === 'read_record' || operation === 'list') {
+    return { ok: true, operation };
   }
-  if (typeof request.operation === 'string' && OUT_OF_CUT_OPERATIONS.has(request.operation)) {
+  if (typeof operation === 'string' && OUT_OF_CUT_OPERATIONS.has(operation)) {
     return { ok: false, reason: 'accion_fuera_de_corte' };
   }
   return { ok: false, reason: 'operacion_no_definida' };
@@ -649,28 +709,35 @@ function readOperation(
 function readRequestedScope(request: Record<string, unknown>, operation: 'read_record' | 'list'): Scope | 'invalid' {
   if (operation === 'read_record') {
     if (hasOwn(request, 'scope')) return 'invalid';
-    if (typeof request.leadId !== 'string' || request.leadId.length === 0) return 'invalid';
-    return { kind: 'record', leadId: request.leadId };
+    const leadId = dataValue(request, 'leadId');
+    if (typeof leadId !== 'string' || leadId.length === 0) return 'invalid';
+    return { kind: 'record', leadId };
   }
-  if (!hasOwn(request, 'scope') || !isRecord(request.scope)) return 'invalid';
-  const scope = request.scope;
-  if (Object.keys(scope).length !== 1) return 'invalid';
-  if (scope.kind === 'company' || scope.kind === 'assigned') return { kind: scope.kind };
+  if (!hasOwn(request, 'scope')) return 'invalid';
+  const scope = dataValue(request, 'scope');
+  if (!isRecord(scope)) return 'invalid';
+  const keys = ownStringKeys(scope);
+  if (!keys || keys.length !== 1) return 'invalid';
+  const kind = dataValue(scope, 'kind');
+  if (kind === 'company' || kind === 'assigned') return { kind };
   return 'invalid';
 }
 
 function readQueryDependencies(request: Record<string, unknown>): string[] | 'invalid' {
-  if (!hasOwn(request, 'query') || request.query == null) return [];
-  if (!isRecord(request.query)) return 'invalid';
-  for (const key of Object.keys(request.query)) {
+  if (!hasOwn(request, 'query') || dataValue(request, 'query') == null) return [];
+  const query = dataValue(request, 'query');
+  if (!isRecord(query)) return 'invalid';
+  const keys = ownStringKeys(query);
+  if (!keys) return 'invalid';
+  for (const key of keys) {
     if (key !== 'filterFields' && key !== 'sortFields' && key !== 'aggregateFields') return 'invalid';
   }
   const fields: string[] = [];
   const seen = new Set<string>();
   for (const key of ['filterFields', 'sortFields', 'aggregateFields'] as const) {
-    if (!hasOwn(request.query, key) || request.query[key] == null) continue;
-    const value = request.query[key];
-    if (!Array.isArray(value)) return 'invalid';
+    if (!hasOwn(query, key) || dataValue(query, key) == null) continue;
+    const value = copyPlainArray(dataValue(query, key));
+    if (!value) return 'invalid';
     for (const item of value) {
       if (typeof item !== 'string' || item.length === 0) return 'invalid';
       if (seen.has(item)) continue;
@@ -683,8 +750,7 @@ function readQueryDependencies(request: Record<string, unknown>): string[] | 'in
 
 function readPolicy(
   state: Record<string, unknown>,
-  organizationId: string,
-  membershipId: string
+  organizationId: string
 ): { ok: true; policy: ParsedPolicy } | { ok: false; reason: CrmReadDenyReason } {
   const grants = readRequiredArray(state, 'grants');
   const restrictions = readRequiredArray(state, 'restrictions');
@@ -710,18 +776,18 @@ function readPolicy(
   const grantMap = new Map<string, ParsedGrant>();
   const seenGrantIds = new Set<string>();
   for (const row of grants.value) {
-    if (!isRecord(row) || typeof row.id !== 'string' || row.id.length === 0) {
-      return { ok: false, reason: 'entrada_invalida' };
-    }
-    if (seenGrantIds.has(row.id)) return { ok: false, reason: 'entrada_invalida' };
-    seenGrantIds.add(row.id);
+    if (!isRecord(row)) return { ok: false, reason: 'entrada_invalida' };
+    const id = dataValue(row, 'id');
+    if (typeof id !== 'string' || id.length === 0) return { ok: false, reason: 'entrada_invalida' };
+    if (seenGrantIds.has(id)) return { ok: false, reason: 'entrada_invalida' };
+    seenGrantIds.add(id);
     const parsed = parseGrant(row);
     if (parsed) grantMap.set(parsed.id, parsed);
   }
 
   const parsedRestrictions: ParsedRestriction[] = [];
   for (const row of restrictions.value) {
-    const classified = classifyRestriction(row, organizationId, membershipId);
+    const classified = classifyRestriction(row, organizationId);
     if (classified === 'invalid') return { ok: false, reason: 'entrada_invalida' };
     if (classified === 'ignore') continue;
     parsedRestrictions.push(classified);
@@ -731,9 +797,9 @@ function readPolicy(
   const parsedAssignments: ParsedAssignment[] = [];
   for (const row of assignments.value) {
     if (!isRecord(row)) return { ok: false, reason: 'entrada_invalida' };
-    const assignmentOrg = row.organizationId;
-    const assignmentMembership = row.membershipId;
-    const leadId = row.leadId;
+    const assignmentOrg = dataValue(row, 'organizationId');
+    const assignmentMembership = dataValue(row, 'membershipId');
+    const leadId = dataValue(row, 'leadId');
     if (
       typeof assignmentOrg !== 'string' ||
       assignmentOrg.length === 0 ||
@@ -756,13 +822,13 @@ function readPolicy(
   const seenLeadIds = new Set<string>();
   for (const row of leads.value) {
     if (!isRecord(row)) return { ok: false, reason: 'entrada_invalida' };
-    if (typeof row.id !== 'string' || row.id.length === 0) return { ok: false, reason: 'entrada_invalida' };
-    if (typeof row.organizationId !== 'string' || row.organizationId.length === 0) {
-      return { ok: false, reason: 'entrada_invalida' };
-    }
-    if (seenLeadIds.has(row.id)) return { ok: false, reason: 'entrada_invalida' };
-    seenLeadIds.add(row.id);
-    parsedLeads.push({ id: row.id, organizationId: row.organizationId, raw: row });
+    const id = dataValue(row, 'id');
+    const leadOrg = dataValue(row, 'organizationId');
+    if (typeof id !== 'string' || id.length === 0) return { ok: false, reason: 'entrada_invalida' };
+    if (typeof leadOrg !== 'string' || leadOrg.length === 0) return { ok: false, reason: 'entrada_invalida' };
+    if (seenLeadIds.has(id)) return { ok: false, reason: 'entrada_invalida' };
+    seenLeadIds.add(id);
+    parsedLeads.push({ id, organizationId: leadOrg, raw: row });
   }
 
   return {
@@ -781,29 +847,35 @@ function readPolicy(
 
 function parseMembership(value: unknown): ParsedMembership | null {
   if (!isRecord(value)) return null;
-  if (typeof value.id !== 'string' || value.id.length === 0) return null;
-  if (typeof value.organizationId !== 'string' || value.organizationId.length === 0) return null;
-  if (typeof value.userId !== 'string' || value.userId.length === 0) return null;
-  if (typeof value.status !== 'string' || value.status.length === 0) return null;
-  return {
-    id: value.id,
-    organizationId: value.organizationId,
-    userId: value.userId,
-    status: value.status,
-  };
+  const id = dataValue(value, 'id');
+  const organizationId = dataValue(value, 'organizationId');
+  const userId = dataValue(value, 'userId');
+  const status = dataValue(value, 'status');
+  if (typeof id !== 'string' || id.length === 0) return null;
+  if (typeof organizationId !== 'string' || organizationId.length === 0) return null;
+  if (typeof userId !== 'string' || userId.length === 0) return null;
+  if (typeof status !== 'string' || status.length === 0) return null;
+  return { id, organizationId, userId, status };
 }
 
 function parseGrant(value: Record<string, unknown>): ParsedGrant | null {
-  if (value.action !== 'crm.lead.read' || value.accessMode !== 'read') return null;
-  if (typeof value.organizationId !== 'string' || value.organizationId.length === 0) return null;
-  if (typeof value.membershipId !== 'string' || value.membershipId.length === 0) return null;
-  if (value.validity !== 'active') return null;
+  if (dataValue(value, 'action') !== 'crm.lead.read' || dataValue(value, 'accessMode') !== 'read') return null;
+  const id = dataValue(value, 'id');
+  const organizationId = dataValue(value, 'organizationId');
+  const membershipId = dataValue(value, 'membershipId');
+  if (typeof id !== 'string' || id.length === 0) return null;
+  if (typeof organizationId !== 'string' || organizationId.length === 0) return null;
+  if (typeof membershipId !== 'string' || membershipId.length === 0) return null;
+  if (dataValue(value, 'validity') !== 'active') return null;
   if (!hasOwn(value, 'parentGrantId')) return null;
-  const parentGrantId = value.parentGrantId;
-  if (parentGrantId !== null && (typeof parentGrantId !== 'string' || parentGrantId.length === 0)) return null;
-  const scope = parseScope(value.scope);
-  const fieldClasses = parseGrantFieldClasses(value.fieldClasses);
-  const origin = parseOrigin(value.origin, value.organizationId);
+  const parentRaw = dataValue(value, 'parentGrantId');
+  let parentGrantId: string | null;
+  if (parentRaw === null) parentGrantId = null;
+  else if (typeof parentRaw === 'string' && parentRaw.length > 0) parentGrantId = parentRaw;
+  else return null;
+  const scope = parseScope(dataValue(value, 'scope'));
+  const fieldClasses = parseGrantFieldClasses(dataValue(value, 'fieldClasses'));
+  const origin = parseOrigin(dataValue(value, 'origin'), organizationId);
   const version = parseOptionalString(value, 'version');
   const requiredParentVersion = parseOptionalString(value, 'requiredParentVersion');
   const validFrom = parseOptionalInstant(value, 'validFrom');
@@ -811,10 +883,11 @@ function parseGrant(value: Record<string, unknown>): ParsedGrant | null {
   if (!scope || !fieldClasses || fieldClasses.length === 0 || !origin) return null;
   if (version === 'invalid' || requiredParentVersion === 'invalid') return null;
   if (validFrom === 'invalid' || validUntil === 'invalid') return null;
+  if (validFrom !== null && validUntil !== null && validFrom > validUntil) return null;
   return {
-    id: value.id as string,
-    organizationId: value.organizationId,
-    membershipId: value.membershipId,
+    id,
+    organizationId,
+    membershipId,
     scope,
     fieldClasses,
     origin,
@@ -827,9 +900,10 @@ function parseGrant(value: Record<string, unknown>): ParsedGrant | null {
 }
 
 function parseGrantFieldClasses(value: unknown): FieldClass[] | null {
-  if (!Array.isArray(value)) return null;
+  const items = copyPlainArray(value);
+  if (!items) return null;
   const classes: FieldClass[] = [];
-  for (const item of value) {
+  for (const item of items) {
     if (typeof item !== 'string') return null;
     if (!isFieldClass(item) || classes.includes(item)) continue;
     classes.push(item);
@@ -837,32 +911,32 @@ function parseGrantFieldClasses(value: unknown): FieldClass[] | null {
   return classes;
 }
 
-function classifyRestriction(
-  value: unknown,
-  organizationId: string,
-  membershipId: string
-): ParsedRestriction | 'ignore' | 'invalid' {
+function classifyRestriction(value: unknown, organizationId: string): ParsedRestriction | 'ignore' | 'invalid' {
   if (!isRecord(value)) return 'invalid';
-  if (typeof value.organizationId !== 'string' || value.organizationId.length === 0) return 'invalid';
-  if (value.organizationId !== organizationId) return 'ignore';
-  if (typeof value.membershipId !== 'string' || value.membershipId.length === 0) return 'invalid';
-  if (value.membershipId !== membershipId) return 'ignore';
-  if (typeof value.action !== 'string' || !isKnownAction(value.action)) return 'invalid';
-  if (value.action !== 'crm.lead.read') return 'ignore';
-  const scope = parseScope(value.scope);
-  const fieldClasses = parseRestrictionFieldClasses(value.fieldClasses);
+  const restrictionOrg = dataValue(value, 'organizationId');
+  if (typeof restrictionOrg !== 'string' || restrictionOrg.length === 0) return 'invalid';
+  if (restrictionOrg !== organizationId) return 'ignore';
+  const membershipId = dataValue(value, 'membershipId');
+  if (typeof membershipId !== 'string' || membershipId.length === 0) return 'invalid';
+  const action = dataValue(value, 'action');
+  if (typeof action !== 'string' || !isKnownAction(action)) return 'invalid';
+  if (action !== 'crm.lead.read') return 'ignore';
+  const scope = parseScope(dataValue(value, 'scope'));
+  const fieldClasses = parseRestrictionFieldClasses(dataValue(value, 'fieldClasses'));
   if (!scope || !fieldClasses) return 'invalid';
   if (hasOwn(value, 'validity')) {
-    if (typeof value.validity !== 'string') return 'invalid';
-    if (value.validity === 'lifted') return 'ignore';
+    const validity = dataValue(value, 'validity');
+    if (typeof validity !== 'string') return 'invalid';
+    if (validity === 'lifted') return 'ignore';
   }
-  return { scope, fieldClasses };
+  return { membershipId, scope, fieldClasses };
 }
 
 function parseRestrictionFieldClasses(value: unknown): FieldClass[] | null {
-  if (!Array.isArray(value) || value.length === 0) return null;
+  const items = copyPlainArray(value);
+  if (!items || items.length === 0) return null;
   const classes: FieldClass[] = [];
-  for (const item of value) {
+  for (const item of items) {
     if (typeof item !== 'string' || !isFieldClass(item)) return null;
     if (!classes.includes(item)) classes.push(item);
   }
@@ -870,47 +944,84 @@ function parseRestrictionFieldClasses(value: unknown): FieldClass[] | null {
 }
 
 function parseScope(value: unknown): Scope | null {
-  if (!isRecord(value) || typeof value.kind !== 'string') return null;
-  if (value.kind === 'company' || value.kind === 'assigned') {
+  if (!isRecord(value)) return null;
+  const kind = dataValue(value, 'kind');
+  if (kind !== 'company' && kind !== 'assigned' && kind !== 'record') return null;
+  if (kind === 'company' || kind === 'assigned') {
     if (hasOwn(value, 'leadId')) return null;
-    return { kind: value.kind };
+    return { kind };
   }
-  if (value.kind === 'record' && typeof value.leadId === 'string' && value.leadId.length > 0) {
-    return { kind: 'record', leadId: value.leadId };
-  }
-  return null;
+  const leadId = dataValue(value, 'leadId');
+  if (typeof leadId !== 'string' || leadId.length === 0) return null;
+  return { kind: 'record', leadId };
 }
 
 function parseOrigin(value: unknown, organizationId: string): Origin | null {
   if (!isRecord(value)) return null;
-  if (typeof value.kind !== 'string' || !ORIGIN_KINDS.has(value.kind)) return null;
-  if (value.organizationId !== organizationId) return null;
-  if (typeof value.rootValidated !== 'boolean') return null;
-  if (hasOwn(value, 'revoked') && typeof value.revoked !== 'boolean') return null;
+  const kind = dataValue(value, 'kind');
+  if (typeof kind !== 'string' || !ORIGIN_KINDS.has(kind)) return null;
+  if (dataValue(value, 'organizationId') !== organizationId) return null;
+  const rootValidated = dataValue(value, 'rootValidated');
+  if (typeof rootValidated !== 'boolean') return null;
+  let revoked = false;
+  if (hasOwn(value, 'revoked')) {
+    const revokedValue = dataValue(value, 'revoked');
+    if (typeof revokedValue !== 'boolean') return null;
+    revoked = revokedValue;
+  }
   return {
-    kind: value.kind as OriginKind,
+    kind: kind as OriginKind,
     organizationId,
-    rootValidated: value.rootValidated,
-    revoked: value.revoked === true,
+    rootValidated,
+    revoked,
   };
 }
 
 function parseOptionalString(value: Record<string, unknown>, key: string): string | null | 'invalid' {
   if (!hasOwn(value, key)) return null;
-  if (typeof value[key] !== 'string' || (value[key] as string).length === 0) return 'invalid';
-  return value[key] as string;
+  const item = dataValue(value, key);
+  if (typeof item !== 'string' || item.length === 0) return 'invalid';
+  return item;
 }
 
-function parseOptionalInstant(value: Record<string, unknown>, key: string): string | null | 'invalid' {
+function parseOptionalInstant(value: Record<string, unknown>, key: string): number | null | 'invalid' {
   if (!hasOwn(value, key)) return null;
-  if (typeof value[key] !== 'string' || !ISO_UTC.test(value[key] as string)) return 'invalid';
-  return value[key] as string;
+  const parsed = parseInstant(dataValue(value, key));
+  if (parsed === null) return 'invalid';
+  return parsed;
 }
 
-function readEvaluatedAt(state: Record<string, unknown>): string | null | 'invalid' {
-  if (!hasOwn(state, 'evaluatedAt') || state.evaluatedAt == null) return null;
-  if (typeof state.evaluatedAt !== 'string' || !ISO_UTC.test(state.evaluatedAt)) return 'invalid';
-  return state.evaluatedAt;
+function readEvaluatedAt(state: Record<string, unknown>): number | null | 'invalid' {
+  if (!hasOwn(state, 'evaluatedAt') || dataValue(state, 'evaluatedAt') == null) return null;
+  const parsed = parseInstant(dataValue(state, 'evaluatedAt'));
+  if (parsed === null) return 'invalid';
+  return parsed;
+}
+
+function parseInstant(value: unknown): number | null {
+  if (typeof value !== 'string') return null;
+  const match = INSTANT_PATTERN.exec(value);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6]);
+  const millisecond = match[7] === undefined ? 0 : Number(match[7]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  if (hour > 23 || minute > 59 || second > 59) return null;
+  const time = nativeDateUTC(year, month - 1, day, hour, minute, second, millisecond);
+  if (!Number.isFinite(time)) return null;
+  const date = new NativeDate(time);
+  if (nativeGetUTCFullYear.call(date) !== year) return null;
+  if (nativeGetUTCMonth.call(date) !== month - 1) return null;
+  if (nativeGetUTCDate.call(date) !== day) return null;
+  if (nativeGetUTCHours.call(date) !== hour) return null;
+  if (nativeGetUTCMinutes.call(date) !== minute) return null;
+  if (nativeGetUTCSeconds.call(date) !== second) return null;
+  if (nativeGetUTCMilliseconds.call(date) !== millisecond) return null;
+  return time;
 }
 
 function readRequiredArray(
@@ -918,8 +1029,11 @@ function readRequiredArray(
   key: string
 ): { ok: true; value: unknown[] } | { ok: false; reason: CrmReadDenyReason } {
   if (!hasOwn(state, key)) return { ok: false, reason: 'politica_incompleta' };
-  if (!Array.isArray(state[key])) return { ok: false, reason: 'entrada_invalida' };
-  return { ok: true, value: state[key] as unknown[] };
+  const raw = dataValue(state, key);
+  if (!nativeArrayIsArray(raw)) return { ok: false, reason: 'entrada_invalida' };
+  const copy = copyPlainArray(raw);
+  if (!copy) return { ok: false, reason: 'entrada_invalida' };
+  return { ok: true, value: copy };
 }
 
 function isKnownAction(action: string): boolean {
@@ -927,17 +1041,68 @@ function isKnownAction(action: string): boolean {
 }
 
 function isFieldClass(value: string): value is FieldClass {
-  return Object.prototype.hasOwnProperty.call(CRM_LEAD_READ_FIELDS, value);
+  return nativeHasOwn.call(CRM_LEAD_READ_FIELDS, value);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
+  if (value === null || typeof value !== 'object') return false;
+  if (nativeArrayIsArray(value)) return false;
+  const proto = nativeGetPrototypeOf(value);
+  if (proto !== OBJECT_PROTOTYPE && proto !== null) return false;
+  return !hasAccessor(value);
 }
 
-function hasOwn(value: Record<string, unknown>, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(value, key);
+function ownDataRecord(value: unknown): Record<string, unknown> | null {
+  return isRecord(value) ? value : null;
 }
 
-function own(value: Record<string, unknown>, key: string): unknown {
-  return hasOwn(value, key) ? value[key] : undefined;
+function hasAccessor(value: object): boolean {
+  const names = nativeGetOwnPropertyNames(value);
+  for (let index = 0; index < names.length; index += 1) {
+    const descriptor = nativeGetOwnPropertyDescriptor(value, names[index]);
+    if (descriptor && (descriptor.get || descriptor.set)) return true;
+  }
+  const symbols = nativeGetOwnPropertySymbols(value);
+  for (let index = 0; index < symbols.length; index += 1) {
+    const descriptor = nativeGetOwnPropertyDescriptor(value, symbols[index]);
+    if (descriptor && (descriptor.get || descriptor.set)) return true;
+  }
+  return false;
+}
+
+function copyPlainArray(value: unknown): unknown[] | null {
+  if (!nativeArrayIsArray(value)) return null;
+  if (nativeGetPrototypeOf(value) !== ARRAY_PROTOTYPE) return null;
+  if (hasAccessor(value)) return null;
+  const lengthDescriptor = nativeGetOwnPropertyDescriptor(value, 'length');
+  if (!lengthDescriptor || typeof lengthDescriptor.value !== 'number') return null;
+  const length = lengthDescriptor.value;
+  if (!Number.isInteger(length) || length < 0) return null;
+  const copy: unknown[] = [];
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = nativeGetOwnPropertyDescriptor(value, String(index));
+    if (!descriptor || descriptor.get || descriptor.set || !('value' in descriptor)) return null;
+    copy.push(descriptor.value);
+  }
+  return copy;
+}
+
+function ownStringKeys(value: object): string[] | null {
+  if (nativeGetOwnPropertySymbols(value).length > 0) return null;
+  return nativeGetOwnPropertyNames(value);
+}
+
+function hasOwn(value: object, key: string): boolean {
+  return nativeHasOwn.call(value, key);
+}
+
+function dataValue(record: object, key: string): unknown {
+  const descriptor = nativeGetOwnPropertyDescriptor(record, key);
+  if (!descriptor || descriptor.get || descriptor.set) return undefined;
+  return descriptor.value;
+}
+
+function own(value: object, key: string): unknown {
+  if (!hasOwn(value, key)) return undefined;
+  return dataValue(value, key);
 }

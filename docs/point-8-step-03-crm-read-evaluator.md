@@ -23,6 +23,8 @@ if (decision.decision === 'allow') {
 
 La función es pura: no modifica el snapshot, no llama callbacks, no lee el reloj del sistema y no importa cliente de base de datos, variables de entorno ni utilidades con efectos.
 
+La entrada tiene que ser dato propio. Un objeto de política o de petición solo se acepta si su prototipo es `Object.prototype` o `null`. Un accessor propio o un prototipo heredado cierra en `entrada_invalida` sin ejecutar el getter ni el setter. Un array de política o de consulta solo se acepta si su prototipo es `Array.prototype`, sin accessors y sin índices huecos; si no, la evaluación es `entrada_invalida`. No se leen propiedades heredadas. La fecha de un lead se copia con los métodos de `Date.prototype` capturados al cargar el módulo, así que un `getTime` sustituido en la instancia no se ejecuta.
+
 ## Entrada
 
 El adaptador futuro entrega un snapshot coherente y vigente. Este módulo no lo busca.
@@ -37,7 +39,7 @@ El adaptador futuro entrega un snapshot coherente y vigente. Este módulo no lo 
 | `restrictions` | Negaciones ya normalizadas. Solo `validity: 'lifted'` deja de aplicar. Otro valor, o la ausencia, mantiene la restricción. El autor no se consulta. |
 | `assignments` | Pares explícitos empresa + membresía + lead. `userId` del lead es procedencia y no asigna. |
 | `leads` | Registros sintéticos o de snapshot. La lista tiene que estar completa: este módulo no descubre leads faltantes. |
-| `evaluatedAt` | Instante UTC `YYYY-MM-DDTHH:mm:ss[.sss]Z`, solo si alguna concesión trae `validFrom` o `validUntil`. |
+| `evaluatedAt` | Instante UTC real `YYYY-MM-DDTHH:mm:ss[.sss]Z`. Si está presente y no es un instante de calendario, la evaluación es `entrada_invalida`. Hace falta cuando una concesión trae ventana. |
 
 Una concesión de lectura lleva `action: 'crm.lead.read'`, `accessMode: 'read'`, ámbito, clases de campo, `validity: 'active'`, origen y `parentGrantId`. `null` en el padre significa que la concesión se presenta como raíz. La raíz efectiva solo puede ser `company_authority` o `legacy_snapshot` con `rootValidated: true` y la misma empresa. `delegated_chain` y `agency_relation` necesitan un padre vigente. `origin.revoked: true` apaga esa concesión. El módulo no comprueba propiedad legal ni una etiqueta `ADMIN`: `rootValidated` lo aporta el adaptador.
 
@@ -74,7 +76,7 @@ La tupla usa la clase, no la columna suelta: `notes` y `value` se conceden o se 
 
 ## Cadena y restricciones
 
-En cada eslabón hacen falta origen coherente con la empresa, vigencia `active`, ventana horaria cumplida, padre existente, sin ciclos y con profundidad de hasta `CRM_READ_MAX_CHAIN_DEPTH` (8, contando la concesión). El padre tiene que cubrir todas las clases del hijo y un ámbito suficiente:
+En cada eslabón hacen falta origen coherente con la empresa, vigencia `active`, ventana horaria cumplida, padre existente, sin ciclos y con profundidad de hasta `CRM_READ_MAX_CHAIN_DEPTH` (8, contando la concesión). La ventana es inclusiva: `validFrom <= evaluatedAt <= validUntil`. Un límite que no es un instante real, o `validFrom` posterior a `validUntil`, anula esa concesión y no se normaliza. Sin `evaluatedAt`, una concesión con ventana no está vigente. El padre tiene que cubrir todas las clases del hijo y un ámbito suficiente:
 
 - empresa cubre empresa, asignados y un registro de esa empresa;
 - asignados cubre un registro solo si ese lead está asignado a la membresía del padre;
@@ -83,11 +85,13 @@ En cada eslabón hacen falta origen coherente con la empresa, vigencia `active`,
 
 Si el padre no cubre la tupla entera, la concesión hija no se parte: no autoriza. Reactivar al padre no revive una hija con `validity: 'invalidated'`. Otra concesión nueva y vigente sí puede autorizar, porque es otro acto ya presente en el snapshot. El evaluador no escribe esa vigencia.
 
-Una restricción de la misma empresa, membresía, acción, ámbito y clase gana a la concesión. La de otra empresa o de otra membresía no entra. Suspender o retirar al autor no la levanta.
+Una restricción de la misma empresa, acción, ámbito y clase se conserva para la membresía a la que nombra, no solo para el lector. En cada eslabón, el campo de un lead es legible solo si ese eslabón incluye la clase, su ámbito cubre el lead para su propia membresía y ninguna restricción vigente de esa membresía lo alcanza. Una restricción del padre o del abuelo oculta esa clase en la delegación y no apaga el resto de clases: identidad puede seguir si solo `reservado` está restringido. Una concesión directa del lector, con otra cadena, no hereda la restricción del otorgante. La de otra empresa no entra. La de otra membresía no afecta a una concesión que no cuelga de ella. Suspender o retirar al autor no la levanta.
+
+Una restricción de empresa bloquea esa clase en cualquier ámbito pedido de ese eslabón. Una de asignados bloquea el listado de asignados y un registro solo si ese lead está asignado a esa membresía; no bloquea un listado de empresa vacío. Una de registro bloquea ese identificador y no un listado de empresa o de asignados vacío.
 
 ## Consultas
 
-Si el ámbito autorizado no tiene leads, el campo tiene que estar cubierto por una concesión de ese ámbito y no por una restricción de ese ámbito. Si hay leads, el campo tiene que ser legible en cada uno, aunque unas concesiones de registro lo muestren y otras no. Si falla uno, la petición se rechaza con `campo_no_legible` y sin registros. No se filtra, no se ordena y no se agrega.
+Antes de mirar filtros, orden o agregados se apartan los registros sin ninguna clase legible. No se proyectan, no cuentan y no cambian `allow` ni `deny`: el resultado con esa ficha es el mismo que sin ella, tanto si el resto está vacío como si hay otra ficha visible. Una ficha parcialmente visible sí entra. Si el campo de la consulta no es legible en cada una de esas fichas, la petición se rechaza con `campo_no_legible` y sin registros. Si no queda ninguna ficha visible, el campo se juzga solo por el ámbito y la cadena, no por filas invisibles. No se filtra, no se ordena y no se agrega.
 
 ## Ajustes de denegación
 
@@ -112,6 +116,6 @@ La proyección no autoriza a enviar, exportar, editar, archivar, compartir ni bo
 npm run tenancy:validate-point8-step03
 ```
 
-Resultado de esta revisión: 30 escenarios sintéticos, todos en verde. Cubren lectura autorizada, denegación por identidad, empresa y membresía, aislamiento entre empresas, rol sin concesión, campos reservados y metadatos, acciones fuera de corte, cruce de registro y campo, restricciones, asignaciones, cadenas, modos, consultas y entradas malformadas. Los datos son ficticios. La suite también comprueba que el módulo no importa runtime con efectos y que ningún otro archivo TypeScript o JavaScript de la aplicación lo referencia.
+Resultado de esta revisión: 34 escenarios sintéticos, todos en verde. Cubren lectura autorizada, denegación por identidad, empresa y membresía, aislamiento entre empresas, rol sin concesión, campos reservados y metadatos, acciones fuera de corte, cruce de registro y campo, restricciones de la cadena por registro y campo, instantes UTC reales, dato propio sin accessors, fichas totalmente invisibles, asignaciones, modos, consultas y entradas malformadas. Los datos son ficticios. La suite también comprueba que el módulo no importa runtime con efectos y que ningún otro archivo TypeScript o JavaScript de la aplicación lo referencia.
 
 No está conectado a `GET /api/crm/leads` ni a ninguna pantalla. Un módulo probado y desconectado no es una función desplegada.

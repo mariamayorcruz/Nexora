@@ -1296,6 +1296,509 @@ const scenarios: Array<{ name: string; run: () => void }> = [
     },
   },
   {
+    name: 'la restricción de cada eslabón limita al delegado por registro y campo',
+    run: () => {
+      const childOrigin = { kind: 'delegated_chain', organizationId: ORG_A, rootValidated: false };
+      const members = [
+        membership(MEM_A, ORG_A, ANA, 'ACTIVE', 'MEMBER'),
+        membership('mem_parent', ORG_A, 'user_parent', 'ACTIVE', 'ADMIN'),
+        membership('mem_grand', ORG_A, 'user_grand', 'ACTIVE', 'ADMIN'),
+      ];
+      const parentRestricted = state({
+        memberships: members,
+        grants: [
+          companyGrant({
+            id: 'grant_parent',
+            membershipId: 'mem_parent',
+            fieldClasses: ['identidad', 'reservado'],
+          }),
+          companyGrant({
+            id: 'grant_child',
+            parentGrantId: 'grant_parent',
+            fieldClasses: ['identidad', 'reservado'],
+            origin: childOrigin,
+          }),
+        ],
+        restrictions: [restriction({ membershipId: 'mem_parent', fieldClasses: ['reservado'] })],
+        leads: [lead('lead_1', ORG_A)],
+      });
+      const hiddenByParent = evaluateCrmLeadRead(parentRestricted, one('lead_1'));
+      assertAllow(hiddenByParent, {
+        count: 1,
+        scopeKind: 'record',
+        names: ['Nombre lead_1'],
+        absent: [NOTES, String(VALUE)],
+      });
+      assertDeny(
+        evaluateCrmLeadRead(parentRestricted, one('lead_1', ORG_A, { filterFields: ['notes'] })),
+        'campo_no_legible',
+        [NOTES, 'Nombre lead_1']
+      );
+      assertAllow(evaluateCrmLeadRead(parentRestricted, one('lead_1', ORG_A, { sortFields: ['name'] })), {
+        count: 1,
+        scopeKind: 'record',
+        queryDependencies: ['name'],
+        names: ['Nombre lead_1'],
+        absent: [NOTES],
+      });
+
+      const grandparentRestricted = state({
+        memberships: members,
+        grants: [
+          companyGrant({
+            id: 'grant_grand',
+            membershipId: 'mem_grand',
+            fieldClasses: ['identidad', 'reservado'],
+          }),
+          companyGrant({
+            id: 'grant_parent',
+            membershipId: 'mem_parent',
+            parentGrantId: 'grant_grand',
+            fieldClasses: ['identidad', 'reservado'],
+            origin: childOrigin,
+          }),
+          companyGrant({
+            id: 'grant_child',
+            parentGrantId: 'grant_parent',
+            fieldClasses: ['identidad', 'reservado'],
+            origin: childOrigin,
+          }),
+        ],
+        restrictions: [restriction({ membershipId: 'mem_grand', fieldClasses: ['reservado'] })],
+        leads: [lead('lead_1', ORG_A)],
+      });
+      assertAllow(evaluateCrmLeadRead(grandparentRestricted, one('lead_1')), {
+        count: 1,
+        scopeKind: 'record',
+        names: ['Nombre lead_1'],
+        absent: [NOTES, String(VALUE)],
+      });
+
+      const directStillReads = state({
+        ...parentRestricted,
+        grants: [
+          ...(parentRestricted.grants as Rec[]),
+          companyGrant({ id: 'grant_direct', fieldClasses: ['reservado'] }),
+        ],
+      });
+      assertAllow(evaluateCrmLeadRead(directStillReads, one('lead_1')), {
+        count: 1,
+        scopeKind: 'record',
+        names: ['Nombre lead_1'],
+        present: [NOTES, String(VALUE)],
+        absent: [UNKNOWN],
+      });
+
+      const byRecord = state({
+        memberships: members,
+        grants: [
+          companyGrant({
+            id: 'grant_parent',
+            membershipId: 'mem_parent',
+            fieldClasses: ['identidad', 'reservado'],
+          }),
+          companyGrant({
+            id: 'grant_child',
+            parentGrantId: 'grant_parent',
+            fieldClasses: ['identidad', 'reservado'],
+            origin: childOrigin,
+          }),
+        ],
+        restrictions: [
+          restriction({
+            membershipId: 'mem_parent',
+            scope: { kind: 'record', leadId: 'lead_closed' },
+            fieldClasses: ['reservado'],
+          }),
+        ],
+        leads: [lead('lead_closed', ORG_A), lead('lead_open', ORG_A, { name: 'Nombre abierto' })],
+      });
+      const mixedRecords = evaluateCrmLeadRead(byRecord, list('company'));
+      assertAllow(mixedRecords, {
+        count: 2,
+        scopeKind: 'company',
+        names: ['Nombre lead_closed', 'Nombre abierto'],
+        absent: [UNKNOWN],
+        present: [NOTES],
+      });
+      if (mixedRecords.decision === 'allow') {
+        assert.equal(Object.prototype.hasOwnProperty.call(mixedRecords.records[0], 'notes'), false);
+        assert.equal(mixedRecords.records[1].notes, NOTES);
+      }
+      assertDeny(
+        evaluateCrmLeadRead(byRecord, list('company', ORG_A, { sortFields: ['notes'] })),
+        'campo_no_legible',
+        [NOTES, 'Nombre lead_closed', 'Nombre abierto']
+      );
+      assertAllow(evaluateCrmLeadRead(state({ ...byRecord, leads: [] }), list('company', ORG_A, { sortFields: ['notes'] })), {
+        count: 0,
+        scopeKind: 'company',
+        queryDependencies: ['notes'],
+        names: [],
+        absent: [NOTES],
+      });
+
+      const byAssignment = state({
+        memberships: members,
+        grants: [
+          companyGrant({
+            id: 'grant_parent',
+            membershipId: 'mem_parent',
+            fieldClasses: ['identidad', 'reservado'],
+          }),
+          companyGrant({
+            id: 'grant_child',
+            parentGrantId: 'grant_parent',
+            fieldClasses: ['identidad', 'reservado'],
+            origin: childOrigin,
+          }),
+        ],
+        restrictions: [
+          restriction({
+            membershipId: 'mem_parent',
+            scope: { kind: 'assigned' },
+            fieldClasses: ['reservado'],
+          }),
+        ],
+        assignments: [{ organizationId: ORG_A, membershipId: 'mem_parent', leadId: 'lead_asig' }],
+        leads: [lead('lead_asig', ORG_A), lead('lead_libre', ORG_A, { name: 'Nombre libre' })],
+      });
+      const mixedAssigned = evaluateCrmLeadRead(byAssignment, list('company'));
+      assertAllow(mixedAssigned, {
+        count: 2,
+        scopeKind: 'company',
+        names: ['Nombre lead_asig', 'Nombre libre'],
+        present: [NOTES],
+        absent: [UNKNOWN],
+      });
+      if (mixedAssigned.decision === 'allow') {
+        assert.equal(Object.prototype.hasOwnProperty.call(mixedAssigned.records[0], 'notes'), false);
+        assert.equal(mixedAssigned.records[1].notes, NOTES);
+      }
+      assertDeny(
+        evaluateCrmLeadRead(byAssignment, list('company', ORG_A, { aggregateFields: ['value'] })),
+        'campo_no_legible',
+        [NOTES, String(VALUE), 'Nombre lead_asig', 'Nombre libre']
+      );
+      assertAllow(
+        evaluateCrmLeadRead(state({ ...byAssignment, leads: [] }), list('company', ORG_A, { filterFields: ['notes'] })),
+        {
+          count: 0,
+          scopeKind: 'company',
+          queryDependencies: ['notes'],
+          names: [],
+          absent: [NOTES],
+        }
+      );
+      assertDeny(
+        evaluateCrmLeadRead(parentRestricted, list('company', ORG_A, { sortFields: ['notes'] })),
+        'campo_no_legible'
+      );
+      const emptyCompany = state({ ...parentRestricted, leads: [] });
+      assertDeny(
+        evaluateCrmLeadRead(emptyCompany, list('company', ORG_A, { sortFields: ['notes'] })),
+        'campo_no_legible'
+      );
+    },
+  },
+  {
+    name: 'instantes imposibles y ventanas invertidas no autorizan',
+    run: () => {
+      assertDeny(
+        evaluateCrmLeadRead(
+          state({
+            evaluatedAt: '2026-99-99T99:99:99.999Z',
+            grants: [companyGrant({ fieldClasses: ['identidad'], validUntil: '2020-01-01T00:00:00.000Z' })],
+            leads: [lead('lead_1', ORG_A)],
+          }),
+          one('lead_1')
+        ),
+        'entrada_invalida',
+        ['Nombre lead_1']
+      );
+      for (const bound of ['validFrom', 'validUntil'] as const) {
+        assertDeny(
+          evaluateCrmLeadRead(
+            state({
+              grants: [companyGrant({ fieldClasses: ['identidad'], [bound]: '2026-99-99T99:99:99.999Z' })],
+              leads: [lead('lead_1', ORG_A)],
+            }),
+            one('lead_1')
+          ),
+          'sin_permiso',
+          ['Nombre lead_1']
+        );
+      }
+      for (const impossible of ['2026-02-31T00:00:00.000Z', '2026-02-29T00:00:00.000Z', '2026-13-01T00:00:00.000Z']) {
+        assertDeny(
+          evaluateCrmLeadRead(
+            state({
+              grants: [companyGrant({ fieldClasses: ['identidad'], validFrom: impossible })],
+              leads: [lead('lead_1', ORG_A)],
+            }),
+            one('lead_1')
+          ),
+          'sin_permiso',
+          ['Nombre lead_1']
+        );
+      }
+      assertDeny(
+        evaluateCrmLeadRead(
+          state({
+            evaluatedAt: '2026-10-01T12:00:00.000Z',
+            grants: [
+              companyGrant({
+                fieldClasses: ['identidad'],
+                validFrom: '2026-10-02T00:00:00.000Z',
+                validUntil: '2026-10-01T00:00:00.000Z',
+              }),
+            ],
+            leads: [lead('lead_1', ORG_A)],
+          }),
+          one('lead_1')
+        ),
+        'sin_permiso',
+        ['Nombre lead_1']
+      );
+      const missingClock = state({
+        grants: [companyGrant({ fieldClasses: ['identidad'], validFrom: '2026-10-01T00:00:00.000Z' })],
+        leads: [lead('lead_1', ORG_A)],
+      });
+      delete missingClock.evaluatedAt;
+      assertDeny(evaluateCrmLeadRead(missingClock, one('lead_1')), 'sin_permiso', ['Nombre lead_1']);
+      assertAllow(
+        evaluateCrmLeadRead(
+          state({
+            evaluatedAt: '2024-02-29T00:00:00.000Z',
+            grants: [
+              companyGrant({
+                id: 'grant_bad_window',
+                fieldClasses: ['reservado'],
+                validFrom: '2026-12-01T00:00:00.000Z',
+                validUntil: '2026-01-01T00:00:00.000Z',
+              }),
+              companyGrant({
+                id: 'grant_leap',
+                fieldClasses: ['identidad'],
+                validFrom: '2024-02-29T00:00:00.000Z',
+                validUntil: '2024-02-29T00:00:00.000Z',
+              }),
+            ],
+            leads: [lead('lead_1', ORG_A)],
+          }),
+          one('lead_1')
+        ),
+        {
+          count: 1,
+          scopeKind: 'record',
+          names: ['Nombre lead_1'],
+          absent: [NOTES, String(VALUE)],
+        }
+      );
+    },
+  },
+  {
+    name: 'prototipo heredado y accessors no autorizan ni se ejecutan',
+    run: () => {
+      const inherited = state({
+        grants: [companyGrant()],
+        leads: [lead('lead_1', ORG_A)],
+      });
+      inherited.principal = Object.create({ userId: ANA, authenticated: true, exists: true });
+      assertDeny(evaluateCrmLeadRead(inherited, one('lead_1')), 'entrada_invalida', ['Nombre lead_1']);
+
+      let reads = 0;
+      const principal: Rec = { userId: ANA, exists: true };
+      Object.defineProperty(principal, 'authenticated', {
+        enumerable: true,
+        get() {
+          reads += 1;
+          return true;
+        },
+      });
+      assertDeny(
+        evaluateCrmLeadRead(
+          state({ principal, grants: [companyGrant()], leads: [lead('lead_1', ORG_A)] }),
+          one('lead_1')
+        ),
+        'entrada_invalida',
+        ['Nombre lead_1']
+      );
+      assert.equal(reads, 0);
+
+      const grant = companyGrant();
+      Object.defineProperty(grant, 'validity', {
+        enumerable: true,
+        get() {
+          reads += 1;
+          return 'active';
+        },
+      });
+      assertDeny(
+        evaluateCrmLeadRead(state({ grants: [grant], leads: [lead('lead_1', ORG_A)] }), one('lead_1')),
+        'entrada_invalida',
+        ['Nombre lead_1']
+      );
+      assert.equal(reads, 0);
+
+      const rows = [lead('lead_1', ORG_A)];
+      Object.defineProperty(rows, '0', {
+        enumerable: true,
+        get() {
+          reads += 1;
+          return lead('lead_1', ORG_A);
+        },
+      });
+      assertDeny(
+        evaluateCrmLeadRead(state({ grants: [companyGrant()], leads: rows }), one('lead_1')),
+        'entrada_invalida',
+        ['Nombre lead_1']
+      );
+      assert.equal(reads, 0);
+
+      const sparse = [companyGrant()];
+      delete sparse[0];
+      assertDeny(
+        evaluateCrmLeadRead(state({ grants: sparse, leads: [lead('lead_1', ORG_A)] }), list('company')),
+        'entrada_invalida'
+      );
+
+      let dateReads = 0;
+      const stamp = new Date('2026-08-15T12:30:00.000Z');
+      Object.defineProperty(stamp, 'getTime', {
+        value() {
+          dateReads += 1;
+          return 0;
+        },
+      });
+      const dated = evaluateCrmLeadRead(
+        state({
+          grants: [companyGrant({ fieldClasses: ['identidad', 'gestion'] })],
+          leads: [lead('lead_1', ORG_A, { lastContactedAt: stamp })],
+        }),
+        one('lead_1')
+      );
+      assert.equal(dateReads, 0);
+      assert.equal(stamp.getTime(), 0);
+      assertAllow(dated, {
+        count: 1,
+        scopeKind: 'record',
+        names: ['Nombre lead_1'],
+        absent: [NOTES],
+      });
+      if (dated.decision === 'allow') {
+        assert.equal(dated.records[0].lastContactedAt, '2026-08-15T12:30:00.000Z');
+      }
+    },
+  },
+  {
+    name: 'una ficha totalmente invisible no altera filtros, orden ni agregados',
+    run: () => {
+      const hiddenLead = lead('HIDDEN', ORG_A, { name: 'CONFIDENTIAL' });
+      const visibleLead = lead('lead_visible', ORG_A, { name: 'Nombre visible' });
+      const base = {
+        grants: [companyGrant({ fieldClasses: ['identidad'] })],
+        restrictions: [
+          restriction({
+            id: 'restriction_hidden',
+            scope: { kind: 'record', leadId: 'HIDDEN' },
+            fieldClasses: ['identidad'],
+          }),
+        ],
+      };
+      const queries = [{ filterFields: ['name'] }, { sortFields: ['name'] }, { aggregateFields: ['name'] }];
+      for (const query of queries) {
+        const request = list('company', ORG_A, query);
+        const empty = evaluateCrmLeadRead(state({ ...base, leads: [] }), request);
+        const onlyHidden = evaluateCrmLeadRead(state({ ...base, leads: [hiddenLead] }), request);
+        assert.deepEqual(onlyHidden, empty);
+        assertAllow(empty, {
+          count: 0,
+          scopeKind: 'company',
+          queryDependencies: ['name'],
+          names: [],
+          absent: ['CONFIDENTIAL', 'HIDDEN', NOTES],
+        });
+        const onlyVisible = evaluateCrmLeadRead(state({ ...base, leads: [visibleLead] }), request);
+        const both = evaluateCrmLeadRead(state({ ...base, leads: [visibleLead, hiddenLead] }), request);
+        assert.deepEqual(both, onlyVisible);
+        assertAllow(both, {
+          count: 1,
+          scopeKind: 'company',
+          queryDependencies: ['name'],
+          names: ['Nombre visible'],
+          absent: ['CONFIDENTIAL', 'HIDDEN', NOTES],
+        });
+      }
+      const hiddenQueries = [{ filterFields: ['notes'] }, { sortFields: ['value'] }, { aggregateFields: ['notes'] }];
+      for (const query of hiddenQueries) {
+        const request = list('company', ORG_A, query);
+        const empty = evaluateCrmLeadRead(state({ ...base, leads: [] }), request);
+        const onlyHidden = evaluateCrmLeadRead(state({ ...base, leads: [hiddenLead] }), request);
+        assert.deepEqual(onlyHidden, empty);
+        assertDeny(empty, 'campo_no_legible', ['CONFIDENTIAL', 'HIDDEN', NOTES, String(VALUE)]);
+        const onlyVisible = evaluateCrmLeadRead(state({ ...base, leads: [visibleLead] }), request);
+        const both = evaluateCrmLeadRead(state({ ...base, leads: [hiddenLead, visibleLead] }), request);
+        assert.deepEqual(both, onlyVisible);
+        assertDeny(both, 'campo_no_legible', ['CONFIDENTIAL', 'HIDDEN', 'Nombre visible', NOTES]);
+      }
+      assertDeny(
+        evaluateCrmLeadRead(state({ ...base, leads: [hiddenLead] }), one('HIDDEN', ORG_A, { sortFields: ['name'] })),
+        'sin_permiso',
+        ['CONFIDENTIAL', NOTES]
+      );
+      assertDeny(
+        evaluateCrmLeadRead(state({ ...base, leads: [] }), one('HIDDEN', ORG_A, { sortFields: ['name'] })),
+        'sin_permiso',
+        ['CONFIDENTIAL']
+      );
+
+      const partial = state({
+        grants: [companyGrant({ fieldClasses: ['identidad', 'reservado'] })],
+        restrictions: [
+          restriction({
+            scope: { kind: 'record', leadId: 'lead_2' },
+            fieldClasses: ['reservado'],
+          }),
+        ],
+        leads: [lead('lead_1', ORG_A), lead('lead_2', ORG_A)],
+      });
+      const partialWithHidden = state({
+        grants: [companyGrant({ fieldClasses: ['identidad', 'reservado'] })],
+        restrictions: [
+          restriction({
+            scope: { kind: 'record', leadId: 'lead_2' },
+            fieldClasses: ['reservado'],
+          }),
+          restriction({
+            id: 'restriction_hidden',
+            scope: { kind: 'record', leadId: 'HIDDEN' },
+            fieldClasses: ['identidad', 'reservado'],
+          }),
+        ],
+        leads: [lead('lead_1', ORG_A), lead('lead_2', ORG_A), hiddenLead],
+      });
+      for (const query of [{ sortFields: ['name'] }, { filterFields: ['name'] }, { aggregateFields: ['id'] }]) {
+        const visibleOnly = evaluateCrmLeadRead(partial, list('company', ORG_A, query));
+        const withHidden = evaluateCrmLeadRead(partialWithHidden, list('company', ORG_A, query));
+        assert.deepEqual(withHidden, visibleOnly);
+        assertAllow(visibleOnly, {
+          count: 2,
+          scopeKind: 'company',
+          queryDependencies: [Object.values(query)[0][0]],
+          names: ['Nombre lead_1', 'Nombre lead_2'],
+          absent: ['CONFIDENTIAL', 'HIDDEN'],
+        });
+      }
+      for (const query of [{ aggregateFields: ['notes'] }, { filterFields: ['value'] }, { sortFields: ['notes'] }]) {
+        const visibleOnly = evaluateCrmLeadRead(partial, list('company', ORG_A, query));
+        const withHidden = evaluateCrmLeadRead(partialWithHidden, list('company', ORG_A, query));
+        assert.deepEqual(withHidden, visibleOnly);
+        assertDeny(visibleOnly, 'campo_no_legible', [NOTES, 'Nombre lead_1', 'Nombre lead_2', 'CONFIDENTIAL', String(VALUE)]);
+      }
+    },
+  },
+  {
     name: 'el módulo no importa runtime con efectos y nadie más lo referencia',
     run: () => {
       const modulePath = path.join(process.cwd(), 'src/lib/tenancy/crm-read-evaluator.ts');
