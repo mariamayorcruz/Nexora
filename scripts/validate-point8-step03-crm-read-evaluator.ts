@@ -1100,6 +1100,173 @@ const scenarios: Array<{ name: string; run: () => void }> = [
     },
   },
   {
+    name: 'fecha se reconoce sin Symbol.toStringTag y objetos falsos se omiten',
+    run: () => {
+      let tagReads = 0;
+      const taggedCounter: Record<PropertyKey, unknown> = {};
+      Object.defineProperty(taggedCounter, Symbol.toStringTag, {
+        configurable: true,
+        enumerable: false,
+        get() {
+          tagReads += 1;
+          return 'Date';
+        },
+      });
+
+      const fakeTagged = { [Symbol.toStringTag]: 'Date' };
+
+      let throwingReads = 0;
+      const throwingTag: Record<PropertyKey, unknown> = {};
+      Object.defineProperty(throwingTag, Symbol.toStringTag, {
+        configurable: true,
+        enumerable: false,
+        get() {
+          throwingReads += 1;
+          throw new Error('toStringTag-no-debe-ejecutarse');
+        },
+      });
+
+      const validStamp = new Date('2026-08-15T12:30:00.000Z');
+      const validTime = validStamp.getTime();
+      const invalidStamp = new Date(Number.NaN);
+
+      let instanceGetTimeReads = 0;
+      const overriddenStamp = new Date('2026-08-15T12:30:00.000Z');
+      Object.defineProperty(overriddenStamp, 'getTime', {
+        value() {
+          instanceGetTimeReads += 1;
+          return 0;
+        },
+      });
+
+      const grant = companyGrant({ fieldClasses: ['identidad', 'gestion', 'reservado'] });
+
+      assert.doesNotThrow(() => {
+        const taggedResult = evaluateCrmLeadRead(
+          state({
+            grants: [grant],
+            leads: [lead('lead_1', ORG_A, { notes: taggedCounter })],
+          }),
+          one('lead_1')
+        );
+        assertAllow(taggedResult, {
+          count: 1,
+          scopeKind: 'record',
+          names: ['Nombre lead_1'],
+          absent: [NOTES],
+        });
+        if (taggedResult.decision === 'allow') {
+          assert.equal(Object.prototype.hasOwnProperty.call(taggedResult.records[0], 'notes'), false);
+        }
+      });
+      assert.equal(tagReads, 0);
+
+      assert.doesNotThrow(() => {
+        const fakeResult = evaluateCrmLeadRead(
+          state({
+            grants: [grant],
+            leads: [lead('lead_1', ORG_A, { notes: fakeTagged })],
+          }),
+          one('lead_1')
+        );
+        assertAllow(fakeResult, {
+          count: 1,
+          scopeKind: 'record',
+          names: ['Nombre lead_1'],
+          absent: [NOTES],
+        });
+        if (fakeResult.decision === 'allow') {
+          assert.equal(Object.prototype.hasOwnProperty.call(fakeResult.records[0], 'notes'), false);
+        }
+      });
+
+      assert.doesNotThrow(() => {
+        const throwingResult = evaluateCrmLeadRead(
+          state({
+            grants: [grant],
+            leads: [lead('lead_1', ORG_A, { notes: throwingTag })],
+          }),
+          one('lead_1')
+        );
+        assertAllow(throwingResult, {
+          count: 1,
+          scopeKind: 'record',
+          names: ['Nombre lead_1'],
+          absent: [NOTES],
+        });
+        if (throwingResult.decision === 'allow') {
+          assert.equal(Object.prototype.hasOwnProperty.call(throwingResult.records[0], 'notes'), false);
+        }
+      });
+      assert.equal(throwingReads, 0);
+
+      const validResult = evaluateCrmLeadRead(
+        state({
+          grants: [grant],
+          leads: [lead('lead_1', ORG_A, { lastContactedAt: validStamp, notes: null })],
+        }),
+        one('lead_1')
+      );
+      assert.equal(validStamp.getTime(), validTime);
+      assertAllow(validResult, {
+        count: 1,
+        scopeKind: 'record',
+        names: ['Nombre lead_1'],
+        absent: [NOTES],
+      });
+      if (validResult.decision === 'allow') {
+        assert.equal(validResult.records[0].lastContactedAt, '2026-08-15T12:30:00.000Z');
+        assert.equal(validResult.records[0].notes, null);
+      }
+
+      const invalidResult = evaluateCrmLeadRead(
+        state({
+          grants: [grant],
+          leads: [lead('lead_1', ORG_A, { lastContactedAt: invalidStamp, notes: null })],
+        }),
+        one('lead_1')
+      );
+      assertAllow(invalidResult, {
+        count: 1,
+        scopeKind: 'record',
+        names: ['Nombre lead_1'],
+        absent: [NOTES],
+      });
+      if (invalidResult.decision === 'allow') {
+        assert.equal(invalidResult.records[0].lastContactedAt, null);
+        assert.equal(invalidResult.records[0].notes, null);
+      }
+
+      const overriddenResult = evaluateCrmLeadRead(
+        state({
+          grants: [grant],
+          leads: [lead('lead_1', ORG_A, { lastContactedAt: overriddenStamp, notes: null })],
+        }),
+        one('lead_1')
+      );
+      assert.equal(instanceGetTimeReads, 0);
+      assertAllow(overriddenResult, {
+        count: 1,
+        scopeKind: 'record',
+        names: ['Nombre lead_1'],
+        absent: [NOTES],
+      });
+      if (overriddenResult.decision === 'allow') {
+        assert.equal(overriddenResult.records[0].lastContactedAt, '2026-08-15T12:30:00.000Z');
+        assert.equal(overriddenResult.records[0].notes, null);
+      }
+      assert.equal(instanceGetTimeReads, 0);
+      assert.equal(overriddenStamp.getTime(), 0);
+
+      const moduleSource = fs.readFileSync(
+        path.join(process.cwd(), 'src/lib/tenancy/crm-read-evaluator.ts'),
+        'utf8'
+      );
+      assert.equal(/Object\.prototype\.toString/.test(moduleSource), false);
+      assert.equal(/toStringTag/.test(moduleSource), false);
+    },
+  },
+  {
     name: 'datos malformados no causan permiso',
     run: () => {
       const rich = readableState();
@@ -1806,6 +1973,8 @@ const scenarios: Array<{ name: string; run: () => void }> = [
       assert.equal(/^import /m.test(source), false);
       assert.equal(/process\.env/.test(source), false);
       assert.equal(/Date\.now/.test(source), false);
+      assert.equal(/Object\.prototype\.toString/.test(source), false);
+      assert.equal(/toStringTag/.test(source), false);
       assert.equal(/\bfetch\s*\(/.test(source), false);
       assert.equal(/@prisma|prisma-client|from ['"]prisma/.test(source), false);
       assert.equal(/localStorage/.test(source), false);

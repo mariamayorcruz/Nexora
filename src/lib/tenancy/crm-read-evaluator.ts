@@ -205,7 +205,6 @@ const nativeGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 const nativeGetOwnPropertyNames = Object.getOwnPropertyNames;
 const nativeGetOwnPropertySymbols = Object.getOwnPropertySymbols;
 const nativeArrayIsArray = Array.isArray;
-const nativeToString = Object.prototype.toString;
 const nativeHasOwn = Object.prototype.hasOwnProperty;
 
 export function evaluateCrmLeadRead(state: unknown, request: unknown): CrmReadDecision {
@@ -559,12 +558,18 @@ function copyScalar(value: unknown): CrmReadScalar | undefined {
   if (value == null) return null;
   if (typeof value === 'string' || typeof value === 'boolean') return value;
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-  if (nativeToString.call(value) === '[object Date]') {
-    const time = nativeGetTime.call(value);
-    if (typeof time !== 'number' || !Number.isFinite(time)) return null;
-    return nativeToISOString.call(new NativeDate(time));
+  if (typeof value !== 'object') return undefined;
+  // Recognize Date only with the captured Date.prototype.getTime intrinsic.
+  // Avoid brand checks that inspect host object labels, and avoid looking up
+  // methods or properties on the received object.
+  let time: unknown;
+  try {
+    time = nativeGetTime.call(value);
+  } catch {
+    return undefined;
   }
-  return undefined;
+  if (typeof time !== 'number' || !Number.isFinite(time)) return null;
+  return nativeToISOString.call(new NativeDate(time));
 }
 
 function isAssigned(

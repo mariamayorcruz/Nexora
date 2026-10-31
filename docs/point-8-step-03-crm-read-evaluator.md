@@ -23,7 +23,7 @@ if (decision.decision === 'allow') {
 
 La función es pura: no modifica el snapshot, no llama callbacks, no lee el reloj del sistema y no importa cliente de base de datos, variables de entorno ni utilidades con efectos.
 
-La entrada tiene que ser dato propio. Un objeto de política o de petición solo se acepta si su prototipo es `Object.prototype` o `null`. Un accessor propio o un prototipo heredado cierra en `entrada_invalida` sin ejecutar el getter ni el setter. Un array de política o de consulta solo se acepta si su prototipo es `Array.prototype`, sin accessors y sin índices huecos; si no, la evaluación es `entrada_invalida`. No se leen propiedades heredadas. La fecha de un lead se copia con los métodos de `Date.prototype` capturados al cargar el módulo, así que un `getTime` sustituido en la instancia no se ejecuta.
+La entrada tiene que ser dato propio. Un objeto de política o de petición solo se acepta si su prototipo es `Object.prototype` o `null`. Un accessor propio o un prototipo heredado cierra en `entrada_invalida` sin ejecutar el getter ni el setter. Un array de política o de consulta solo se acepta si su prototipo es `Array.prototype`, sin accessors y sin índices huecos; si no, la evaluación es `entrada_invalida`. No se leen propiedades heredadas. La fecha de un lead se reconoce con `Date.prototype.getTime` capturado al cargar el módulo (sin `Object.prototype.toString` ni `Symbol.toStringTag`): un `getTime` sustituido en la instancia no se ejecuta, una etiqueta `Date` falsificada se omite sin lanzar, y un getter de `toStringTag` no se invoca.
 
 ## Entrada
 
@@ -116,6 +116,6 @@ La proyección no autoriza a enviar, exportar, editar, archivar, compartir ni bo
 npm run tenancy:validate-point8-step03
 ```
 
-Resultado de esta revisión: 34 escenarios sintéticos, todos en verde. Cubren lectura autorizada, denegación por identidad, empresa y membresía, aislamiento entre empresas, rol sin concesión, campos reservados y metadatos, acciones fuera de corte, cruce de registro y campo, restricciones de la cadena por registro y campo, instantes UTC reales, dato propio sin accessors, fichas totalmente invisibles, asignaciones, modos, consultas y entradas malformadas. Los datos son ficticios. La suite también comprueba que el módulo no importa runtime con efectos y que ningún otro archivo TypeScript o JavaScript de la aplicación lo referencia.
+Resultado de esta revisión: 35 escenarios sintéticos, todos en verde, incluido el reconocimiento seguro de fechas sin `Symbol.toStringTag`. Cubren lectura autorizada, denegación por identidad, empresa y membresía, aislamiento entre empresas, rol sin concesión, campos reservados y metadatos, acciones fuera de corte, cruce de registro y campo, restricciones de la cadena por registro y campo, instantes UTC reales, dato propio sin accessors, fichas totalmente invisibles, asignaciones, modos, consultas, entradas malformadas y omisión de objetos con `toStringTag` falso o hostil. Los datos son ficticios. La suite también comprueba que el módulo no importa runtime con efectos y que ningún otro archivo TypeScript o JavaScript de la aplicación lo referencia.
 
 No está conectado a `GET /api/crm/leads` ni a ninguna pantalla. Un módulo probado y desconectado no es una función desplegada.
