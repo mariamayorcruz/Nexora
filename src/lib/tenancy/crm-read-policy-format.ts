@@ -67,6 +67,8 @@ export type CrmReadPolicyFormatIssueCode =
   | 'evidencia_ajena'
   | 'evidencia_inexacta'
   | 'objeto_inexistente'
+  | 'historial_retirado_omitido'
+  | 'historial_retirado_incoherente'
   | 'auto_levantamiento'
   | 'contenido_mutado_tras_validacion'
   | 'checksum_invalido'
@@ -249,6 +251,12 @@ type ParsedBundle = {
   contentChecksum: string | null;
   membershipIds: Set<string>;
   leadIds: Set<string>;
+  /**
+   * Explicit retired grant logical identities. Must be present (possibly empty).
+   * Absence is not an empty history. Once listed, an id cannot leave the set
+   * and cannot reappear as an active grant.
+   */
+  retiredGrantLogicalIds: Set<string>;
   grants: ParsedGrant[];
   restrictions: ParsedRestriction[];
   grantsByVersionId: Map<string, ParsedGrant>;
@@ -514,6 +522,15 @@ function parseBundle(
   if (!hasOwn(record, 'leadIds')) {
     issues.push(issue('coleccion_ausente', `${path}.leadIds`, 'leadIds must be present'));
   }
+  if (!hasOwn(record, 'retiredGrantLogicalIds')) {
+    issues.push(
+      issue(
+        'coleccion_ausente',
+        `${path}.retiredGrantLogicalIds`,
+        'retiredGrantLogicalIds must be present; absence is not an empty history'
+      )
+    );
+  }
   if (!hasOwn(record, 'grants')) {
     issues.push(issue('coleccion_ausente', `${path}.grants`, 'grants must be present'));
   }
@@ -523,6 +540,11 @@ function parseBundle(
 
   const membershipIds = readIdSet(dataValue(record, 'membershipIds'), issues, `${path}.membershipIds`);
   const leadIds = readIdSet(dataValue(record, 'leadIds'), issues, `${path}.leadIds`);
+  const retiredGrantLogicalIds = readIdSet(
+    dataValue(record, 'retiredGrantLogicalIds'),
+    issues,
+    `${path}.retiredGrantLogicalIds`
+  );
   const grantsRaw = readPresentArray(dataValue(record, 'grants'), issues, `${path}.grants`);
   const restrictionsRaw = readPresentArray(
     dataValue(record, 'restrictions'),
@@ -536,6 +558,7 @@ function parseBundle(
     status === null ||
     membershipIds === null ||
     leadIds === null ||
+    retiredGrantLogicalIds === null ||
     grantsRaw === null ||
     restrictionsRaw === null
   ) {
@@ -559,6 +582,29 @@ function parseBundle(
     grants.push(grant);
     grantsByVersionId.set(grant.versionId, grant);
     grantsByLogicalId.set(grant.logicalId, grant);
+  }
+
+  for (const grant of grants) {
+    if (grant.validity === 'revoked' || grant.validity === 'invalidated') {
+      if (!retiredGrantLogicalIds.has(grant.logicalId)) {
+        issues.push(
+          issue(
+            'historial_retirado_incoherente',
+            `${path}.retiredGrantLogicalIds`,
+            `revoked/invalidated grant ${grant.logicalId} must be listed in retiredGrantLogicalIds`
+          )
+        );
+      }
+    }
+    if (grant.validity === 'active' && retiredGrantLogicalIds.has(grant.logicalId)) {
+      issues.push(
+        issue(
+          'reactivacion_invalida',
+          `grant:${grant.logicalId}`,
+          'active grant logicalId is listed as retired'
+        )
+      );
+    }
   }
 
   for (const grant of grants) {
@@ -605,6 +651,7 @@ function parseBundle(
     contentChecksum,
     membershipIds,
     leadIds,
+    retiredGrantLogicalIds,
     grants,
     restrictions,
     grantsByVersionId,
@@ -1229,6 +1276,18 @@ function checkSuccessionSemantics(
     evidenceByTarget.set(row.targetLogicalId, list);
   }
 
+  for (const retiredId of reference.retiredGrantLogicalIds) {
+    if (!candidate.retiredGrantLogicalIds.has(retiredId)) {
+      issues.push(
+        issue(
+          'historial_retirado_omitido',
+          'candidate.retiredGrantLogicalIds',
+          `retired grant logicalId ${retiredId} cannot disappear in succession`
+        )
+      );
+    }
+  }
+
   for (const prior of reference.restrictions) {
     if (prior.validity !== 'active') continue;
     const next = candidate.restrictionsByLogicalId.get(prior.logicalId);
@@ -1289,6 +1348,15 @@ function checkSuccessionSemantics(
     const related = evidenceByTarget.get(prior.logicalId) || [];
 
     if (prior.validity === 'revoked' || prior.validity === 'invalidated') {
+      if (!candidate.retiredGrantLogicalIds.has(prior.logicalId)) {
+        issues.push(
+          issue(
+            'historial_retirado_omitido',
+            `grant:${prior.logicalId}`,
+            'revoked/invalidated identity must remain in candidate retiredGrantLogicalIds'
+          )
+        );
+      }
       if (next && next.validity === 'active') {
         issues.push(
           issue(
@@ -1310,6 +1378,15 @@ function checkSuccessionSemantics(
         );
       } else {
         consumed.add(covered.evidenceId);
+        if (!candidate.retiredGrantLogicalIds.has(prior.logicalId)) {
+          issues.push(
+            issue(
+              'historial_retirado_incoherente',
+              `grant:${prior.logicalId}`,
+              'removing/revoking a grant must list its logicalId in candidate retiredGrantLogicalIds'
+            )
+          );
+        }
       }
       continue;
     }
@@ -1330,6 +1407,15 @@ function checkSuccessionSemantics(
         );
       } else {
         consumed.add(covered.evidenceId);
+        if (!candidate.retiredGrantLogicalIds.has(prior.logicalId)) {
+          issues.push(
+            issue(
+              'historial_retirado_incoherente',
+              `grant:${prior.logicalId}`,
+              'revoking/invalidating a grant must list its logicalId in candidate retiredGrantLogicalIds'
+            )
+          );
+        }
       }
       continue;
     }
@@ -1478,6 +1564,19 @@ function checkSuccessionSemantics(
   for (const next of candidate.grants) {
     if (reference.grantsByLogicalId.has(next.logicalId)) continue;
     if (next.validity !== 'active') continue;
+    if (
+      reference.retiredGrantLogicalIds.has(next.logicalId) ||
+      candidate.retiredGrantLogicalIds.has(next.logicalId)
+    ) {
+      issues.push(
+        issue(
+          'reactivacion_invalida',
+          `grant:${next.logicalId}`,
+          'retired grant logicalId cannot be introduced as a new active grant'
+        )
+      );
+      continue;
+    }
     const related = evidenceByTarget.get(next.logicalId) || [];
     const add = related.find((row) => matchesAddGrantEvidence(row, next));
     if (!add) {
@@ -1994,6 +2093,7 @@ function computeBundleChecksum(bundle: ParsedBundle): string {
     version: bundle.version,
     membershipIds: Array.from(bundle.membershipIds).sort(compareString),
     leadIds: Array.from(bundle.leadIds).sort(compareString),
+    retiredGrantLogicalIds: Array.from(bundle.retiredGrantLogicalIds).sort(compareString),
     grants,
     restrictions,
   };

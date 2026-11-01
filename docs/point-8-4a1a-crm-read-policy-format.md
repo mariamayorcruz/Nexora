@@ -19,11 +19,26 @@ Un resultado `ok: true` significa solo **estructura/sucesión válida**. Siempre
 
 Reactivar como `active` el mismo `logicalId` que estaba `revoked`/`invalidated` se rechaza. Una concesión nueva usa otro `logicalId` y evidencia `add_grant`.
 
+## Identidades retiradas (`retiredGrantLogicalIds`)
+
+Solución única de este corte: cada bundle declara un registro explícito `retiredGrantLogicalIds` (array presente; `[]` es historial vacío explícito). **La ausencia del campo no se interpreta como historial vacío** (`coleccion_ausente`).
+
+Reglas:
+
+- Forma parte del contenido canónico / checksum.
+- Toda concesión `revoked` o `invalidated` presente en `grants` debe figurar en el registro (`historial_retirado_incoherente` si falta).
+- Una identidad listada no puede aparecer como grant `active` en el mismo bundle (`reactivacion_invalida`).
+- En sucesión el conjunto es monótono: ninguna identidad retirada de la referencia puede desaparecer del candidato (`historial_retirado_omitido`).
+- Retirar u omitir una concesión activa (`remove_grant` / `revoke_grant` / `invalidate_grant`) exige listar su `logicalId` en el candidato.
+- Reintroducir como `active` un `logicalId` ya retirado —incluso tras versiones intermedias que omiten la fila del grant— se rechaza (`reactivacion_invalida`). Una concesión independiente con **otro** `logicalId` y evidencia `add_grant` exacta sigue siendo válida.
+
+No hay base de datos ni persistencia externa: el historial viaja dentro del formato del bundle.
+
 ## Checksum
 
 Versión canónica: `crm-read-policy-canonical/v1`.  
-Incluye organización, versión, catálogos de membresías/leads, grants y restrictions con alcance, clases ordenadas, validez, cadena (`parentVersionId`), vigencia, origen y procedencia.  
-Ordenaciones irrelevantes no cambian el digest; un cambio semántico sí. No se usa `JSON.stringify` de objetos de entrada sin canonicalizar.
+Incluye organización, versión, catálogos de membresías/leads, `retiredGrantLogicalIds` ordenado, grants y restrictions con alcance, clases ordenadas, validez, cadena (`parentVersionId`), vigencia, origen y procedencia.  
+Ordenaciones irrelevantes no cambian el digest; un cambio semántico (incluido el historial retirado) sí. No se usa `JSON.stringify` de objetos de entrada sin canonicalizar.
 
 - `status: 'validated'` exige `contentChecksum` presente e igual al digest canónico.
 - `status: 'draft'` admite `contentChecksum: null`; si se declara, debe coincidir.
@@ -55,7 +70,7 @@ Toda reducción de restricción pasa auto-levantamiento del `AuthorityContext` s
 - Instantes UTC reales `YYYY-MM-DDTHH:mm:ss[.sss]Z` (misma disciplina de calendario que el evaluador del paso 3).
 - No se ejecutan getters, métodos del valor recibido ni comprobaciones de etiqueta de marca del host object.
 - Scope `assigned` rechazado. Acción distinta de `crm.lead.read` rechazada.
-- Colecciones `grants`, `restrictions`, `membershipIds` y `leadIds` deben **estar presentes**; `[]` es vacío explícito válido.
+- Colecciones `grants`, `restrictions`, `membershipIds`, `leadIds` y `retiredGrantLogicalIds` deben **estar presentes**; `[]` es vacío explícito válido.
 
 ## Límites de este corte
 

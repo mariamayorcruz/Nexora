@@ -84,6 +84,7 @@ function bundle(extra: Rec = {}): Rec {
     contentChecksum: null,
     membershipIds: [MEM_A, MEM_B],
     leadIds: [LEAD_1],
+    retiredGrantLogicalIds: [],
     grants: [baseGrant()],
     restrictions: [baseRestriction()],
     ...extra,
@@ -171,6 +172,9 @@ const scenarios: Array<{ name: string; run: () => void }> = [
       const missingRestrictions = bundle();
       delete missingRestrictions.restrictions;
       assertIssue(validateCrmReadPolicyBundle(missingRestrictions), 'coleccion_ausente');
+      const missingRetired = bundle();
+      delete missingRetired.retiredGrantLogicalIds;
+      assertIssue(validateCrmReadPolicyBundle(missingRetired), 'coleccion_ausente');
     },
   },
   {
@@ -526,6 +530,7 @@ const scenarios: Array<{ name: string; run: () => void }> = [
       const reference = bundle({
         version: 1,
         grants: [baseGrant({ validity: 'invalidated' })],
+        retiredGrantLogicalIds: ['g_logic_1'],
         restrictions: [],
       });
       const refSum = computeCrmReadPolicyBundleChecksum(reference)!;
@@ -535,6 +540,7 @@ const scenarios: Array<{ name: string; run: () => void }> = [
           candidate: bundle({
             version: 2,
             grants: [baseGrant({ versionId: 'gv2', validity: 'active' })],
+            retiredGrantLogicalIds: ['g_logic_1'],
             restrictions: [],
           }),
           expectedPredecessor: { version: 1, checksum: refSum },
@@ -567,6 +573,7 @@ const scenarios: Array<{ name: string; run: () => void }> = [
               fieldClasses: ['identidad'],
             }),
           ],
+          retiredGrantLogicalIds: ['g_logic_1'],
           restrictions: [],
         }),
         expectedPredecessor: { version: 1, checksum: refSum },
@@ -1206,6 +1213,7 @@ const scenarios: Array<{ name: string; run: () => void }> = [
         contentChecksum: null,
         membershipIds: [],
         leadIds: [],
+        retiredGrantLogicalIds: [],
         grants: [],
         restrictions: [],
       });
@@ -1238,6 +1246,372 @@ const scenarios: Array<{ name: string; run: () => void }> = [
       });
       assertIssue(validateCrmReadPolicyBundle(tagged), 'entrada_invalida');
       assert.equal(reads, 0);
+    },
+  },
+  {
+    name: 'regresión: A→B→C no reactiva logicalId revoked vía versión intermedia vacía',
+    run: () => {
+      const a = bundle({
+        version: 1,
+        grants: [baseGrant({ logicalId: 'g', validity: 'revoked' })],
+        retiredGrantLogicalIds: ['g'],
+        restrictions: [],
+      });
+      const aSum = computeCrmReadPolicyBundleChecksum(a)!;
+      const b = bundle({
+        version: 2,
+        grants: [],
+        retiredGrantLogicalIds: ['g'],
+        restrictions: [],
+      });
+      const ab = validateCrmReadPolicySuccession({
+        reference: a,
+        candidate: b,
+        expectedPredecessor: { version: 1, checksum: aSum },
+        changeEvidence: [],
+        authority: authority(),
+      });
+      assert.equal(ab.ok, true);
+
+      const bSum = computeCrmReadPolicyBundleChecksum(b)!;
+      const c = bundle({
+        version: 3,
+        grants: [baseGrant({ versionId: 'gv3', logicalId: 'g', validity: 'active' })],
+        retiredGrantLogicalIds: ['g'],
+        restrictions: [],
+      });
+      assertIssue(
+        validateCrmReadPolicySuccession({
+          reference: b,
+          candidate: c,
+          expectedPredecessor: { version: 2, checksum: bSum },
+          changeEvidence: [
+            {
+              evidenceId: 'e_reactivate',
+              organizationId: ORG,
+              fromVersion: 2,
+              toVersion: 3,
+              changeKind: 'add_grant',
+              targetLogicalId: 'g',
+              after: grantFingerprint(),
+            },
+          ],
+          authority: authority(),
+        }),
+        'reactivacion_invalida'
+      );
+    },
+  },
+  {
+    name: 'regresión: A→B→C no reactiva logicalId invalidated vía versión intermedia vacía',
+    run: () => {
+      const a = bundle({
+        version: 1,
+        grants: [baseGrant({ logicalId: 'g', validity: 'invalidated' })],
+        retiredGrantLogicalIds: ['g'],
+        restrictions: [],
+      });
+      const aSum = computeCrmReadPolicyBundleChecksum(a)!;
+      const b = bundle({
+        version: 2,
+        grants: [],
+        retiredGrantLogicalIds: ['g'],
+        restrictions: [],
+      });
+      assert.equal(
+        validateCrmReadPolicySuccession({
+          reference: a,
+          candidate: b,
+          expectedPredecessor: { version: 1, checksum: aSum },
+          changeEvidence: [],
+          authority: authority(),
+        }).ok,
+        true
+      );
+
+      const bSum = computeCrmReadPolicyBundleChecksum(b)!;
+      assertIssue(
+        validateCrmReadPolicySuccession({
+          reference: b,
+          candidate: bundle({
+            version: 3,
+            grants: [baseGrant({ versionId: 'gv3', logicalId: 'g', validity: 'active' })],
+            retiredGrantLogicalIds: ['g'],
+            restrictions: [],
+          }),
+          expectedPredecessor: { version: 2, checksum: bSum },
+          changeEvidence: [
+            {
+              evidenceId: 'e_reactivate',
+              organizationId: ORG,
+              fromVersion: 2,
+              toVersion: 3,
+              changeKind: 'add_grant',
+              targetLogicalId: 'g',
+              after: grantFingerprint(),
+            },
+          ],
+          authority: authority(),
+        }),
+        'reactivacion_invalida'
+      );
+    },
+  },
+  {
+    name: 'regresión: identidad retirada se conserva a través de varias versiones intermedias',
+    run: () => {
+      const v1 = bundle({
+        version: 1,
+        grants: [baseGrant({ logicalId: 'g', validity: 'revoked' })],
+        retiredGrantLogicalIds: ['g'],
+        restrictions: [],
+      });
+      let previous = v1;
+      let previousSum = computeCrmReadPolicyBundleChecksum(v1)!;
+      for (const version of [2, 3, 4]) {
+        const next = bundle({
+          version,
+          grants: [],
+          retiredGrantLogicalIds: ['g'],
+          restrictions: [],
+        });
+        const step = validateCrmReadPolicySuccession({
+          reference: previous,
+          candidate: next,
+          expectedPredecessor: { version: version - 1, checksum: previousSum },
+          changeEvidence: [],
+          authority: authority(),
+        });
+        assert.equal(step.ok, true);
+        previous = next;
+        previousSum = computeCrmReadPolicyBundleChecksum(next)!;
+      }
+
+      assertIssue(
+        validateCrmReadPolicySuccession({
+          reference: previous,
+          candidate: bundle({
+            version: 5,
+            grants: [baseGrant({ versionId: 'gv5', logicalId: 'g', validity: 'active' })],
+            retiredGrantLogicalIds: ['g'],
+            restrictions: [],
+          }),
+          expectedPredecessor: { version: 4, checksum: previousSum },
+          changeEvidence: [
+            {
+              evidenceId: 'e_late',
+              organizationId: ORG,
+              fromVersion: 4,
+              toVersion: 5,
+              changeKind: 'add_grant',
+              targetLogicalId: 'g',
+              after: grantFingerprint(),
+            },
+          ],
+          authority: authority(),
+        }),
+        'reactivacion_invalida'
+      );
+    },
+  },
+  {
+    name: 'regresión: conservación válida y borrado/manipulación del historial retirado se rechazan',
+    run: () => {
+      const reference = bundle({
+        version: 1,
+        grants: [baseGrant({ logicalId: 'g', validity: 'revoked' })],
+        retiredGrantLogicalIds: ['g'],
+        restrictions: [],
+      });
+      const refSum = computeCrmReadPolicyBundleChecksum(reference)!;
+
+      assert.equal(
+        validateCrmReadPolicySuccession({
+          reference,
+          candidate: bundle({
+            version: 2,
+            grants: [baseGrant({ versionId: 'gv2', logicalId: 'g', validity: 'revoked' })],
+            retiredGrantLogicalIds: ['g'],
+            restrictions: [],
+          }),
+          expectedPredecessor: { version: 1, checksum: refSum },
+          changeEvidence: [],
+          authority: authority(),
+        }).ok,
+        true
+      );
+
+      assertIssue(
+        validateCrmReadPolicySuccession({
+          reference,
+          candidate: bundle({
+            version: 2,
+            grants: [],
+            retiredGrantLogicalIds: [],
+            restrictions: [],
+          }),
+          expectedPredecessor: { version: 1, checksum: refSum },
+          changeEvidence: [],
+          authority: authority(),
+        }),
+        'historial_retirado_omitido'
+      );
+
+      assertIssue(
+        validateCrmReadPolicyBundle(
+          bundle({
+            grants: [baseGrant({ logicalId: 'g', validity: 'revoked' })],
+            retiredGrantLogicalIds: [],
+            restrictions: [],
+          })
+        ),
+        'historial_retirado_incoherente'
+      );
+
+      assertIssue(
+        validateCrmReadPolicyBundle(
+          bundle({
+            grants: [baseGrant({ logicalId: 'g', validity: 'active' })],
+            retiredGrantLogicalIds: ['g'],
+            restrictions: [],
+          })
+        ),
+        'reactivacion_invalida'
+      );
+    },
+  },
+  {
+    name: 'regresión: nueva concesión con otro logicalId y evidencia exacta sigue válida tras retiro',
+    run: () => {
+      const reference = bundle({
+        version: 1,
+        grants: [],
+        retiredGrantLogicalIds: ['g_old'],
+        restrictions: [],
+      });
+      const refSum = computeCrmReadPolicyBundleChecksum(reference)!;
+      const result = validateCrmReadPolicySuccession({
+        reference,
+        candidate: bundle({
+          version: 2,
+          grants: [
+            baseGrant({
+              versionId: 'gv_new',
+              logicalId: 'g_new',
+              membershipId: MEM_B,
+              fieldClasses: ['identidad'],
+            }),
+          ],
+          retiredGrantLogicalIds: ['g_old'],
+          restrictions: [],
+        }),
+        expectedPredecessor: { version: 1, checksum: refSum },
+        changeEvidence: [
+          {
+            evidenceId: 'e_new',
+            organizationId: ORG,
+            fromVersion: 1,
+            toVersion: 2,
+            changeKind: 'add_grant',
+            targetLogicalId: 'g_new',
+            after: grantFingerprint({ membershipId: MEM_B, fieldClasses: ['identidad'] }),
+          },
+        ],
+        authority: authority(),
+      });
+      assert.equal(result.ok, true);
+    },
+  },
+  {
+    name: 'regresión: checksum determinista y sensible al historial retirado',
+    run: () => {
+      const withHistoryA = bundle({
+        grants: [],
+        restrictions: [],
+        retiredGrantLogicalIds: ['g_b', 'g_a'],
+      });
+      const withHistoryB = bundle({
+        grants: [],
+        restrictions: [],
+        retiredGrantLogicalIds: ['g_a', 'g_b'],
+      });
+      const emptyHistory = bundle({
+        grants: [],
+        restrictions: [],
+        retiredGrantLogicalIds: [],
+      });
+      const sumA = computeCrmReadPolicyBundleChecksum(withHistoryA);
+      const sumB = computeCrmReadPolicyBundleChecksum(withHistoryB);
+      const sumEmpty = computeCrmReadPolicyBundleChecksum(emptyHistory);
+      assert.equal(typeof sumA, 'string');
+      assert.equal(sumA, sumB);
+      assert.notEqual(sumA, sumEmpty);
+
+      const missing = bundle({ grants: [], restrictions: [] });
+      delete missing.retiredGrantLogicalIds;
+      assert.equal(computeCrmReadPolicyBundleChecksum(missing), null);
+      assertIssue(validateCrmReadPolicyBundle(missing), 'coleccion_ausente');
+    },
+  },
+  {
+    name: 'regresión: remove_grant exige listar la identidad en retiredGrantLogicalIds',
+    run: () => {
+      const reference = bundle({
+        version: 1,
+        grants: [baseGrant({ logicalId: 'g' })],
+        retiredGrantLogicalIds: [],
+        restrictions: [],
+      });
+      const refSum = computeCrmReadPolicyBundleChecksum(reference)!;
+      assertIssue(
+        validateCrmReadPolicySuccession({
+          reference,
+          candidate: bundle({
+            version: 2,
+            grants: [],
+            retiredGrantLogicalIds: [],
+            restrictions: [],
+          }),
+          expectedPredecessor: { version: 1, checksum: refSum },
+          changeEvidence: [
+            {
+              evidenceId: 'e_remove',
+              organizationId: ORG,
+              fromVersion: 1,
+              toVersion: 2,
+              changeKind: 'remove_grant',
+              targetLogicalId: 'g',
+              before: grantFingerprint(),
+            },
+          ],
+          authority: authority(),
+        }),
+        'historial_retirado_incoherente'
+      );
+
+      const ok = validateCrmReadPolicySuccession({
+        reference,
+        candidate: bundle({
+          version: 2,
+          grants: [],
+          retiredGrantLogicalIds: ['g'],
+          restrictions: [],
+        }),
+        expectedPredecessor: { version: 1, checksum: refSum },
+        changeEvidence: [
+          {
+            evidenceId: 'e_remove_ok',
+            organizationId: ORG,
+            fromVersion: 1,
+            toVersion: 2,
+            changeKind: 'remove_grant',
+            targetLogicalId: 'g',
+            before: grantFingerprint(),
+          },
+        ],
+        authority: authority(),
+      });
+      assert.equal(ok.ok, true);
     },
   },
   {
