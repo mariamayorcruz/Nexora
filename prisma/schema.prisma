@@ -79,6 +79,8 @@ model Organization {
   memberships Membership[]
   /// Point 8B-1 physical column; Point 8B-2 dual-write only (reads remain userId-scoped).
   crmLeads    CrmLead[]
+  /// Point 8 4A-1B: inactive candidate CRM read-policy storage only (no active bundle pointer).
+  crmReadPolicyBundles CrmReadPolicyBundle[]
 }
 
 model Membership {
@@ -91,8 +93,15 @@ model Membership {
   updatedAt      DateTime         @updatedAt
   organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Point 8 4A-1B composite target for same-org grant/restriction FKs (ON DELETE RESTRICT).
+  crmReadPolicyGrants                 CrmReadPolicyGrant[]                 @relation("GrantMembership")
+  crmReadPolicyRestrictions           CrmReadPolicyRestriction[]           @relation("RestrictionMembership")
+  crmReadPolicyRestrictionAuthors     CrmReadPolicyRestriction[]           @relation("RestrictionAuthorMembership")
+  crmReadPolicyBundleMembershipLinks  CrmReadPolicyBundleMembershipLink[]
 
   @@unique([organizationId, userId])
+  /// Enables composite FKs (organizationId, id) from candidate policy rows.
+  @@unique([organizationId, id])
   @@index([userId, status])
   @@index([organizationId, status])
 }
@@ -208,7 +217,13 @@ model CrmLead {
   campaign        Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  /// Point 8 4A-1B: RECORD-scope targets for candidate policies (ON DELETE RESTRICT).
+  crmReadPolicyGrants            CrmReadPolicyGrant[]            @relation("GrantScopeLead")
+  crmReadPolicyRestrictions      CrmReadPolicyRestriction[]      @relation("RestrictionScopeLead")
+  crmReadPolicyBundleLeadLinks   CrmReadPolicyBundleLeadLink[]
 
+  /// Enables composite FKs (organizationId, id) from candidate policy rows.
+  @@unique([organizationId, id])
   @@index([organizationId, updatedAt])
   @@index([organizationId, stage])
   @@index([userId])
@@ -469,4 +484,247 @@ model AttributionEvent {
 
   @@index([attributionSessionId, eventTs])
   @@index([eventName, createdAt])
+}
+
+/// Point 8 step 4A-1B — inactive candidate CRM read-policy persistence.
+/// Contract reference: PR #23 (4A-1A pure validators). This cut stores DRAFT candidates only;
+/// VALIDATED writes are blocked until a future sealing service. No active-bundle pointer on
+/// Organization, no operational APIs, no authority, no product bypass for immutability.
+
+enum CrmReadPolicyBundleStatus {
+  DRAFT
+  VALIDATED
+}
+
+enum CrmReadPolicyScopeKind {
+  COMPANY
+  RECORD
+}
+
+enum CrmReadPolicyFieldClass {
+  IDENTIDAD
+  CANAL
+  GESTION
+  RESERVADO
+}
+
+enum CrmReadPolicyGrantValidity {
+  ACTIVE
+  REVOKED
+  INVALIDATED
+}
+
+enum CrmReadPolicyRestrictionValidity {
+  ACTIVE
+  LIFTED
+}
+
+enum CrmReadPolicyOriginKind {
+  LEGACY_SNAPSHOT
+  COMPANY_AUTHORITY
+  DELEGATED_CHAIN
+  AGENCY_RELATION
+}
+
+enum CrmReadPolicyChangeKind {
+  ADD_GRANT
+  REMOVE_GRANT
+  REVOKE_GRANT
+  INVALIDATE_GRANT
+  REASSIGN_GRANT
+  NARROW_GRANT_CLASSES
+  WIDEN_GRANT_CLASSES
+  WIDEN_GRANT_SCOPE
+  EXTEND_GRANT_WINDOW
+  CHANGE_GRANT_PARENT
+  CHANGE_GRANT_ORIGIN
+  ADD_RESTRICTION
+  LIFT_RESTRICTION
+  NARROW_RESTRICTION_CLASSES
+}
+
+/// Candidate policy bundle header. contentChecksum is NOT an actor signature.
+model CrmReadPolicyBundle {
+  id                         String                    @id @default(cuid())
+  organizationId             String
+  version                    Int
+  status                     CrmReadPolicyBundleStatus @default(DRAFT)
+  /// Mirrors CRM_READ_POLICY_CANONICAL_VERSION from PR #23 validators.
+  canonicalVersion           String
+  contentChecksum            String?
+  predecessorOrganizationId  String?
+  predecessorVersion         Int?
+  createdAt                  DateTime                  @default(now())
+  updatedAt                  DateTime                  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  predecessor CrmReadPolicyBundle?  @relation("BundlePredecessor", fields: [predecessorOrganizationId, predecessorVersion], references: [organizationId, version], onDelete: Restrict)
+  successors  CrmReadPolicyBundle[] @relation("BundlePredecessor")
+
+  membershipLinks       CrmReadPolicyBundleMembershipLink[]
+  leadLinks             CrmReadPolicyBundleLeadLink[]
+  retiredGrantLogicalIds CrmReadPolicyRetiredGrantLogicalId[]
+  grants                CrmReadPolicyGrant[]
+  restrictions          CrmReadPolicyRestriction[]
+  evidenceFrom          CrmReadPolicyChangeEvidence[] @relation("EvidenceFromBundle")
+  evidenceTo            CrmReadPolicyChangeEvidence[] @relation("EvidenceToBundle")
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, version])
+  @@index([organizationId, status])
+}
+
+model CrmReadPolicyBundleMembershipLink {
+  organizationId String
+  bundleId       String
+  membershipId   String
+
+  bundle     CrmReadPolicyBundle @relation(fields: [organizationId, bundleId], references: [organizationId, id], onDelete: Cascade)
+  membership Membership          @relation(fields: [organizationId, membershipId], references: [organizationId, id], onDelete: Restrict)
+
+  @@id([organizationId, bundleId, membershipId])
+}
+
+model CrmReadPolicyBundleLeadLink {
+  organizationId String
+  bundleId       String
+  leadId         String
+
+  bundle CrmReadPolicyBundle @relation(fields: [organizationId, bundleId], references: [organizationId, id], onDelete: Cascade)
+  lead   CrmLead             @relation(fields: [organizationId, leadId], references: [organizationId, id], onDelete: Restrict)
+
+  @@id([organizationId, bundleId, leadId])
+}
+
+model CrmReadPolicyRetiredGrantLogicalId {
+  organizationId String
+  bundleId       String
+  logicalId      String
+
+  bundle CrmReadPolicyBundle @relation(fields: [organizationId, bundleId], references: [organizationId, id], onDelete: Cascade)
+
+  @@id([organizationId, bundleId, logicalId])
+}
+
+model CrmReadPolicyGrant {
+  organizationId         String
+  bundleId               String
+  versionId              String
+  logicalId              String
+  membershipId           String
+  /// Fixed action for this cut; DB CHECK enforces crm.lead.read.
+  action                 String                      @default("crm.lead.read")
+  accessMode             String                      @default("read")
+  scopeKind              CrmReadPolicyScopeKind
+  scopeLeadId            String?
+  validity               CrmReadPolicyGrantValidity  @default(ACTIVE)
+  parentVersionId        String?
+  originKind             CrmReadPolicyOriginKind
+  originOrganizationId   String
+  originRootValidated    Boolean
+  originRevoked          Boolean                     @default(false)
+  grantVersion           String?
+  requiredParentVersion  String?
+  validFrom              DateTime?
+  validUntil             DateTime?
+  createdAt              DateTime                    @default(now())
+  updatedAt              DateTime                    @updatedAt
+
+  bundle     CrmReadPolicyBundle @relation(fields: [organizationId, bundleId], references: [organizationId, id], onDelete: Cascade)
+  membership Membership          @relation("GrantMembership", fields: [organizationId, membershipId], references: [organizationId, id], onDelete: Restrict)
+  scopeLead  CrmLead?            @relation("GrantScopeLead", fields: [organizationId, scopeLeadId], references: [organizationId, id], onDelete: Restrict)
+  parent     CrmReadPolicyGrant? @relation("GrantParent", fields: [organizationId, bundleId, parentVersionId], references: [organizationId, bundleId, versionId], onDelete: Restrict)
+  children   CrmReadPolicyGrant[] @relation("GrantParent")
+  fieldClasses CrmReadPolicyGrantFieldClass[]
+
+  @@id([organizationId, bundleId, versionId])
+  @@unique([organizationId, bundleId, logicalId])
+  @@index([organizationId, membershipId])
+}
+
+model CrmReadPolicyGrantFieldClass {
+  organizationId String
+  bundleId       String
+  grantVersionId String
+  fieldClass     CrmReadPolicyFieldClass
+
+  grant CrmReadPolicyGrant @relation(fields: [organizationId, bundleId, grantVersionId], references: [organizationId, bundleId, versionId], onDelete: Cascade)
+
+  @@id([organizationId, bundleId, grantVersionId, fieldClass])
+}
+
+model CrmReadPolicyRestriction {
+  organizationId     String
+  bundleId           String
+  versionId          String
+  logicalId          String
+  membershipId       String
+  action             String                           @default("crm.lead.read")
+  scopeKind          CrmReadPolicyScopeKind
+  scopeLeadId        String?
+  validity           CrmReadPolicyRestrictionValidity @default(ACTIVE)
+  authorMembershipId String?
+  createdAt          DateTime                         @default(now())
+  updatedAt          DateTime                         @updatedAt
+
+  bundle           CrmReadPolicyBundle @relation(fields: [organizationId, bundleId], references: [organizationId, id], onDelete: Cascade)
+  membership       Membership          @relation("RestrictionMembership", fields: [organizationId, membershipId], references: [organizationId, id], onDelete: Restrict)
+  authorMembership Membership?         @relation("RestrictionAuthorMembership", fields: [organizationId, authorMembershipId], references: [organizationId, id], onDelete: Restrict)
+  scopeLead        CrmLead?            @relation("RestrictionScopeLead", fields: [organizationId, scopeLeadId], references: [organizationId, id], onDelete: Restrict)
+  fieldClasses     CrmReadPolicyRestrictionFieldClass[]
+
+  @@id([organizationId, bundleId, versionId])
+  @@unique([organizationId, bundleId, logicalId])
+  @@index([organizationId, membershipId])
+}
+
+model CrmReadPolicyRestrictionFieldClass {
+  organizationId       String
+  bundleId             String
+  restrictionVersionId String
+  fieldClass           CrmReadPolicyFieldClass
+
+  restriction CrmReadPolicyRestriction @relation(fields: [organizationId, bundleId, restrictionVersionId], references: [organizationId, bundleId, versionId], onDelete: Cascade)
+
+  @@id([organizationId, bundleId, restrictionVersionId, fieldClass])
+}
+
+/// Typed succession evidence between two candidate bundle versions of the same org.
+/// Snapshot payloads are stored as JSON; exact fingerprint contracts stay in PR #23 validators.
+model CrmReadPolicyChangeEvidence {
+  id               String                  @id @default(cuid())
+  evidenceId       String
+  organizationId   String
+  fromVersion      Int
+  toVersion         Int
+  changeKind       CrmReadPolicyChangeKind
+  targetLogicalId  String
+  beforeSnapshot   Json?
+  afterSnapshot    Json?
+  createdAt        DateTime                @default(now())
+
+  fromBundle   CrmReadPolicyBundle @relation("EvidenceFromBundle", fields: [organizationId, fromVersion], references: [organizationId, version], onDelete: Restrict)
+  toBundle     CrmReadPolicyBundle @relation("EvidenceToBundle", fields: [organizationId, toVersion], references: [organizationId, version], onDelete: Restrict)
+  fieldClasses CrmReadPolicyChangeEvidenceFieldClass[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, evidenceId])
+  @@index([organizationId, fromVersion, toVersion])
+}
+
+enum CrmReadPolicyEvidenceClassDirection {
+  ADDED
+  REMOVED
+}
+
+model CrmReadPolicyChangeEvidenceFieldClass {
+  organizationId String
+  evidenceRowId  String
+  direction      CrmReadPolicyEvidenceClassDirection
+  fieldClass     CrmReadPolicyFieldClass
+
+  evidence CrmReadPolicyChangeEvidence @relation(fields: [organizationId, evidenceRowId], references: [organizationId, id], onDelete: Cascade)
+
+  @@id([organizationId, evidenceRowId, direction, fieldClass])
 }
