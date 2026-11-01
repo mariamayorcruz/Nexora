@@ -111,7 +111,15 @@ Esto **no** afirma exposición en producción: producción no se inspeccionó ni
 FR004_DATABASE_URL=postgresql://… npm run tenancy:validate-point8-4a1b
 ```
 
-Solo Postgres desechable. Fixtures VALIDATED usan `DISABLE TRIGGER` privilegiado del entorno de prueba, no un bypass de producto.
+Solo Postgres desechable. Fixtures VALIDATED usan `session_replication_role=replica` privilegiado del entorno de prueba, no un bypass de producto.
+
+La prueba de privilegios de cliente:
+
+1. Crea `anon` / `authenticated` / `authenticator` **antes** de la migración correctiva.
+2. Despliega tablas 4A-1B, simula grants de cliente y confirma que existen.
+3. Aplica solo la migración correctiva real.
+4. Comprueba que los privilegios desaparecieron **sin** `REVOKE`/`GRANT` correctivos desde la prueba.
+5. Incluye sensibilidad: sin hardening, la misma aserción de ausencia falla y `anon` aún puede `SELECT`.
 
 ## Exclusiones
 

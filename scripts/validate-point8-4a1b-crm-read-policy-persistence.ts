@@ -198,6 +198,99 @@ function privilegedInsertValidatedFixture(
   );
 }
 
+const CLIENT_ROLES = ['anon', 'authenticated', 'authenticator'] as const;
+
+function ensureClientRoles(url: string) {
+  for (const role of CLIENT_ROLES) {
+    psql(
+      url,
+      `DO $$ BEGIN
+         IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${role}') THEN
+           CREATE ROLE ${role} NOLOGIN;
+         END IF;
+       END $$;`
+    );
+  }
+}
+
+function tablePrivCsv(url: string, role: string, table: string): string {
+  return psql(
+    url,
+    `SELECT COALESCE(has_table_privilege('${role}', '"${table}"', 'SELECT'), false)::text
+     || ',' || COALESCE(has_table_privilege('${role}', '"${table}"', 'INSERT'), false)::text
+     || ',' || COALESCE(has_table_privilege('${role}', '"${table}"', 'UPDATE'), false)::text
+     || ',' || COALESCE(has_table_privilege('${role}', '"${table}"', 'DELETE'), false)::text
+     || ',' || COALESCE(has_table_privilege('${role}', '"${table}"', 'TRUNCATE'), false)::text;`
+  );
+}
+
+function grantSimulatedClientPrivileges(url: string) {
+  // Schema USAGE mirrors typical Supabase client access; table DML/TRUNCATE are
+  // the privileges the hardening migration must remove.
+  const grants = [
+    `GRANT USAGE ON SCHEMA public TO ${CLIENT_ROLES.join(', ')}`,
+    ...CLIENT_ROLES.flatMap((role) =>
+      POLICY_TABLES.map(
+        (table) =>
+          `GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON TABLE "${table}" TO ${role}`
+      )
+    ),
+  ];
+  psql(url, `${grants.join(';\n')};`);
+}
+
+function assertClientPrivilegesPresent(url: string, label: string) {
+  for (const role of CLIENT_ROLES) {
+    for (const table of POLICY_TABLES) {
+      const priv = tablePrivCsv(url, role, table);
+      assert(
+        priv === 'true,true,true,true,true',
+        `${label}: expected simulated client privs on ${table} for ${role}, got ${priv}`
+      );
+    }
+  }
+}
+
+function assertClientPrivilegesAbsent(url: string, label: string) {
+  for (const role of CLIENT_ROLES) {
+    for (const table of POLICY_TABLES) {
+      const priv = tablePrivCsv(url, role, table);
+      assert(
+        priv === 'false,false,false,false,false',
+        `${label}: ${role} must lack DML/TRUNCATE on ${table} after hardening, got ${priv}`
+      );
+    }
+  }
+}
+
+/** Deploy a contiguous prefix of active migrations from a temporary folder. */
+function deployMigrationPrefix(env: NodeJS.ProcessEnv, migrationNames: string[]): string {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'nexora-point8-4a1b-prefix-'));
+  try {
+    const prismaDir = path.join(tmp, 'prisma');
+    const migrationsDir = path.join(prismaDir, 'migrations');
+    fs.mkdirSync(migrationsDir, { recursive: true });
+    fs.copyFileSync(
+      path.join(repoRoot(), 'prisma', 'schema.prisma'),
+      path.join(prismaDir, 'schema.prisma')
+    );
+    fs.copyFileSync(
+      path.join(repoRoot(), 'prisma', 'migrations', 'migration_lock.toml'),
+      path.join(migrationsDir, 'migration_lock.toml')
+    );
+    for (const name of migrationNames) {
+      fs.cpSync(
+        path.join(repoRoot(), 'prisma', 'migrations', name),
+        path.join(migrationsDir, name),
+        { recursive: true }
+      );
+    }
+    return runPrisma(['migrate', 'deploy', '--schema', path.join(prismaDir, 'schema.prisma')], env);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
 function main(): void {
   const url = process.env.FR004_DATABASE_URL || process.env.DATABASE_URL;
   if (!url) throw new Error('Set FR004_DATABASE_URL or DATABASE_URL to a disposable Postgres');
@@ -473,79 +566,133 @@ function main(): void {
       },
     },
     {
-      name: 'roles de cliente sin acceso a tablas nuevas (incl. destructivas)',
+      name: 'roles de cliente: hardening elimina privilegios previos (sin REVOKE post-migración)',
       run: () => {
+        // Outer loop already reset public. Manage migrate path here:
+        // 1) create client roles BEFORE hardening
+        // 2) deploy through 4A-1B tables only
+        // 3) simulate prior client grants and confirm they exist
+        // 4) apply real hardening migration
+        // 5) assert migration removed privs — no test-side REVOKE/GRANT after step 4
+        ensureClientRoles(url);
+        const pre = deployMigrationPrefix(env, [
+          BASELINE_NAME,
+          SLICE0_NAME,
+          POINT8B1_NAME,
+          POINT8B6_NAME,
+          POINT8_4A1B_NAME,
+        ]);
+        assert(pre.includes(POINT8_4A1B_NAME), 'pre-hardening deploy must create policy tables');
+        assert(
+          !pre.includes(`Applying migration \`${POINT8_4A1B_HARDENING_NAME}\``),
+          'hardening must not apply before privilege simulation'
+        );
+
+        grantSimulatedClientPrivileges(url);
+        assertClientPrivilegesPresent(url, 'before hardening');
+
+        const harden = runPrisma(['migrate', 'deploy'], env);
+        assert(
+          harden.includes(POINT8_4A1B_HARDENING_NAME),
+          'corrective hardening migration must apply'
+        );
+
+        // No REVOKE / GRANT / security DDL from the test after migrate.
+        assertClientPrivilegesAbsent(url, 'after hardening migration alone');
+
         const s = seedTenants(url);
         const b = id('bundle');
         insertDraftBundle(url, { bundleId: b, orgId: s.orgA, version: 1, t: s.t });
 
-        for (const role of ['anon', 'authenticated']) {
-          psql(
-            url,
-            `DO $$ BEGIN
-               IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${role}') THEN
-                 CREATE ROLE ${role} NOLOGIN;
-               END IF;
-             END $$;`
-          );
-          // Ensure revoke from hardening still holds even if role was created later.
-          psql(
-            url,
-            POLICY_TABLES.map((t) => `REVOKE ALL ON TABLE "${t}" FROM ${role}`).join(';\n') + ';'
-          );
-
-          for (const table of POLICY_TABLES) {
-            const priv = psql(
-              url,
-              `SELECT COALESCE(has_table_privilege('${role}', '"${table}"', 'SELECT'), false)::text
-               || ',' || COALESCE(has_table_privilege('${role}', '"${table}"', 'INSERT'), false)::text
-               || ',' || COALESCE(has_table_privilege('${role}', '"${table}"', 'UPDATE'), false)::text
-               || ',' || COALESCE(has_table_privilege('${role}', '"${table}"', 'DELETE'), false)::text
-               || ',' || COALESCE(has_table_privilege('${role}', '"${table}"', 'TRUNCATE'), false)::text;`
-            );
-            assert(
-              priv === 'false,false,false,false,false',
-              `${role} must lack DML/TRUNCATE on ${table}, got ${priv}`
-            );
-          }
-
-          // Deny may surface as permission denied or as relation-not-visible
-          // when schema USAGE is absent — both mean no client Data API access.
-          const deny = /permission denied|does not exist/i;
+        const deny = /permission denied|does not exist/i;
+        for (const role of CLIENT_ROLES) {
           expectFail(
             url,
             `SET ROLE ${role}; SELECT COUNT(*) FROM public."CrmReadPolicyBundle"; RESET ROLE;`,
-            `${role} SELECT CrmReadPolicyBundle`,
+            `${role} SELECT after hardening`,
             deny
           );
           expectFail(
             url,
             `SET ROLE ${role}; TRUNCATE public."CrmReadPolicyBundle"; RESET ROLE;`,
-            `${role} TRUNCATE CrmReadPolicyBundle`,
+            `${role} TRUNCATE after hardening`,
             deny
           );
           expectFail(
             url,
             `SET ROLE ${role}; DELETE FROM public."CrmReadPolicyBundle"; RESET ROLE;`,
-            `${role} DELETE CrmReadPolicyBundle`,
+            `${role} DELETE after hardening`,
             deny
           );
         }
 
         for (const table of POLICY_TABLES) {
-          const rls = psql(
-            url,
-            `SELECT relrowsecurity::text FROM pg_class
-             WHERE relname='${table}' AND relnamespace='public'::regnamespace;`
+          assert(
+            psql(
+              url,
+              `SELECT relrowsecurity::text FROM pg_class
+               WHERE relname='${table}' AND relnamespace='public'::regnamespace;`
+            ) === 'true',
+            `RLS must be enabled on ${table}`
           );
-          assert(rls === 'true', `RLS must be enabled on ${table}`);
-          const policies = psql(
-            url,
-            `SELECT COUNT(*)::text FROM pg_policies
-             WHERE schemaname='public' AND tablename='${table}';`
+          assert(
+            psql(
+              url,
+              `SELECT COUNT(*)::text FROM pg_policies
+               WHERE schemaname='public' AND tablename='${table}';`
+            ) === '0',
+            `${table} must have no permissive client policies`
           );
-          assert(policies === '0', `${table} must have no permissive client policies`);
         }
+      },
+    },
+    {
+      name: 'sensibilidad: sin hardening el test detecta privilegios de cliente incorrectos',
+      run: () => {
+        ensureClientRoles(url);
+        const pre = deployMigrationPrefix(env, [
+          BASELINE_NAME,
+          SLICE0_NAME,
+          POINT8B1_NAME,
+          POINT8B6_NAME,
+          POINT8_4A1B_NAME,
+        ]);
+        assert(pre.includes(POINT8_4A1B_NAME), 'tables must exist for sensitivity fixture');
+        assert(
+          !pre.includes(`Applying migration \`${POINT8_4A1B_HARDENING_NAME}\``),
+          'sensitivity fixture must omit hardening'
+        );
+
+        grantSimulatedClientPrivileges(url);
+        assertClientPrivilegesPresent(url, 'sensitivity fixture');
+
+        let detected = false;
+        let detail = '';
+        try {
+          assertClientPrivilegesAbsent(url, 'sensitivity expects failure');
+        } catch (err) {
+          detected = true;
+          detail = err instanceof Error ? err.message : String(err);
+        }
+        assert(detected, 'without hardening, privilege-absence assertion must fail');
+        assert(
+          /must lack DML\/TRUNCATE|after hardening/i.test(detail),
+          `sensitivity message mismatch: ${detail.slice(0, 300)}`
+        );
+
+        // Positive control: client role can still SELECT before hardening.
+        const probe = psql(
+          url,
+          `SET ROLE anon; SELECT COUNT(*)::text FROM public."CrmReadPolicyBundle"; RESET ROLE;`
+        );
+        const countLine = probe
+          .split(/\n/)
+          .map((line) => line.trim())
+          .find((line) => /^\d+$/.test(line));
+        assert(
+          countLine !== undefined,
+          `anon SELECT should succeed without hardening, got ${JSON.stringify(probe)}`
+        );
       },
     },
     {
@@ -755,11 +902,17 @@ function main(): void {
     },
   ];
 
+  const selfManagedMigrate = new Set([
+    'actualización desde esquema anterior con datos sintéticos',
+    'roles de cliente: hardening elimina privilegios previos (sin REVOKE post-migración)',
+    'sensibilidad: sin hardening el test detecta privilegios de cliente incorrectos',
+  ]);
+
   let failed = 0;
   for (const scenario of scenarios) {
     try {
       resetPublic(url);
-      if (scenario.name !== 'actualización desde esquema anterior con datos sintéticos') {
+      if (!selfManagedMigrate.has(scenario.name)) {
         runPrisma(['migrate', 'deploy'], env);
       }
       scenario.run();
