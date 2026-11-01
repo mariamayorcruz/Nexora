@@ -106,6 +106,26 @@ function authority(extra: Rec = {}): AuthorityContext {
   };
 }
 
+function grantFingerprint(extra: Rec = {}): Rec {
+  return {
+    membershipId: MEM_A,
+    fieldClasses: ['identidad', 'gestion'],
+    scopeKind: 'company',
+    scopeLeadId: null,
+    ...extra,
+  };
+}
+
+function restrictionFingerprint(extra: Rec = {}): Rec {
+  return {
+    membershipId: MEM_A,
+    fieldClasses: ['reservado'],
+    scopeKind: 'company',
+    scopeLeadId: null,
+    ...extra,
+  };
+}
+
 function codes(result: { ok: false; issues: Array<{ code: string }> } | { ok: true }): string[] {
   if (result.ok) return [];
   return result.issues.map((issue) => issue.code);
@@ -366,6 +386,7 @@ const scenarios: Array<{ name: string; run: () => void }> = [
               toVersion: 2,
               changeKind: 'add_grant',
               targetLogicalId: 'g_logic_new',
+              after: grantFingerprint({ membershipId: MEM_B, fieldClasses: ['identidad'] }),
             },
             {
               evidenceId: 'e3',
@@ -374,6 +395,7 @@ const scenarios: Array<{ name: string; run: () => void }> = [
               toVersion: 2,
               changeKind: 'lift_restriction',
               targetLogicalId: 'r_logic_1',
+              before: restrictionFingerprint(),
             },
           ],
           authority: authority({ representedMembershipIds: [MEM_B], authorityChainMembershipIds: [MEM_B] }),
@@ -524,6 +546,7 @@ const scenarios: Array<{ name: string; run: () => void }> = [
               toVersion: 2,
               changeKind: 'add_grant',
               targetLogicalId: 'g_logic_1',
+              after: grantFingerprint(),
             },
           ],
           authority: authority(),
@@ -555,6 +578,7 @@ const scenarios: Array<{ name: string; run: () => void }> = [
             toVersion: 2,
             changeKind: 'add_grant',
             targetLogicalId: 'g_logic_independent',
+            after: grantFingerprint({ fieldClasses: ['identidad'] }),
           },
         ],
         authority: authority(),
@@ -581,6 +605,7 @@ const scenarios: Array<{ name: string; run: () => void }> = [
               toVersion: 2,
               changeKind: 'lift_restriction',
               targetLogicalId: 'r_logic_1',
+              before: restrictionFingerprint(),
             },
           ],
           authority: authority({ representedMembershipIds: [MEM_A] }),
@@ -600,6 +625,7 @@ const scenarios: Array<{ name: string; run: () => void }> = [
               toVersion: 2,
               changeKind: 'lift_restriction',
               targetLogicalId: 'r_logic_1',
+              before: restrictionFingerprint(),
             },
           ],
           authority: authority({
@@ -953,6 +979,212 @@ const scenarios: Array<{ name: string; run: () => void }> = [
         authority: authority({ representedMembershipIds: [MEM_B] }),
       });
       assert.equal(result.ok, true);
+    },
+  },
+  {
+    name: 'regresión: add_grant con after contradictorio se rechaza',
+    run: () => {
+      const reference = bundle({ version: 1, grants: [], restrictions: [] });
+      const refSum = computeCrmReadPolicyBundleChecksum(reference)!;
+      const result = validateCrmReadPolicySuccession({
+        reference,
+        candidate: bundle({
+          version: 2,
+          grants: [
+            baseGrant({
+              versionId: 'gv_new',
+              logicalId: 'g',
+              membershipId: MEM_B,
+              fieldClasses: ['reservado'],
+            }),
+          ],
+          restrictions: [],
+        }),
+        expectedPredecessor: { version: 1, checksum: refSum },
+        changeEvidence: [
+          {
+            evidenceId: 'e_bad_add',
+            organizationId: ORG,
+            fromVersion: 1,
+            toVersion: 2,
+            changeKind: 'add_grant',
+            targetLogicalId: 'g',
+            after: {
+              membershipId: MEM_A,
+              fieldClasses: ['identidad'],
+              scopeKind: 'record',
+              scopeLeadId: LEAD_1,
+            },
+          },
+        ],
+        authority: authority(),
+      });
+      assert.equal(result.ok, false);
+      assert.equal(codes(result as { ok: false; issues: Array<{ code: string }> }).includes('ampliacion_sin_evidencia'), true);
+    },
+  },
+  {
+    name: 'regresión: lift_restriction con before contradictorio se rechaza',
+    run: () => {
+      const reference = bundle({
+        version: 1,
+        grants: [baseGrant()],
+        restrictions: [
+          baseRestriction({
+            logicalId: 'r',
+            membershipId: MEM_A,
+            fieldClasses: ['reservado', 'gestion'],
+          }),
+        ],
+      });
+      const refSum = computeCrmReadPolicyBundleChecksum(reference)!;
+      const result = validateCrmReadPolicySuccession({
+        reference,
+        candidate: bundle({ version: 2, grants: [baseGrant({ versionId: 'gv2' })], restrictions: [] }),
+        expectedPredecessor: { version: 1, checksum: refSum },
+        changeEvidence: [
+          {
+            evidenceId: 'e_bad_lift',
+            organizationId: ORG,
+            fromVersion: 1,
+            toVersion: 2,
+            changeKind: 'lift_restriction',
+            targetLogicalId: 'r',
+            before: {
+              membershipId: MEM_B,
+              fieldClasses: ['canal'],
+              scopeKind: 'record',
+              scopeLeadId: LEAD_1,
+            },
+          },
+        ],
+        authority: authority({ representedMembershipIds: [MEM_B] }),
+      });
+      assert.equal(result.ok, false);
+      assert.equal(
+        codes(result as { ok: false; issues: Array<{ code: string }> }).includes('restriccion_omitida_sin_evidencia'),
+        true
+      );
+    },
+  },
+  {
+    name: 'regresión: delta correcto con snapshots contradictorios se rechaza',
+    run: () => {
+      const reference = bundle({
+        version: 1,
+        grants: [baseGrant({ logicalId: 'g', fieldClasses: ['identidad'] })],
+        restrictions: [],
+      });
+      const refSum = computeCrmReadPolicyBundleChecksum(reference)!;
+      const result = validateCrmReadPolicySuccession({
+        reference,
+        candidate: bundle({
+          version: 2,
+          grants: [baseGrant({ versionId: 'gv2', logicalId: 'g', fieldClasses: ['identidad', 'reservado'] })],
+          restrictions: [],
+        }),
+        expectedPredecessor: { version: 1, checksum: refSum },
+        changeEvidence: [
+          {
+            evidenceId: 'e_conflict',
+            organizationId: ORG,
+            fromVersion: 1,
+            toVersion: 2,
+            changeKind: 'widen_grant_classes',
+            targetLogicalId: 'g',
+            fieldClassesAdded: ['reservado'],
+            before: { membershipId: MEM_B },
+            after: { membershipId: MEM_B },
+          },
+        ],
+        authority: authority(),
+      });
+      assert.equal(result.ok, false);
+      const issueCodes = codes(result as { ok: false; issues: Array<{ code: string }> });
+      assert.equal(issueCodes.includes('evidencia_inexacta'), true);
+      assert.equal(issueCodes.includes('ampliacion_sin_evidencia'), true);
+    },
+  },
+  {
+    name: 'evidencia incompleta u objeto inexistente se rechaza',
+    run: () => {
+      const reference = bundle({ version: 1, grants: [], restrictions: [] });
+      const refSum = computeCrmReadPolicyBundleChecksum(reference)!;
+      assertIssue(
+        validateCrmReadPolicySuccession({
+          reference,
+          candidate: bundle({
+            version: 2,
+            grants: [baseGrant({ versionId: 'n', logicalId: 'g_new', fieldClasses: ['identidad'] })],
+            restrictions: [],
+          }),
+          expectedPredecessor: { version: 1, checksum: refSum },
+          changeEvidence: [
+            {
+              evidenceId: 'e_missing_after',
+              organizationId: ORG,
+              fromVersion: 1,
+              toVersion: 2,
+              changeKind: 'add_grant',
+              targetLogicalId: 'g_new',
+            },
+          ],
+          authority: authority(),
+        }),
+        'evidencia_inexacta'
+      );
+      assertIssue(
+        validateCrmReadPolicySuccession({
+          reference,
+          candidate: bundle({ version: 2, grants: [], restrictions: [] }),
+          expectedPredecessor: { version: 1, checksum: refSum },
+          changeEvidence: [
+            {
+              evidenceId: 'e_ghost',
+              organizationId: ORG,
+              fromVersion: 1,
+              toVersion: 2,
+              changeKind: 'add_grant',
+              targetLogicalId: 'ghost',
+              after: grantFingerprint({ fieldClasses: ['identidad'] }),
+            },
+          ],
+          authority: authority(),
+        }),
+        'objeto_inexistente'
+      );
+      const withGrant = bundle({
+        version: 1,
+        grants: [baseGrant({ fieldClasses: ['identidad'] })],
+        restrictions: [],
+      });
+      const withSum = computeCrmReadPolicyBundleChecksum(withGrant)!;
+      assert.equal(
+        validateCrmReadPolicySuccession({
+          reference: withGrant,
+          candidate: bundle({
+            version: 2,
+            grants: [baseGrant({ versionId: 'gv2', fieldClasses: ['identidad', 'reservado'] })],
+            restrictions: [],
+          }),
+          expectedPredecessor: { version: 1, checksum: withSum },
+          changeEvidence: [
+            {
+              evidenceId: 'e_ok_widen',
+              organizationId: ORG,
+              fromVersion: 1,
+              toVersion: 2,
+              changeKind: 'widen_grant_classes',
+              targetLogicalId: 'g_logic_1',
+              fieldClassesAdded: ['reservado'],
+              before: { fieldClasses: ['identidad'] },
+              after: { fieldClasses: ['identidad', 'reservado'] },
+            },
+          ],
+          authority: authority(),
+        }).ok,
+        true
+      );
     },
   },
   {

@@ -33,9 +33,20 @@ Ordenaciones irrelevantes no cambian el digest; un cambio semántico sí. No se 
 
 Las diferencias de clases se calculan como conjuntos (`añadidas = candidato \ referencia`, `retiradas = referencia \ candidato`). Añadir clases a una restricción no compensa retirar otras.
 
-La evidencia debe traer el delta exacto (`fieldClassesAdded` / `fieldClassesRemoved`) o `before`/`after` coherentes con destinatario, scope, ventana, padre u origen. Una etiqueta `changeKind` sola no cubre el cambio.
+Contrato por `changeKind` (campos obligatorios y admitidos):
 
-Toda reducción de restricción (omisión, `lifted` o clases retiradas) pasa la comprobación de auto-levantamiento del `AuthorityContext` sintético, incluida la reducción parcial.
+| changeKind | Obligatorio | Admitido además |
+|---|---|---|
+| `add_grant` / `add_restriction` | `after` con huella (membershipId, fieldClasses, scopeKind, scopeLeadId) igual al objeto nuevo | — |
+| `lift_restriction` / `remove_grant` / `revoke_grant` / `invalidate_grant` | `before` con la misma huella del objeto de referencia | — |
+| `widen_grant_classes` | `fieldClassesAdded` exacto | `before`/`after` solo con `fieldClasses` |
+| `narrow_*` | `fieldClassesRemoved` exacto | `before`/`after` solo con `fieldClasses` |
+| `reassign_grant` | `before`/`after.membershipId` | solo esos campos |
+| `widen_grant_scope` / `extend_grant_window` / `change_grant_parent` / `change_grant_origin` | `before`/`after` del atributo cambiado | solo campos de ese atributo |
+
+Una etiqueta + `logicalId` no bastan. Snapshots contradictorios o campos no admitidos → `evidencia_inexacta`. Evidencia hacia un id ausente → `objeto_inexistente`. Filas que no cubren un cambio real se rechazan.
+
+Toda reducción de restricción pasa auto-levantamiento del `AuthorityContext` sintético (también parcial).
 
 ## Formato de entrada admitido
 

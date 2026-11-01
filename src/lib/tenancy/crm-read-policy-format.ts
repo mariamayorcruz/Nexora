@@ -66,10 +66,11 @@ export type CrmReadPolicyFormatIssueCode =
   | 'ampliacion_sin_evidencia'
   | 'evidencia_ajena'
   | 'evidencia_inexacta'
+  | 'objeto_inexistente'
   | 'auto_levantamiento'
   | 'contenido_mutado_tras_validacion'
   | 'checksum_invalido'
-  | 'checksum_ausente';
+  | 'checksum_ausente'
 
 export type CrmReadPolicyFormatIssue = {
   code: CrmReadPolicyFormatIssueCode;
@@ -154,10 +155,17 @@ export type CrmReadPolicyChangeKind =
   | 'narrow_restriction_classes';
 
 /**
- * Evidence must name the exact semantic delta. A changeKind label alone is
- * not enough: class diffs use fieldClassesAdded / fieldClassesRemoved; other
- * widenings use before/after snapshots that must match the reference and
- * candidate values for the fields being changed.
+ * Evidence contracts (per changeKind):
+ * - add_grant / add_restriction: require `after` identity fingerprint of the
+ *   new object; forbid `before` and class deltas.
+ * - lift_restriction / remove|revoke|invalidate_grant: require `before`
+ *   fingerprint of the removed/lifted object; forbid `after` and class deltas.
+ * - widen_grant_classes / narrow_*: require exact class delta sets; optional
+ *   before/after may only restate fieldClasses of prior/next; other snapshot
+ *   fields are not admitted.
+ * - reassign / scope / window / parent / origin: require before+after fields
+ *   that match the real change; extraneous snapshot fields are rejected.
+ * A changeKind label + logicalId alone never certifies the content.
  */
 export type CrmReadPolicyChangeEvidence = {
   evidenceId: string;
@@ -1198,14 +1206,11 @@ function parseEvidenceSnapshot(
 /**
  * Succession rules (final):
  * - Compare set differences explicitly (added = next\prior, removed = prior\next).
- * - Any access-widening grant change needs evidence whose exact values match.
- * - Any restriction weakening (omit, lift, or remove classes) needs matching
- *   evidence and fails auto-lift checks for the restriction target.
- * - Adding restriction classes is strengthening and does not need lift evidence.
- * - Same logicalId cannot change membership without reassign_grant evidence;
- *   otherwise reject and require a new independent grant.
+ * - Evidence must satisfy the per-changeKind contract (required/admitted fields)
+ *   and match the real object fingerprint or delta; contradictory snapshots fail.
+ * - Restriction weakening always runs auto-lift checks.
  * - Revoked/invalidated logical grants cannot become active again.
- * - Evidence labels without matching before/after or class deltas are rejected.
+ * - Every evidence row must correspond to a real change on an existing object.
  */
 function checkSuccessionSemantics(
   reference: ParsedBundle,
@@ -1215,7 +1220,10 @@ function checkSuccessionSemantics(
   issues: CrmReadPolicyFormatIssue[]
 ) {
   const evidenceByTarget = new Map<string, CrmReadPolicyChangeEvidence[]>();
+  const consumed = new Set<string>();
   for (const row of evidence) {
+    const shapeIssues = evidenceContractIssues(row);
+    for (const item of shapeIssues) issues.push(item);
     const list = evidenceByTarget.get(row.targetLogicalId) || [];
     list.push(row);
     evidenceByTarget.set(row.targetLogicalId, list);
@@ -1226,33 +1234,18 @@ function checkSuccessionSemantics(
     const next = candidate.restrictionsByLogicalId.get(prior.logicalId);
     const related = evidenceByTarget.get(prior.logicalId) || [];
 
-    if (!next) {
-      const lift = related.find((row) => row.changeKind === 'lift_restriction');
+    if (!next || next.validity === 'lifted') {
+      const lift = related.find((row) => matchesLiftRestrictionEvidence(row, prior));
       if (!lift) {
         issues.push(
           issue(
             'restriccion_omitida_sin_evidencia',
             `restriction:${prior.logicalId}`,
-            'active restriction omitted without lift evidence'
+            'active restriction omitted/lifted without exact lift evidence'
           )
         );
       } else {
-        assertLiftAuthority(prior.membershipId, authority, issues, prior.logicalId);
-      }
-      continue;
-    }
-
-    if (next.validity === 'lifted') {
-      const lift = related.find((row) => row.changeKind === 'lift_restriction');
-      if (!lift) {
-        issues.push(
-          issue(
-            'restriccion_omitida_sin_evidencia',
-            `restriction:${prior.logicalId}`,
-            'restriction marked lifted without evidence'
-          )
-        );
-      } else {
+        consumed.add(lift.evidenceId);
         assertLiftAuthority(prior.membershipId, authority, issues, prior.logicalId);
       }
       continue;
@@ -1272,12 +1265,9 @@ function checkSuccessionSemantics(
     }
 
     const removed = setDifference(prior.fieldClasses, next.fieldClasses);
-    const added = setDifference(next.fieldClasses, prior.fieldClasses);
     if (removed.length > 0) {
-      const narrow = related.find(
-        (row) =>
-          row.changeKind === 'narrow_restriction_classes' &&
-          sameStringSet(row.fieldClassesRemoved || [], removed)
+      const narrow = related.find((row) =>
+        matchesNarrowRestrictionEvidence(row, prior, next, removed)
       );
       if (!narrow) {
         issues.push(
@@ -1288,18 +1278,8 @@ function checkSuccessionSemantics(
           )
         );
       } else {
+        consumed.add(narrow.evidenceId);
         assertLiftAuthority(prior.membershipId, authority, issues, prior.logicalId);
-        if (narrow.fieldClassesAdded && narrow.fieldClassesAdded.length > 0) {
-          if (!sameStringSet(narrow.fieldClassesAdded, added)) {
-            issues.push(
-              issue(
-                'evidencia_inexacta',
-                `changeEvidence.${narrow.evidenceId}`,
-                'narrow evidence fieldClassesAdded does not match candidate delta'
-              )
-            );
-          }
-        }
       }
     }
   }
@@ -1323,23 +1303,22 @@ function checkSuccessionSemantics(
     if (prior.validity !== 'active') continue;
 
     if (!next) {
-      const covered = related.some(
-        (row) =>
-          row.changeKind === 'remove_grant' ||
-          row.changeKind === 'revoke_grant' ||
-          row.changeKind === 'invalidate_grant'
-      );
+      const covered = related.find((row) => matchesGrantRemovalEvidence(row, prior));
       if (!covered) {
         issues.push(
           issue('ampliacion_sin_evidencia', `grant:${prior.logicalId}`, 'active grant removed without evidence')
         );
+      } else {
+        consumed.add(covered.evidenceId);
       }
       continue;
     }
 
     if (next.validity === 'revoked' || next.validity === 'invalidated') {
-      const covered = related.some(
-        (row) => row.changeKind === 'revoke_grant' || row.changeKind === 'invalidate_grant'
+      const covered = related.find(
+        (row) =>
+          (row.changeKind === 'revoke_grant' || row.changeKind === 'invalidate_grant') &&
+          matchesGrantRemovalEvidence(row, prior)
       );
       if (!covered) {
         issues.push(
@@ -1349,17 +1328,14 @@ function checkSuccessionSemantics(
             'grant validity tightened without evidence'
           )
         );
+      } else {
+        consumed.add(covered.evidenceId);
       }
       continue;
     }
 
     if (prior.membershipId !== next.membershipId) {
-      const reassign = related.find(
-        (row) =>
-          row.changeKind === 'reassign_grant' &&
-          row.before?.membershipId === prior.membershipId &&
-          row.after?.membershipId === next.membershipId
-      );
+      const reassign = related.find((row) => matchesReassignEvidence(row, prior, next));
       if (!reassign) {
         issues.push(
           issue(
@@ -1368,17 +1344,15 @@ function checkSuccessionSemantics(
             'membership change on same logicalId requires reassign_grant evidence or a new logical grant'
           )
         );
+      } else {
+        consumed.add(reassign.evidenceId);
       }
     }
 
     const addedClasses = setDifference(next.fieldClasses, prior.fieldClasses);
     const removedClasses = setDifference(prior.fieldClasses, next.fieldClasses);
     if (addedClasses.length > 0) {
-      const widen = related.find(
-        (row) =>
-          row.changeKind === 'widen_grant_classes' &&
-          sameStringSet(row.fieldClassesAdded || [], addedClasses)
-      );
+      const widen = related.find((row) => matchesWidenGrantClassesEvidence(row, prior, next, addedClasses));
       if (!widen) {
         issues.push(
           issue(
@@ -1387,25 +1361,23 @@ function checkSuccessionSemantics(
             'grant classes added without exact widen_grant_classes evidence'
           )
         );
+      } else {
+        consumed.add(widen.evidenceId);
       }
       for (const row of related) {
         if (row.changeKind !== 'widen_grant_classes') continue;
-        if (sameStringSet(row.fieldClassesAdded || [], addedClasses)) continue;
+        if (matchesWidenGrantClassesEvidence(row, prior, next, addedClasses)) continue;
         issues.push(
           issue(
             'evidencia_inexacta',
             `changeEvidence.${row.evidenceId}`,
-            'widen_grant_classes fieldClassesAdded does not match added class set'
+            'widen_grant_classes evidence does not match the real class delta/snapshots'
           )
         );
       }
     }
     if (removedClasses.length > 0) {
-      const narrow = related.find(
-        (row) =>
-          row.changeKind === 'narrow_grant_classes' &&
-          sameStringSet(row.fieldClassesRemoved || [], removedClasses)
-      );
+      const narrow = related.find((row) => matchesNarrowGrantClassesEvidence(row, prior, next, removedClasses));
       if (!narrow) {
         issues.push(
           issue(
@@ -1414,16 +1386,13 @@ function checkSuccessionSemantics(
             'grant classes removed without exact narrow_grant_classes evidence'
           )
         );
+      } else {
+        consumed.add(narrow.evidenceId);
       }
     }
 
     if (scopeWidened(prior.scope, next.scope)) {
-      const widen = related.find(
-        (row) =>
-          row.changeKind === 'widen_grant_scope' &&
-          snapshotMatchesScope(row.before, prior.scope) &&
-          snapshotMatchesScope(row.after, next.scope)
-      );
+      const widen = related.find((row) => matchesWidenScopeEvidence(row, prior, next));
       if (!widen) {
         issues.push(
           issue(
@@ -1432,6 +1401,8 @@ function checkSuccessionSemantics(
             'grant scope widened without exact widen_grant_scope evidence'
           )
         );
+      } else {
+        consumed.add(widen.evidenceId);
       }
     } else if (!sameScope(prior.scope, next.scope)) {
       issues.push(
@@ -1444,12 +1415,7 @@ function checkSuccessionSemantics(
     }
 
     if (windowWidened(prior, next)) {
-      const extend = related.find(
-        (row) =>
-          row.changeKind === 'extend_grant_window' &&
-          snapshotMatchesWindow(row.before, prior) &&
-          snapshotMatchesWindow(row.after, next)
-      );
+      const extend = related.find((row) => matchesExtendWindowEvidence(row, prior, next));
       if (!extend) {
         issues.push(
           issue(
@@ -1458,16 +1424,13 @@ function checkSuccessionSemantics(
             'grant validity window widened without exact extend_grant_window evidence'
           )
         );
+      } else {
+        consumed.add(extend.evidenceId);
       }
     }
 
     if (prior.parentVersionId !== next.parentVersionId) {
-      const change = related.find(
-        (row) =>
-          row.changeKind === 'change_grant_parent' &&
-          (row.before?.parentVersionId ?? null) === prior.parentVersionId &&
-          (row.after?.parentVersionId ?? null) === next.parentVersionId
-      );
+      const change = related.find((row) => matchesChangeParentEvidence(row, prior, next));
       if (!change) {
         issues.push(
           issue(
@@ -1476,28 +1439,14 @@ function checkSuccessionSemantics(
             'grant parent changed without change_grant_parent evidence'
           )
         );
+      } else {
+        consumed.add(change.evidenceId);
       }
     }
 
-    if (
-      prior.grantVersion !== next.grantVersion ||
-      prior.requiredParentVersion !== next.requiredParentVersion
-    ) {
-      const change = related.find(
-        (row) =>
-          row.changeKind === 'change_grant_parent' &&
-          (row.before?.grantVersion ?? null) === prior.grantVersion &&
-          (row.after?.grantVersion ?? null) === next.grantVersion &&
-          (row.before?.requiredParentVersion ?? null) === prior.requiredParentVersion &&
-          (row.after?.requiredParentVersion ?? null) === next.requiredParentVersion
-      );
-      // Version string changes are treated as parent/version-condition changes.
-      if (
-        (prior.requiredParentVersion !== next.requiredParentVersion ||
-          prior.grantVersion !== next.grantVersion) &&
-        !change &&
-        versionConditionRelaxed(prior, next)
-      ) {
+    if (versionConditionRelaxed(prior, next)) {
+      const change = related.find((row) => matchesChangeParentEvidence(row, prior, next));
+      if (!change) {
         issues.push(
           issue(
             'ampliacion_sin_evidencia',
@@ -1505,16 +1454,13 @@ function checkSuccessionSemantics(
             'grant version conditions relaxed without evidence'
           )
         );
+      } else {
+        consumed.add(change.evidenceId);
       }
     }
 
     if (originWidened(prior.origin, next.origin) || originIdentityChanged(prior.origin, next.origin)) {
-      const change = related.find(
-        (row) =>
-          row.changeKind === 'change_grant_origin' &&
-          snapshotMatchesOrigin(row.before, prior.origin) &&
-          snapshotMatchesOrigin(row.after, next.origin)
-      );
+      const change = related.find((row) => matchesChangeOriginEvidence(row, prior, next));
       if (!change) {
         issues.push(
           issue(
@@ -1523,6 +1469,8 @@ function checkSuccessionSemantics(
             'grant origin changed or widened without change_grant_origin evidence'
           )
         );
+      } else {
+        consumed.add(change.evidenceId);
       }
     }
   }
@@ -1531,14 +1479,17 @@ function checkSuccessionSemantics(
     if (reference.grantsByLogicalId.has(next.logicalId)) continue;
     if (next.validity !== 'active') continue;
     const related = evidenceByTarget.get(next.logicalId) || [];
-    if (!related.some((row) => row.changeKind === 'add_grant')) {
+    const add = related.find((row) => matchesAddGrantEvidence(row, next));
+    if (!add) {
       issues.push(
         issue(
           'ampliacion_sin_evidencia',
           `grant:${next.logicalId}`,
-          'new independent active grant requires add_grant evidence'
+          'new independent active grant requires exact add_grant evidence'
         )
       );
+    } else {
+      consumed.add(add.evidenceId);
     }
   }
 
@@ -1546,16 +1497,344 @@ function checkSuccessionSemantics(
     if (reference.restrictionsByLogicalId.has(next.logicalId)) continue;
     if (next.validity !== 'active') continue;
     const related = evidenceByTarget.get(next.logicalId) || [];
-    if (!related.some((row) => row.changeKind === 'add_restriction')) {
+    const add = related.find((row) => matchesAddRestrictionEvidence(row, next));
+    if (!add) {
       issues.push(
         issue(
           'ampliacion_sin_evidencia',
           `restriction:${next.logicalId}`,
-          'new active restriction requires add_restriction evidence'
+          'new active restriction requires exact add_restriction evidence'
         )
       );
+    } else {
+      consumed.add(add.evidenceId);
     }
   }
+
+  for (const row of evidence) {
+    if (consumed.has(row.evidenceId)) continue;
+    if (evidenceContractIssues(row).length > 0) continue;
+    const existsInReference =
+      reference.grantsByLogicalId.has(row.targetLogicalId) ||
+      reference.restrictionsByLogicalId.has(row.targetLogicalId);
+    const existsInCandidate =
+      candidate.grantsByLogicalId.has(row.targetLogicalId) ||
+      candidate.restrictionsByLogicalId.has(row.targetLogicalId);
+    if (!existsInReference && !existsInCandidate) {
+      issues.push(
+        issue(
+          'objeto_inexistente',
+          `changeEvidence.${row.evidenceId}`,
+          'evidence targets a logical id absent from reference and candidate'
+        )
+      );
+      continue;
+    }
+    issues.push(
+      issue(
+        'evidencia_inexacta',
+        `changeEvidence.${row.evidenceId}`,
+        'evidence does not correspond to a real succession change'
+      )
+    );
+  }
+}
+
+function evidenceContractIssues(row: CrmReadPolicyChangeEvidence): CrmReadPolicyFormatIssue[] {
+  const path = `changeEvidence.${row.evidenceId}`;
+  const issues: CrmReadPolicyFormatIssue[] = [];
+  const hasAdded = row.fieldClassesAdded !== undefined;
+  const hasRemoved = row.fieldClassesRemoved !== undefined;
+  switch (row.changeKind) {
+    case 'add_grant':
+    case 'add_restriction':
+      if (!row.after) issues.push(issue('evidencia_inexacta', path, `${row.changeKind} requires after fingerprint`));
+      if (row.before) issues.push(issue('evidencia_inexacta', path, `${row.changeKind} forbids before`));
+      if (hasAdded || hasRemoved) {
+        issues.push(issue('evidencia_inexacta', path, `${row.changeKind} forbids class delta fields`));
+      }
+      break;
+    case 'lift_restriction':
+    case 'remove_grant':
+    case 'revoke_grant':
+    case 'invalidate_grant':
+      if (!row.before) issues.push(issue('evidencia_inexacta', path, `${row.changeKind} requires before fingerprint`));
+      if (row.after) issues.push(issue('evidencia_inexacta', path, `${row.changeKind} forbids after`));
+      if (hasAdded || hasRemoved) {
+        issues.push(issue('evidencia_inexacta', path, `${row.changeKind} forbids class delta fields`));
+      }
+      break;
+    case 'widen_grant_classes':
+      if (!hasAdded) issues.push(issue('evidencia_inexacta', path, 'widen_grant_classes requires fieldClassesAdded'));
+      if (hasRemoved) issues.push(issue('evidencia_inexacta', path, 'widen_grant_classes forbids fieldClassesRemoved'));
+      issues.push(...classDeltaSnapshotAdmissionIssues(row, path));
+      break;
+    case 'narrow_grant_classes':
+    case 'narrow_restriction_classes':
+      if (!hasRemoved) {
+        issues.push(issue('evidencia_inexacta', path, `${row.changeKind} requires fieldClassesRemoved`));
+      }
+      if (hasAdded) issues.push(issue('evidencia_inexacta', path, `${row.changeKind} forbids fieldClassesAdded`));
+      issues.push(...classDeltaSnapshotAdmissionIssues(row, path));
+      break;
+    case 'reassign_grant':
+      if (!row.before?.membershipId || !row.after?.membershipId) {
+        issues.push(issue('evidencia_inexacta', path, 'reassign_grant requires before/after membershipId'));
+      }
+      issues.push(...forbidClassDeltas(row, path));
+      issues.push(...admitOnlySnapshotKeys(row.before, path + '.before', ['membershipId']));
+      issues.push(...admitOnlySnapshotKeys(row.after, path + '.after', ['membershipId']));
+      break;
+    case 'widen_grant_scope':
+      if (!row.before || !row.after) {
+        issues.push(issue('evidencia_inexacta', path, 'widen_grant_scope requires before/after scope'));
+      }
+      issues.push(...forbidClassDeltas(row, path));
+      issues.push(...admitOnlySnapshotKeys(row.before, path + '.before', ['scopeKind', 'scopeLeadId']));
+      issues.push(...admitOnlySnapshotKeys(row.after, path + '.after', ['scopeKind', 'scopeLeadId']));
+      break;
+    case 'extend_grant_window':
+      if (!row.before || !row.after) {
+        issues.push(issue('evidencia_inexacta', path, 'extend_grant_window requires before/after window'));
+      }
+      issues.push(...forbidClassDeltas(row, path));
+      issues.push(...admitOnlySnapshotKeys(row.before, path + '.before', ['validFrom', 'validUntil']));
+      issues.push(...admitOnlySnapshotKeys(row.after, path + '.after', ['validFrom', 'validUntil']));
+      break;
+    case 'change_grant_parent':
+      if (!row.before || !row.after) {
+        issues.push(issue('evidencia_inexacta', path, 'change_grant_parent requires before/after'));
+      }
+      issues.push(...forbidClassDeltas(row, path));
+      issues.push(
+        ...admitOnlySnapshotKeys(row.before, path + '.before', [
+          'parentVersionId',
+          'grantVersion',
+          'requiredParentVersion',
+        ])
+      );
+      issues.push(
+        ...admitOnlySnapshotKeys(row.after, path + '.after', [
+          'parentVersionId',
+          'grantVersion',
+          'requiredParentVersion',
+        ])
+      );
+      break;
+    case 'change_grant_origin':
+      if (!row.before || !row.after) {
+        issues.push(issue('evidencia_inexacta', path, 'change_grant_origin requires before/after origin'));
+      }
+      issues.push(...forbidClassDeltas(row, path));
+      issues.push(
+        ...admitOnlySnapshotKeys(row.before, path + '.before', [
+          'originKind',
+          'originRootValidated',
+          'originRevoked',
+        ])
+      );
+      issues.push(
+        ...admitOnlySnapshotKeys(row.after, path + '.after', [
+          'originKind',
+          'originRootValidated',
+          'originRevoked',
+        ])
+      );
+      break;
+    default:
+      break;
+  }
+  return issues;
+}
+
+function forbidClassDeltas(
+  row: CrmReadPolicyChangeEvidence,
+  path: string
+): CrmReadPolicyFormatIssue[] {
+  const issues: CrmReadPolicyFormatIssue[] = [];
+  if (row.fieldClassesAdded !== undefined || row.fieldClassesRemoved !== undefined) {
+    issues.push(issue('evidencia_inexacta', path, 'class delta fields are not admitted for this changeKind'));
+  }
+  return issues;
+}
+
+function classDeltaSnapshotAdmissionIssues(
+  row: CrmReadPolicyChangeEvidence,
+  path: string
+): CrmReadPolicyFormatIssue[] {
+  return [
+    ...admitOnlySnapshotKeys(row.before, `${path}.before`, ['fieldClasses']),
+    ...admitOnlySnapshotKeys(row.after, `${path}.after`, ['fieldClasses']),
+  ];
+}
+
+function admitOnlySnapshotKeys(
+  snapshot: CrmReadPolicyEvidenceSnapshot | undefined,
+  path: string,
+  allowed: string[]
+): CrmReadPolicyFormatIssue[] {
+  if (!snapshot) return [];
+  const allowedSet = new Set(allowed);
+  const keys = Object.keys(snapshot);
+  const issues: CrmReadPolicyFormatIssue[] = [];
+  for (const key of keys) {
+    if (!allowedSet.has(key)) {
+      issues.push(issue('evidencia_inexacta', path, `field ${key} is not admitted for this changeKind`));
+    }
+  }
+  return issues;
+}
+
+function evidenceContractOk(row: CrmReadPolicyChangeEvidence): boolean {
+  return evidenceContractIssues(row).length === 0;
+}
+
+function matchesAddGrantEvidence(row: CrmReadPolicyChangeEvidence, grant: ParsedGrant): boolean {
+  if (row.changeKind !== 'add_grant' || !evidenceContractOk(row)) return false;
+  return snapshotMatchesGrantFingerprint(row.after, grant);
+}
+
+function matchesAddRestrictionEvidence(
+  row: CrmReadPolicyChangeEvidence,
+  restriction: ParsedRestriction
+): boolean {
+  if (row.changeKind !== 'add_restriction' || !evidenceContractOk(row)) return false;
+  return snapshotMatchesRestrictionFingerprint(row.after, restriction);
+}
+
+function matchesLiftRestrictionEvidence(
+  row: CrmReadPolicyChangeEvidence,
+  restriction: ParsedRestriction
+): boolean {
+  if (row.changeKind !== 'lift_restriction' || !evidenceContractOk(row)) return false;
+  return snapshotMatchesRestrictionFingerprint(row.before, restriction);
+}
+
+function matchesGrantRemovalEvidence(row: CrmReadPolicyChangeEvidence, grant: ParsedGrant): boolean {
+  if (
+    row.changeKind !== 'remove_grant' &&
+    row.changeKind !== 'revoke_grant' &&
+    row.changeKind !== 'invalidate_grant'
+  ) {
+    return false;
+  }
+  if (!evidenceContractOk(row)) return false;
+  return snapshotMatchesGrantFingerprint(row.before, grant);
+}
+
+function matchesWidenGrantClassesEvidence(
+  row: CrmReadPolicyChangeEvidence,
+  prior: ParsedGrant,
+  next: ParsedGrant,
+  added: string[]
+): boolean {
+  if (row.changeKind !== 'widen_grant_classes' || !evidenceContractOk(row)) return false;
+  if (!sameStringSet(row.fieldClassesAdded || [], added)) return false;
+  if (row.before?.fieldClasses && !sameStringSet(row.before.fieldClasses, prior.fieldClasses)) return false;
+  if (row.after?.fieldClasses && !sameStringSet(row.after.fieldClasses, next.fieldClasses)) return false;
+  return true;
+}
+
+function matchesNarrowGrantClassesEvidence(
+  row: CrmReadPolicyChangeEvidence,
+  prior: ParsedGrant,
+  next: ParsedGrant,
+  removed: string[]
+): boolean {
+  if (row.changeKind !== 'narrow_grant_classes' || !evidenceContractOk(row)) return false;
+  if (!sameStringSet(row.fieldClassesRemoved || [], removed)) return false;
+  if (row.before?.fieldClasses && !sameStringSet(row.before.fieldClasses, prior.fieldClasses)) return false;
+  if (row.after?.fieldClasses && !sameStringSet(row.after.fieldClasses, next.fieldClasses)) return false;
+  return true;
+}
+
+function matchesNarrowRestrictionEvidence(
+  row: CrmReadPolicyChangeEvidence,
+  prior: ParsedRestriction,
+  next: ParsedRestriction,
+  removed: string[]
+): boolean {
+  if (row.changeKind !== 'narrow_restriction_classes' || !evidenceContractOk(row)) return false;
+  if (!sameStringSet(row.fieldClassesRemoved || [], removed)) return false;
+  if (row.before?.fieldClasses && !sameStringSet(row.before.fieldClasses, prior.fieldClasses)) return false;
+  if (row.after?.fieldClasses && !sameStringSet(row.after.fieldClasses, next.fieldClasses)) return false;
+  return true;
+}
+
+function matchesReassignEvidence(
+  row: CrmReadPolicyChangeEvidence,
+  prior: ParsedGrant,
+  next: ParsedGrant
+): boolean {
+  if (row.changeKind !== 'reassign_grant' || !evidenceContractOk(row)) return false;
+  return row.before?.membershipId === prior.membershipId && row.after?.membershipId === next.membershipId;
+}
+
+function matchesWidenScopeEvidence(
+  row: CrmReadPolicyChangeEvidence,
+  prior: ParsedGrant,
+  next: ParsedGrant
+): boolean {
+  if (row.changeKind !== 'widen_grant_scope' || !evidenceContractOk(row)) return false;
+  return snapshotMatchesScope(row.before, prior.scope) && snapshotMatchesScope(row.after, next.scope);
+}
+
+function matchesExtendWindowEvidence(
+  row: CrmReadPolicyChangeEvidence,
+  prior: ParsedGrant,
+  next: ParsedGrant
+): boolean {
+  if (row.changeKind !== 'extend_grant_window' || !evidenceContractOk(row)) return false;
+  return snapshotMatchesWindow(row.before, prior) && snapshotMatchesWindow(row.after, next);
+}
+
+function matchesChangeParentEvidence(
+  row: CrmReadPolicyChangeEvidence,
+  prior: ParsedGrant,
+  next: ParsedGrant
+): boolean {
+  if (row.changeKind !== 'change_grant_parent' || !evidenceContractOk(row)) return false;
+  return (
+    (row.before?.parentVersionId ?? null) === prior.parentVersionId &&
+    (row.after?.parentVersionId ?? null) === next.parentVersionId &&
+    (row.before?.grantVersion ?? null) === prior.grantVersion &&
+    (row.after?.grantVersion ?? null) === next.grantVersion &&
+    (row.before?.requiredParentVersion ?? null) === prior.requiredParentVersion &&
+    (row.after?.requiredParentVersion ?? null) === next.requiredParentVersion
+  );
+}
+
+function matchesChangeOriginEvidence(
+  row: CrmReadPolicyChangeEvidence,
+  prior: ParsedGrant,
+  next: ParsedGrant
+): boolean {
+  if (row.changeKind !== 'change_grant_origin' || !evidenceContractOk(row)) return false;
+  return snapshotMatchesOrigin(row.before, prior.origin) && snapshotMatchesOrigin(row.after, next.origin);
+}
+
+function snapshotMatchesGrantFingerprint(
+  snapshot: CrmReadPolicyEvidenceSnapshot | undefined,
+  grant: ParsedGrant
+): boolean {
+  if (!snapshot) return false;
+  if (snapshot.membershipId !== grant.membershipId) return false;
+  if (!snapshot.fieldClasses || !sameStringSet(snapshot.fieldClasses, grant.fieldClasses)) return false;
+  if (snapshot.scopeKind !== grant.scope.kind) return false;
+  if (!snapshotMatchesScope(snapshot, grant.scope)) return false;
+  return true;
+}
+
+function snapshotMatchesRestrictionFingerprint(
+  snapshot: CrmReadPolicyEvidenceSnapshot | undefined,
+  restriction: ParsedRestriction
+): boolean {
+  if (!snapshot) return false;
+  if (snapshot.membershipId !== restriction.membershipId) return false;
+  if (!snapshot.fieldClasses || !sameStringSet(snapshot.fieldClasses, restriction.fieldClasses)) return false;
+  if (snapshot.scopeKind !== restriction.scope.kind) return false;
+  if (!snapshotMatchesScope(snapshot, restriction.scope)) return false;
+  return true;
 }
 
 function setDifference(from: readonly string[], without: readonly string[]): string[] {
