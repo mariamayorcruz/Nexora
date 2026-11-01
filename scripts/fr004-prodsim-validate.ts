@@ -26,6 +26,7 @@ import {
   POINT8B1_NAME,
   POINT8B6_NAME,
   POINT8_4A1B_NAME,
+  POINT8_4A1B_HARDENING_NAME,
   SLICE0_NAME,
   assertActiveMigrationSet,
   assertDisposableDatabaseUrl,
@@ -156,6 +157,9 @@ function main(): void {
   if (!deployOut.includes(POINT8_4A1B_NAME)) {
     throw new Error('deploy output missing Point 8 4A-1B')
   }
+  if (!deployOut.includes(POINT8_4A1B_HARDENING_NAME)) {
+    throw new Error('deploy output missing Point 8 4A-1B hardening')
+  }
   if (deployOut.includes(`Applying migration \`${BASELINE_NAME}\``)) {
     throw new Error('deploy unexpectedly applied baseline DDL')
   }
@@ -170,9 +174,12 @@ function main(): void {
       !block.includes(SLICE0_NAME) ||
       !block.includes(POINT8B1_NAME) ||
       !block.includes(POINT8B6_NAME) ||
-      !block.includes(POINT8_4A1B_NAME)
+      !block.includes(POINT8_4A1B_NAME) ||
+      !block.includes(POINT8_4A1B_HARDENING_NAME)
     ) {
-      throw new Error('deploy applied set must include Slice 0, Point 8B-1, Point 8B-6, and Point 8 4A-1B')
+      throw new Error(
+        'deploy applied set must include Slice 0, Point 8B-1, Point 8B-6, Point 8 4A-1B, and hardening',
+      )
     }
   }
 
@@ -186,13 +193,14 @@ function main(): void {
     !finalNames.includes(SLICE0_NAME) ||
     !finalNames.includes(POINT8B1_NAME) ||
     !finalNames.includes(POINT8B6_NAME) ||
-    !finalNames.includes(POINT8_4A1B_NAME)
+    !finalNames.includes(POINT8_4A1B_NAME) ||
+    !finalNames.includes(POINT8_4A1B_HARDENING_NAME)
   ) {
     throw new Error(`Final migration set incomplete: ${finalNames.join(',')}`)
   }
-  // six legacy + baseline + Slice 0 + Point 8B-1 + Point 8B-6 + Point 8 4A-1B
-  if (finalNames.length !== 11) {
-    throw new Error(`Expected 11 migration rows after deploy; got ${finalNames.length}`)
+  // six legacy + baseline + Slice 0 + Point 8B-1 + Point 8B-6 + Point 8 4A-1B + hardening
+  if (finalNames.length !== 12) {
+    throw new Error(`Expected 12 migration rows after deploy; got ${finalNames.length}`)
   }
 
   assertSlice0Present(url)

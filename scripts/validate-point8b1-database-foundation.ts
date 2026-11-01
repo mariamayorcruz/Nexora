@@ -28,6 +28,7 @@ import {
   POINT8B1_NAME,
   POINT8B6_NAME,
   POINT8_4A1B_NAME,
+  POINT8_4A1B_HARDENING_NAME,
   SLICE0_NAME,
   assertActiveMigrationSet,
   assertDisposableDatabaseUrl,
@@ -183,7 +184,8 @@ function deployMigrationsThroughPoint8B1(env: NodeJS.ProcessEnv): string {
         copied[1] === SLICE0_NAME &&
         copied[2] === POINT8B1_NAME &&
         !copied.includes(POINT8B6_NAME) &&
-        !copied.includes(POINT8_4A1B_NAME),
+        !copied.includes(POINT8_4A1B_NAME) &&
+        !copied.includes(POINT8_4A1B_HARDENING_NAME),
       `historical migration sandbox must be exactly through Point 8B-1, got ${copied.join(',')}`
     );
     return runPrisma(
@@ -328,12 +330,13 @@ function main(): void {
 
   const fullRows = readMigrationRows(url).map((r) => r.migration_name);
   assert(
-    fullRows.length === 5 &&
+    fullRows.length === 6 &&
       fullRows[0] === BASELINE_NAME &&
       fullRows[1] === SLICE0_NAME &&
       fullRows[2] === POINT8B1_NAME &&
       fullRows[3] === POINT8B6_NAME &&
-      fullRows[4] === POINT8_4A1B_NAME,
+      fullRows[4] === POINT8_4A1B_NAME &&
+      fullRows[5] === POINT8_4A1B_HARDENING_NAME,
     `unexpected full-chain migration rows: ${fullRows.join(',')}`
   );
   assertFoundationShape(url, false);

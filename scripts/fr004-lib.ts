@@ -15,6 +15,9 @@ export const POINT8B1_NAME = '20260930011200_add_crmlead_organization_tenancy_fo
 export const POINT8B6_NAME = '20261004120000_crmlead_organization_id_not_null'
 /** Point 8 4A-1B inactive candidate CRM read-policy persistence. */
 export const POINT8_4A1B_NAME = '20261031200000_add_crm_read_policy_candidate_persistence'
+/** Point 8 4A-1B corrective hardening (no VALIDATED writes / RLS / OLD+NEW guards). */
+export const POINT8_4A1B_HARDENING_NAME =
+  '20261031210000_crm_read_policy_candidate_persistence_hardening'
 
 export const LEGACY_PRODUCTION_MIGRATION_NAMES = [
   '20260215120000_lead_capture_paid_flags',
@@ -80,7 +83,14 @@ export function listActiveMigrationNames(): string[] {
 
 export function assertActiveMigrationSet(): void {
   const names = listActiveMigrationNames()
-  const expected = [BASELINE_NAME, SLICE0_NAME, POINT8B1_NAME, POINT8B6_NAME, POINT8_4A1B_NAME]
+  const expected = [
+    BASELINE_NAME,
+    SLICE0_NAME,
+    POINT8B1_NAME,
+    POINT8B6_NAME,
+    POINT8_4A1B_NAME,
+    POINT8_4A1B_HARDENING_NAME,
+  ]
   if (names.length !== expected.length || expected.some((n, i) => names[i] !== n)) {
     throw new Error(
       `Active prisma/migrations must be exactly [${expected.join(', ')}]; found [${names.join(', ')}]`,
@@ -341,10 +351,16 @@ export const PENDING_AFTER_AUTH_A_HISTORICAL = [
   POINT8B1_NAME,
   POINT8B6_NAME,
   POINT8_4A1B_NAME,
+  POINT8_4A1B_HARDENING_NAME,
 ] as const
 
 /** Pending when baseline+Slice0 applied and Point 8B-1/8B-6/4A-1B not yet applied. */
-export const PENDING_BEFORE_POINT8B1 = [POINT8B1_NAME, POINT8B6_NAME, POINT8_4A1B_NAME] as const
+export const PENDING_BEFORE_POINT8B1 = [
+  POINT8B1_NAME,
+  POINT8B6_NAME,
+  POINT8_4A1B_NAME,
+  POINT8_4A1B_HARDENING_NAME,
+] as const
 
 /**
  * CURRENT pre-Point8B1 applied set (order-independent):

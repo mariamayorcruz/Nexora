@@ -487,8 +487,9 @@ model AttributionEvent {
 }
 
 /// Point 8 step 4A-1B — inactive candidate CRM read-policy persistence.
-/// Contract reference: PR #23 (4A-1A pure validators). This cut stores candidates only;
-/// no active-bundle pointer on Organization, no operational APIs, no authority.
+/// Contract reference: PR #23 (4A-1A pure validators). This cut stores DRAFT candidates only;
+/// VALIDATED writes are blocked until a future sealing service. No active-bundle pointer on
+/// Organization, no operational APIs, no authority, no product bypass for immutability.
 
 enum CrmReadPolicyBundleStatus {
   DRAFT

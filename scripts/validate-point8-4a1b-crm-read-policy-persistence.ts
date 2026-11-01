@@ -1,11 +1,14 @@
 /**
  * Point 8 step 4A-1B — disposable Postgres validation for inactive CRM
- * read-policy candidate persistence.
+ * read-policy candidate persistence (+ corrective hardening migration).
  *
  * Contract reference (fixed): PR #23 HEAD
  *   02c8a573b967d7656c8f5e057003b49ae214d0c5
  * Pure validators live on that PR and are NOT imported or duplicated here.
  * This script exercises real database constraints only.
+ *
+ * VALIDATED fixtures (for negative tests only) are created by temporarily
+ * DISABLE TRIGGER as the disposable superuser — never via a product GUC/bypass.
  *
  * Requires FR004_DATABASE_URL or DATABASE_URL → disposable local Postgres.
  * Refuses hosted/production-looking URLs. No production secrets.
@@ -22,6 +25,7 @@ import {
   BASELINE_NAME,
   POINT8B1_NAME,
   POINT8B6_NAME,
+  POINT8_4A1B_HARDENING_NAME,
   POINT8_4A1B_NAME,
   SLICE0_NAME,
   assertActiveMigrationSet,
@@ -35,6 +39,19 @@ import {
 } from './fr004-lib';
 
 type Scenario = { name: string; run: () => void };
+
+const POLICY_TABLES = [
+  'CrmReadPolicyBundle',
+  'CrmReadPolicyBundleMembershipLink',
+  'CrmReadPolicyBundleLeadLink',
+  'CrmReadPolicyRetiredGrantLogicalId',
+  'CrmReadPolicyGrant',
+  'CrmReadPolicyGrantFieldClass',
+  'CrmReadPolicyRestriction',
+  'CrmReadPolicyRestrictionFieldClass',
+  'CrmReadPolicyChangeEvidence',
+  'CrmReadPolicyChangeEvidenceFieldClass',
+] as const;
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -105,29 +122,79 @@ function insertDraftBundle(
     orgId: string;
     version: number;
     checksum?: string | null;
-    status?: 'DRAFT' | 'VALIDATED';
     predecessorVersion?: number | null;
     t: string;
   }
 ) {
-  const status = opts.status || 'DRAFT';
-  const checksum =
-    opts.checksum === undefined
-      ? status === 'VALIDATED'
-        ? 'crm-read-policy-canonical/v1:fixture'
-        : null
-      : opts.checksum;
+  const checksumSql = opts.checksum == null ? 'NULL' : `'${opts.checksum}'`;
   const predOrg = opts.predecessorVersion == null ? 'NULL' : `'${opts.orgId}'`;
   const predVer = opts.predecessorVersion == null ? 'NULL' : String(opts.predecessorVersion);
-  const checksumSql = checksum == null ? 'NULL' : `'${checksum}'`;
   psql(
     url,
     `INSERT INTO "CrmReadPolicyBundle"
       ("id","organizationId","version","status","canonicalVersion","contentChecksum",
        "predecessorOrganizationId","predecessorVersion","createdAt","updatedAt")
      VALUES
-      ('${opts.bundleId}','${opts.orgId}',${opts.version},'${status}',
+      ('${opts.bundleId}','${opts.orgId}',${opts.version},'DRAFT',
        'crm-read-policy-canonical/v1',${checksumSql},${predOrg},${predVer},'${opts.t}','${opts.t}');`
+  );
+}
+
+/**
+ * Disposable-only privileged fixture: superuser session_replication_role=replica
+ * suppresses user triggers for the transaction, inserts a VALIDATED snapshot,
+ * then restores origin. Not a product bypass and not left in migrations.
+ */
+function privilegedInsertValidatedFixture(
+  url: string,
+  opts: {
+    bundleId: string;
+    orgId: string;
+    version: number;
+    memId: string;
+    t: string;
+    withGrant?: boolean;
+    withRetired?: boolean;
+    evidence?: { id: string; evidenceId: string; fromVersion: number; toVersion: number };
+  }
+) {
+  const inserts: string[] = [
+    `INSERT INTO "CrmReadPolicyBundle"
+      ("id","organizationId","version","status","canonicalVersion","contentChecksum","createdAt","updatedAt")
+     VALUES ('${opts.bundleId}','${opts.orgId}',${opts.version},'VALIDATED',
+       'crm-read-policy-canonical/v1','crm-read-policy-canonical/v1:fixture','${opts.t}','${opts.t}')`,
+  ];
+  if (opts.withRetired) {
+    inserts.push(
+      `INSERT INTO "CrmReadPolicyRetiredGrantLogicalId" ("organizationId","bundleId","logicalId")
+       VALUES ('${opts.orgId}','${opts.bundleId}','g_retired')`
+    );
+  }
+  if (opts.withGrant) {
+    inserts.push(
+      `INSERT INTO "CrmReadPolicyGrant"
+         ("organizationId","bundleId","versionId","logicalId","membershipId","scopeKind",
+          "originKind","originOrganizationId","originRootValidated","createdAt","updatedAt")
+       VALUES ('${opts.orgId}','${opts.bundleId}','gv_locked','g_locked','${opts.memId}','COMPANY',
+          'LEGACY_SNAPSHOT','${opts.orgId}',true,'${opts.t}','${opts.t}')`
+    );
+  }
+  if (opts.evidence) {
+    inserts.push(
+      `INSERT INTO "CrmReadPolicyChangeEvidence"
+         ("id","evidenceId","organizationId","fromVersion","toVersion","changeKind",
+          "targetLogicalId","createdAt")
+       VALUES ('${opts.evidence.id}','${opts.evidence.evidenceId}','${opts.orgId}',
+         ${opts.evidence.fromVersion},${opts.evidence.toVersion},'ADD_GRANT','g_x','${opts.t}')`
+    );
+  }
+  psql(
+    url,
+    `BEGIN;
+     SET LOCAL session_replication_role = replica;
+     ${inserts.join(';\n')};
+     SET LOCAL session_replication_role = origin;
+     COMMIT;`
   );
 }
 
@@ -142,6 +209,9 @@ function main(): void {
   console.log(
     '[point8-4a1b] contract_ref=PR#23@02c8a573b967d7656c8f5e057003b49ae214d0c5 (validators not imported)'
   );
+  console.log(
+    '[point8-4a1b] prior_migration_applied_on=disposable local Postgres nexora_point8_4a1b@127.0.0.1 (not production)'
+  );
 
   const env = { ...process.env, DATABASE_URL: url };
   console.log('[point8-4a1b] prisma validate');
@@ -149,25 +219,32 @@ function main(): void {
   console.log('[point8-4a1b] prisma generate');
   runPrisma(['generate'], env);
 
-  // --- Greenfield apply ---
   resetPublic(url);
   console.log('[point8-4a1b] migrate deploy from empty schema');
   const deployOut = runPrisma(['migrate', 'deploy'], env);
   assert(deployOut.includes(POINT8_4A1B_NAME), '4A-1B migration must apply');
+  assert(deployOut.includes(POINT8_4A1B_HARDENING_NAME), '4A-1B hardening migration must apply');
   const names = readMigrationRows(url).map((r) => r.migration_name);
   assert(
-    names.length === 5 &&
+    names.length === 6 &&
       names[0] === BASELINE_NAME &&
       names[1] === SLICE0_NAME &&
       names[2] === POINT8B1_NAME &&
       names[3] === POINT8B6_NAME &&
-      names[4] === POINT8_4A1B_NAME,
+      names[4] === POINT8_4A1B_NAME &&
+      names[5] === POINT8_4A1B_HARDENING_NAME,
     `unexpected migration rows: ${names.join(',')}`
   );
 
+  const gucGone = psql(
+    url,
+    `SELECT COUNT(*)::text FROM pg_proc WHERE proname = 'crm_read_policy_allow_validated_snapshot_write';`
+  );
+  assert(gucGone === '0', 'product GUC bypass function must be dropped');
+
   const scenarios: Scenario[] = [
     {
-      name: 'inserción válida de bundle vacío, grant, retired ids y evidencia',
+      name: 'controles positivos: almacenamiento DRAFT válido',
       run: () => {
         const s = seedTenants(url);
         const b1 = id('bundle');
@@ -180,8 +257,6 @@ function main(): void {
           predecessorVersion: 1,
           t: s.t,
         });
-
-        // Empty candidate catalogs + retired history + grant with parent
         psql(
           url,
           `INSERT INTO "CrmReadPolicyRetiredGrantLogicalId" ("organizationId","bundleId","logicalId")
@@ -215,25 +290,266 @@ function main(): void {
            VALUES ('${id('evrow')}','ev1','${s.orgA}',1,2,'ADD_GRANT','g_new',
              NULL,'{"membershipId":"${s.memA}"}','${s.t}');`
         );
-
         const retired = psql(
           url,
           `SELECT "logicalId" FROM "CrmReadPolicyRetiredGrantLogicalId"
            WHERE "bundleId"='${b1}' ORDER BY "logicalId";`
         );
         assert(retired === 'g_retired', `retired history round-trip failed: ${retired}`);
-
         const empty = id('bundle');
         insertDraftBundle(url, { bundleId: empty, orgId: s.orgB, version: 1, t: s.t });
-        const grantCount = psql(
-          url,
-          `SELECT COUNT(*)::text FROM "CrmReadPolicyGrant" WHERE "bundleId"='${empty}';`
+        assert(
+          psql(url, `SELECT COUNT(*)::text FROM "CrmReadPolicyGrant" WHERE "bundleId"='${empty}';`) ===
+            '0',
+          'empty candidate policy must allow zero grants'
         );
-        assert(grantCount === '0', 'empty candidate policy must allow zero grants');
       },
     },
     {
-      name: 'relaciones cruzadas entre empresas se rechazan',
+      name: 'INSERT VALIDATED y DRAFT→VALIDATED rechazados; GUC antiguo no habilita escrituras',
+      run: () => {
+        const s = seedTenants(url);
+        const draftId = id('bundle');
+        insertDraftBundle(url, { bundleId: draftId, orgId: s.orgA, version: 1, t: s.t });
+        expectFail(
+          url,
+          `INSERT INTO "CrmReadPolicyBundle"
+             ("id","organizationId","version","status","canonicalVersion","contentChecksum",
+              "createdAt","updatedAt")
+           VALUES ('${id('bundle')}','${s.orgA}',2,'VALIDATED','crm-read-policy-canonical/v1',
+             'crm-read-policy-canonical/v1:x','${s.t}','${s.t}');`,
+          'direct INSERT VALIDATED',
+          /INSERT of VALIDATED bundle blocked/i
+        );
+        expectFail(
+          url,
+          `UPDATE "CrmReadPolicyBundle" SET "status"='VALIDATED',
+             "contentChecksum"='crm-read-policy-canonical/v1:x', "updatedAt"='${s.t}'
+           WHERE "id"='${draftId}';`,
+          'DRAFT to VALIDATED update',
+          /DRAFT to VALIDATED transition blocked/i
+        );
+        // Former product bypass must not exist / must not enable writes.
+        expectFail(
+          url,
+          `SELECT set_config('crm_read_policy.allow_validated_snapshot_write', 'on', true);
+           INSERT INTO "CrmReadPolicyBundle"
+             ("id","organizationId","version","status","canonicalVersion","contentChecksum",
+              "createdAt","updatedAt")
+           VALUES ('${id('bundle')}','${s.orgA}',3,'VALIDATED','crm-read-policy-canonical/v1',
+             'crm-read-policy-canonical/v1:x','${s.t}','${s.t}');`,
+          'legacy GUC cannot enable VALIDATED insert',
+          /INSERT of VALIDATED bundle blocked/i
+        );
+        assert(
+          psql(
+            url,
+            `SELECT COUNT(*)::text FROM pg_proc
+             WHERE proname='crm_read_policy_allow_validated_snapshot_write';`
+          ) === '0',
+          'bypass function must remain absent'
+        );
+      },
+    },
+    {
+      name: 'UPDATE que traslada hijos/evidencia fuera de VALIDATED se rechaza',
+      run: () => {
+        const s = seedTenants(url);
+        const validatedId = id('bundle');
+        const draftId = id('bundle');
+        const evidenceId = id('evrow');
+        const draftLater = id('bundle');
+        insertDraftBundle(url, { bundleId: draftId, orgId: s.orgA, version: 1, t: s.t });
+        privilegedInsertValidatedFixture(url, {
+          bundleId: validatedId,
+          orgId: s.orgA,
+          version: 2,
+          memId: s.memA,
+          t: s.t,
+          withGrant: true,
+          withRetired: true,
+          evidence: { id: evidenceId, evidenceId: 'ev_locked', fromVersion: 1, toVersion: 2 },
+        });
+        insertDraftBundle(url, {
+          bundleId: draftLater,
+          orgId: s.orgA,
+          version: 3,
+          predecessorVersion: 1,
+          t: s.t,
+        });
+
+        expectFail(
+          url,
+          `UPDATE "CrmReadPolicyRetiredGrantLogicalId"
+           SET "bundleId"='${draftId}'
+           WHERE "organizationId"='${s.orgA}' AND "bundleId"='${validatedId}' AND "logicalId"='g_retired';`,
+          'move retired id from VALIDATED to DRAFT',
+          /origin on VALIDATED|immutable/i
+        );
+        expectFail(
+          url,
+          `UPDATE "CrmReadPolicyGrant"
+           SET "bundleId"='${draftId}', "updatedAt"='${s.t}'
+           WHERE "organizationId"='${s.orgA}' AND "bundleId"='${validatedId}' AND "versionId"='gv_locked';`,
+          'move grant from VALIDATED to DRAFT',
+          /origin on VALIDATED|immutable/i
+        );
+        expectFail(
+          url,
+          `UPDATE "CrmReadPolicyChangeEvidence"
+           SET "fromVersion"=1, "toVersion"=3
+           WHERE "id"='${evidenceId}';`,
+          'rewrite evidence away from VALIDATED endpoint onto DRAFT pair',
+          /origin tied to VALIDATED|immutable/i
+        );
+      },
+    },
+    {
+      name: 'escrituras hacia VALIDATED se rechazan',
+      run: () => {
+        const s = seedTenants(url);
+        const validatedId = id('bundle');
+        const draftId = id('bundle');
+        insertDraftBundle(url, { bundleId: draftId, orgId: s.orgA, version: 1, t: s.t });
+        privilegedInsertValidatedFixture(url, {
+          bundleId: validatedId,
+          orgId: s.orgA,
+          version: 2,
+          memId: s.memA,
+          t: s.t,
+          withGrant: true,
+        });
+        // Seed a grant on draft, then try to move it onto validated.
+        psql(
+          url,
+          `INSERT INTO "CrmReadPolicyGrant"
+             ("organizationId","bundleId","versionId","logicalId","membershipId","scopeKind",
+              "originKind","originOrganizationId","originRootValidated","createdAt","updatedAt")
+           VALUES ('${s.orgA}','${draftId}','gv_draft','g_draft','${s.memA}','COMPANY',
+              'LEGACY_SNAPSHOT','${s.orgA}',true,'${s.t}','${s.t}');`
+        );
+        expectFail(
+          url,
+          `UPDATE "CrmReadPolicyGrant"
+           SET "bundleId"='${validatedId}', "updatedAt"='${s.t}'
+           WHERE "bundleId"='${draftId}' AND "versionId"='gv_draft';`,
+          'move grant from DRAFT onto VALIDATED',
+          /destination on VALIDATED|immutable/i
+        );
+        expectFail(
+          url,
+          `INSERT INTO "CrmReadPolicyGrant"
+             ("organizationId","bundleId","versionId","logicalId","membershipId","scopeKind",
+              "originKind","originOrganizationId","originRootValidated","createdAt","updatedAt")
+           VALUES ('${s.orgA}','${validatedId}','gv_new','g_new','${s.memA}','COMPANY',
+              'LEGACY_SNAPSHOT','${s.orgA}',true,'${s.t}','${s.t}');`,
+          'insert grant into VALIDATED',
+          /destination on VALIDATED|immutable/i
+        );
+        expectFail(
+          url,
+          `UPDATE "CrmReadPolicyBundle" SET "contentChecksum"='tampered', "updatedAt"='${s.t}'
+           WHERE "id"='${validatedId}';`,
+          'update validated bundle header',
+          /immutable/i
+        );
+        expectFail(
+          url,
+          `DELETE FROM "CrmReadPolicyBundle" WHERE "id"='${validatedId}';`,
+          'delete validated bundle',
+          /immutable/i
+        );
+        expectFail(
+          url,
+          `SELECT set_config('crm_read_policy.allow_validated_snapshot_write', 'on', true);
+           INSERT INTO "CrmReadPolicyGrant"
+             ("organizationId","bundleId","versionId","logicalId","membershipId","scopeKind",
+              "originKind","originOrganizationId","originRootValidated","createdAt","updatedAt")
+           VALUES ('${s.orgA}','${validatedId}','gv_guc','g_guc','${s.memA}','COMPANY',
+              'LEGACY_SNAPSHOT','${s.orgA}',true,'${s.t}','${s.t}');`,
+          'legacy GUC cannot insert child into VALIDATED',
+          /destination on VALIDATED|immutable/i
+        );
+      },
+    },
+    {
+      name: 'roles de cliente sin acceso a tablas nuevas (incl. destructivas)',
+      run: () => {
+        const s = seedTenants(url);
+        const b = id('bundle');
+        insertDraftBundle(url, { bundleId: b, orgId: s.orgA, version: 1, t: s.t });
+
+        for (const role of ['anon', 'authenticated']) {
+          psql(
+            url,
+            `DO $$ BEGIN
+               IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${role}') THEN
+                 CREATE ROLE ${role} NOLOGIN;
+               END IF;
+             END $$;`
+          );
+          // Ensure revoke from hardening still holds even if role was created later.
+          psql(
+            url,
+            POLICY_TABLES.map((t) => `REVOKE ALL ON TABLE "${t}" FROM ${role}`).join(';\n') + ';'
+          );
+
+          for (const table of POLICY_TABLES) {
+            const priv = psql(
+              url,
+              `SELECT COALESCE(has_table_privilege('${role}', '"${table}"', 'SELECT'), false)::text
+               || ',' || COALESCE(has_table_privilege('${role}', '"${table}"', 'INSERT'), false)::text
+               || ',' || COALESCE(has_table_privilege('${role}', '"${table}"', 'UPDATE'), false)::text
+               || ',' || COALESCE(has_table_privilege('${role}', '"${table}"', 'DELETE'), false)::text
+               || ',' || COALESCE(has_table_privilege('${role}', '"${table}"', 'TRUNCATE'), false)::text;`
+            );
+            assert(
+              priv === 'false,false,false,false,false',
+              `${role} must lack DML/TRUNCATE on ${table}, got ${priv}`
+            );
+          }
+
+          // Deny may surface as permission denied or as relation-not-visible
+          // when schema USAGE is absent — both mean no client Data API access.
+          const deny = /permission denied|does not exist/i;
+          expectFail(
+            url,
+            `SET ROLE ${role}; SELECT COUNT(*) FROM public."CrmReadPolicyBundle"; RESET ROLE;`,
+            `${role} SELECT CrmReadPolicyBundle`,
+            deny
+          );
+          expectFail(
+            url,
+            `SET ROLE ${role}; TRUNCATE public."CrmReadPolicyBundle"; RESET ROLE;`,
+            `${role} TRUNCATE CrmReadPolicyBundle`,
+            deny
+          );
+          expectFail(
+            url,
+            `SET ROLE ${role}; DELETE FROM public."CrmReadPolicyBundle"; RESET ROLE;`,
+            `${role} DELETE CrmReadPolicyBundle`,
+            deny
+          );
+        }
+
+        for (const table of POLICY_TABLES) {
+          const rls = psql(
+            url,
+            `SELECT relrowsecurity::text FROM pg_class
+             WHERE relname='${table}' AND relnamespace='public'::regnamespace;`
+          );
+          assert(rls === 'true', `RLS must be enabled on ${table}`);
+          const policies = psql(
+            url,
+            `SELECT COUNT(*)::text FROM pg_policies
+             WHERE schemaname='public' AND tablename='${table}';`
+          );
+          assert(policies === '0', `${table} must have no permissive client policies`);
+        }
+      },
+    },
+    {
+      name: 'relaciones cruzadas, duplicados, scopes y RESTRICT',
       run: () => {
         const s = seedTenants(url);
         const b = id('bundle');
@@ -246,7 +562,7 @@ function main(): void {
            VALUES ('${s.orgA}','${b}','gv1','g1','${s.memB}','COMPANY',
               'LEGACY_SNAPSHOT','${s.orgA}',true,'${s.t}','${s.t}');`,
           'cross-org membership on grant',
-          /foreign key|CrmReadPolicyGrant_organizationId_membershipId/i
+          /foreign key|membershipId/i
         );
         expectFail(
           url,
@@ -256,7 +572,7 @@ function main(): void {
            VALUES ('${s.orgA}','${b}','gv2','g2','${s.memA}','RECORD','${s.leadB}',
               'LEGACY_SNAPSHOT','${s.orgA}',true,'${s.t}','${s.t}');`,
           'cross-org lead on grant',
-          /foreign key|CrmReadPolicyGrant_organizationId_scopeLeadId/i
+          /foreign key|scopeLeadId/i
         );
         expectFail(
           url,
@@ -266,8 +582,74 @@ function main(): void {
            VALUES ('${id('bundle')}','${s.orgA}',2,'DRAFT','crm-read-policy-canonical/v1',NULL,
               '${s.orgB}',1,'${s.t}','${s.t}');`,
           'cross-org predecessor',
-          /CrmReadPolicyBundle_predecessor_pair|check constraint/i
+          /predecessor_pair|check constraint/i
         );
+        expectFail(
+          url,
+          `INSERT INTO "CrmReadPolicyBundle"
+             ("id","organizationId","version","status","canonicalVersion","createdAt","updatedAt")
+           VALUES ('${id('bundle')}','${s.orgA}',1,'DRAFT','crm-read-policy-canonical/v1','${s.t}','${s.t}');`,
+          'duplicate version per org',
+          /unique|organizationId_version/i
+        );
+        expectFail(
+          url,
+          `INSERT INTO "CrmReadPolicyBundle"
+             ("id","organizationId","version","status","canonicalVersion","createdAt","updatedAt")
+           VALUES ('${id('bundle')}','${s.orgA}',0,'DRAFT','crm-read-policy-canonical/v1','${s.t}','${s.t}');`,
+          'non-positive version',
+          /version_positive|check constraint/i
+        );
+        psql(
+          url,
+          `INSERT INTO "CrmReadPolicyGrant"
+             ("organizationId","bundleId","versionId","logicalId","membershipId","scopeKind",
+              "originKind","originOrganizationId","originRootValidated","createdAt","updatedAt")
+           VALUES ('${s.orgA}','${b}','gv1','g1','${s.memA}','COMPANY',
+              'LEGACY_SNAPSHOT','${s.orgA}',true,'${s.t}','${s.t}');`
+        );
+        expectFail(
+          url,
+          `INSERT INTO "CrmReadPolicyGrant"
+             ("organizationId","bundleId","versionId","logicalId","membershipId","scopeKind",
+              "originKind","originOrganizationId","originRootValidated","createdAt","updatedAt")
+           VALUES ('${s.orgA}','${b}','gv_dup','g1','${s.memA}','COMPANY',
+              'LEGACY_SNAPSHOT','${s.orgA}',true,'${s.t}','${s.t}');`,
+          'duplicate logicalId',
+          /unique|logicalId/i
+        );
+        expectFail(
+          url,
+          `INSERT INTO "CrmReadPolicyGrant"
+             ("organizationId","bundleId","versionId","logicalId","membershipId","scopeKind","scopeLeadId",
+              "originKind","originOrganizationId","originRootValidated","createdAt","updatedAt")
+           VALUES ('${s.orgA}','${b}','gv3','g3','${s.memA}','COMPANY','${s.leadA}',
+              'LEGACY_SNAPSHOT','${s.orgA}',true,'${s.t}','${s.t}');`,
+          'COMPANY with lead',
+          /scope_shape|check constraint/i
+        );
+        expectFail(
+          url,
+          `INSERT INTO "CrmReadPolicyGrant"
+             ("organizationId","bundleId","versionId","logicalId","membershipId","scopeKind","scopeLeadId",
+              "originKind","originOrganizationId","originRootValidated","createdAt","updatedAt")
+           VALUES ('${s.orgA}','${b}','gv4','g4','${s.memA}','RECORD',NULL,
+              'LEGACY_SNAPSHOT','${s.orgA}',true,'${s.t}','${s.t}');`,
+          'RECORD without lead',
+          /scope_shape|check constraint/i
+        );
+        expectFail(
+          url,
+          `DELETE FROM "Membership" WHERE "id"='${s.memA}';`,
+          'membership delete while grant references it',
+          /foreign key|restrict|Membership/i
+        );
+        assert(
+          psql(url, `SELECT COUNT(*)::text FROM "CrmReadPolicyGrant" WHERE "bundleId"='${b}';`) ===
+            '1',
+          'grant must remain after failed membership delete'
+        );
+        psql(url, `UPDATE "Membership" SET "status"='REMOVED' WHERE "id"='${s.memA}';`);
       },
     },
     {
@@ -305,263 +687,8 @@ function main(): void {
       },
     },
     {
-      name: 'duplicados y scopes inválidos se rechazan',
-      run: () => {
-        const s = seedTenants(url);
-        const b = id('bundle');
-        insertDraftBundle(url, { bundleId: b, orgId: s.orgA, version: 1, t: s.t });
-        expectFail(
-          url,
-          `INSERT INTO "CrmReadPolicyBundle"
-             ("id","organizationId","version","status","canonicalVersion","createdAt","updatedAt")
-           VALUES ('${id('bundle')}','${s.orgA}',1,'DRAFT','crm-read-policy-canonical/v1','${s.t}','${s.t}');`,
-          'duplicate version per org',
-          /unique|organizationId_version/i
-        );
-        expectFail(
-          url,
-          `INSERT INTO "CrmReadPolicyBundle"
-             ("id","organizationId","version","status","canonicalVersion","createdAt","updatedAt")
-           VALUES ('${id('bundle')}','${s.orgA}',0,'DRAFT','crm-read-policy-canonical/v1','${s.t}','${s.t}');`,
-          'non-positive version',
-          /version_positive|check constraint/i
-        );
-        psql(
-          url,
-          `INSERT INTO "CrmReadPolicyGrant"
-             ("organizationId","bundleId","versionId","logicalId","membershipId","scopeKind",
-              "originKind","originOrganizationId","originRootValidated","createdAt","updatedAt")
-           VALUES ('${s.orgA}','${b}','gv1','g1','${s.memA}','COMPANY',
-              'LEGACY_SNAPSHOT','${s.orgA}',true,'${s.t}','${s.t}');`
-        );
-        expectFail(
-          url,
-          `INSERT INTO "CrmReadPolicyGrant"
-             ("organizationId","bundleId","versionId","logicalId","membershipId","scopeKind",
-              "originKind","originOrganizationId","originRootValidated","createdAt","updatedAt")
-           VALUES ('${s.orgA}','${b}','gv2','g1','${s.memA}','COMPANY',
-              'LEGACY_SNAPSHOT','${s.orgA}',true,'${s.t}','${s.t}');`,
-          'duplicate logicalId in bundle',
-          /unique|logicalId/i
-        );
-        expectFail(
-          url,
-          `INSERT INTO "CrmReadPolicyGrant"
-             ("organizationId","bundleId","versionId","logicalId","membershipId","scopeKind","scopeLeadId",
-              "originKind","originOrganizationId","originRootValidated","createdAt","updatedAt")
-           VALUES ('${s.orgA}','${b}','gv3','g3','${s.memA}','COMPANY','${s.leadA}',
-              'LEGACY_SNAPSHOT','${s.orgA}',true,'${s.t}','${s.t}');`,
-          'COMPANY with lead',
-          /scope_shape|check constraint/i
-        );
-        expectFail(
-          url,
-          `INSERT INTO "CrmReadPolicyGrant"
-             ("organizationId","bundleId","versionId","logicalId","membershipId","scopeKind","scopeLeadId",
-              "originKind","originOrganizationId","originRootValidated","createdAt","updatedAt")
-           VALUES ('${s.orgA}','${b}','gv4','g4','${s.memA}','RECORD',NULL,
-              'LEGACY_SNAPSHOT','${s.orgA}',true,'${s.t}','${s.t}');`,
-          'RECORD without lead',
-          /scope_shape|check constraint/i
-        );
-        expectFail(
-          url,
-          `INSERT INTO "CrmReadPolicyGrantFieldClass"
-             ("organizationId","bundleId","grantVersionId","fieldClass")
-           VALUES ('${s.orgA}','${b}','gv1','IDENTIDAD'), ('${s.orgA}','${b}','gv1','IDENTIDAD');`,
-          'duplicate field class',
-          /unique|duplicate|pkey/i
-        );
-        expectFail(
-          url,
-          `INSERT INTO "CrmReadPolicyRetiredGrantLogicalId"
-             ("organizationId","bundleId","logicalId")
-           VALUES ('${s.orgA}','${b}','g_x'), ('${s.orgA}','${b}','g_x');`,
-          'duplicate retired logicalId',
-          /unique|duplicate|pkey/i
-        );
-        expectFail(
-          url,
-          `INSERT INTO "CrmReadPolicyGrant"
-             ("organizationId","bundleId","versionId","logicalId","membershipId","scopeKind",
-              "validFrom","validUntil","originKind","originOrganizationId","originRootValidated",
-              "createdAt","updatedAt")
-           VALUES ('${s.orgA}','${b}','gv5','g5','${s.memA}','COMPANY',
-              '2026-02-01T00:00:00.000Z','2026-01-01T00:00:00.000Z',
-              'LEGACY_SNAPSHOT','${s.orgA}',true,'${s.t}','${s.t}');`,
-          'inverted validity window',
-          /window_order|check constraint/i
-        );
-      },
-    },
-    {
-      name: 'políticas se conservan ante retirada de membresía (DELETE RESTRICT)',
-      run: () => {
-        const s = seedTenants(url);
-        const b = id('bundle');
-        insertDraftBundle(url, { bundleId: b, orgId: s.orgA, version: 1, t: s.t });
-        psql(
-          url,
-          `INSERT INTO "CrmReadPolicyGrant"
-             ("organizationId","bundleId","versionId","logicalId","membershipId","scopeKind",
-              "originKind","originOrganizationId","originRootValidated","createdAt","updatedAt")
-           VALUES ('${s.orgA}','${b}','gv1','g1','${s.memA}','COMPANY',
-              'LEGACY_SNAPSHOT','${s.orgA}',true,'${s.t}','${s.t}');`
-        );
-        expectFail(
-          url,
-          `DELETE FROM "Membership" WHERE "id"='${s.memA}';`,
-          'membership delete while grant references it',
-          /foreign key|restrict|Membership/i
-        );
-        const still = psql(
-          url,
-          `SELECT COUNT(*)::text FROM "CrmReadPolicyGrant" WHERE "bundleId"='${b}';`
-        );
-        assert(still === '1', 'grant must remain after failed membership delete');
-        // Soft withdrawal remains available
-        psql(url, `UPDATE "Membership" SET "status"='REMOVED' WHERE "id"='${s.memA}';`);
-        const status = psql(url, `SELECT "status"::text FROM "Membership" WHERE "id"='${s.memA}';`);
-        assert(status === 'REMOVED', 'membership status REMOVED must remain available');
-      },
-    },
-    {
-      name: 'historial de identidades retiradas se almacena y recupera fielmente',
-      run: () => {
-        const s = seedTenants(url);
-        const b = id('bundle');
-        insertDraftBundle(url, { bundleId: b, orgId: s.orgA, version: 1, t: s.t });
-        psql(
-          url,
-          `INSERT INTO "CrmReadPolicyRetiredGrantLogicalId" ("organizationId","bundleId","logicalId") VALUES
-             ('${s.orgA}','${b}','g_b'),
-             ('${s.orgA}','${b}','g_a');`
-        );
-        const rows = psql(
-          url,
-          `SELECT string_agg("logicalId", ',' ORDER BY "logicalId")
-           FROM "CrmReadPolicyRetiredGrantLogicalId" WHERE "bundleId"='${b}';`
-        );
-        assert(rows === 'g_a,g_b', `retired ids round-trip mismatch: ${rows}`);
-      },
-    },
-    {
-      name: 'inmutabilidad VALIDATED y bloqueo DRAFT→VALIDATED',
-      run: () => {
-        const s = seedTenants(url);
-        const draftId = id('bundle');
-        const validatedId = id('bundle');
-        insertDraftBundle(url, { bundleId: draftId, orgId: s.orgA, version: 1, t: s.t });
-        expectFail(
-          url,
-          `UPDATE "CrmReadPolicyBundle" SET "status"='VALIDATED',
-             "contentChecksum"='crm-read-policy-canonical/v1:x', "updatedAt"='${s.t}'
-           WHERE "id"='${draftId}';`,
-          'DRAFT to VALIDATED update',
-          /DRAFT to VALIDATED transition blocked|immutable/i
-        );
-
-        // Initial validated snapshot write under explicit session guard (future transactional service).
-        psql(
-          url,
-          `SELECT set_config('crm_read_policy.allow_validated_snapshot_write', 'on', true);
-           INSERT INTO "CrmReadPolicyBundle"
-             ("id","organizationId","version","status","canonicalVersion","contentChecksum",
-              "createdAt","updatedAt")
-           VALUES ('${validatedId}','${s.orgA}',2,'VALIDATED','crm-read-policy-canonical/v1',
-             'crm-read-policy-canonical/v1:validated','${s.t}','${s.t}');
-           INSERT INTO "CrmReadPolicyRetiredGrantLogicalId" ("organizationId","bundleId","logicalId")
-           VALUES ('${s.orgA}','${validatedId}','g_locked');
-           INSERT INTO "CrmReadPolicyGrant"
-             ("organizationId","bundleId","versionId","logicalId","membershipId","scopeKind",
-              "originKind","originOrganizationId","originRootValidated","createdAt","updatedAt")
-           VALUES ('${s.orgA}','${validatedId}','gv1','g1','${s.memA}','COMPANY',
-              'LEGACY_SNAPSHOT','${s.orgA}',true,'${s.t}','${s.t}');
-           SELECT set_config('crm_read_policy.allow_validated_snapshot_write', 'off', true);`
-        );
-
-        expectFail(
-          url,
-          `UPDATE "CrmReadPolicyBundle" SET "contentChecksum"='tampered', "updatedAt"='${s.t}'
-           WHERE "id"='${validatedId}';`,
-          'update validated bundle',
-          /immutable/i
-        );
-        expectFail(
-          url,
-          `DELETE FROM "CrmReadPolicyBundle" WHERE "id"='${validatedId}';`,
-          'delete validated bundle',
-          /immutable/i
-        );
-        expectFail(
-          url,
-          `INSERT INTO "CrmReadPolicyGrant"
-             ("organizationId","bundleId","versionId","logicalId","membershipId","scopeKind",
-              "originKind","originOrganizationId","originRootValidated","createdAt","updatedAt")
-           VALUES ('${s.orgA}','${validatedId}','gv2','g2','${s.memA}','COMPANY',
-              'LEGACY_SNAPSHOT','${s.orgA}',true,'${s.t}','${s.t}');`,
-          'insert grant into validated bundle',
-          /immutable/i
-        );
-        expectFail(
-          url,
-          `UPDATE "CrmReadPolicyGrant" SET "validity"='REVOKED', "updatedAt"='${s.t}'
-           WHERE "bundleId"='${validatedId}' AND "versionId"='gv1';`,
-          'update grant on validated bundle',
-          /immutable/i
-        );
-        expectFail(
-          url,
-          `INSERT INTO "CrmReadPolicyBundle"
-             ("id","organizationId","version","status","canonicalVersion","contentChecksum",
-              "createdAt","updatedAt")
-           VALUES ('${id('bundle')}','${s.orgA}',3,'VALIDATED','crm-read-policy-canonical/v1',
-             NULL,'${s.t}','${s.t}');`,
-          'VALIDATED without checksum',
-          /validated_requires_checksum|check constraint/i
-        );
-      },
-    },
-    {
-      name: 'evidencia no puede vincular versiones de empresas distintas',
-      run: () => {
-        const s = seedTenants(url);
-        const bA = id('bundle');
-        const bB = id('bundle');
-        insertDraftBundle(url, { bundleId: bA, orgId: s.orgA, version: 1, t: s.t });
-        insertDraftBundle(url, { bundleId: bB, orgId: s.orgB, version: 1, t: s.t });
-        insertDraftBundle(url, {
-          bundleId: id('bundle'),
-          orgId: s.orgA,
-          version: 2,
-          predecessorVersion: 1,
-          t: s.t,
-        });
-        expectFail(
-          url,
-          `INSERT INTO "CrmReadPolicyChangeEvidence"
-             ("id","evidenceId","organizationId","fromVersion","toVersion","changeKind",
-              "targetLogicalId","createdAt")
-           VALUES ('${id('evrow')}','evx','${s.orgA}',1,1,'ADD_GRANT','g','${s.t}');`,
-          'evidence version order',
-          /version_order|check constraint/i
-        );
-        // orgA fromVersion=1 exists; toVersion referring as if orgB's version via wrong org id fails FK
-        expectFail(
-          url,
-          `INSERT INTO "CrmReadPolicyChangeEvidence"
-             ("id","evidenceId","organizationId","fromVersion","toVersion","changeKind",
-              "targetLogicalId","createdAt")
-           VALUES ('${id('evrow')}','evy','${s.orgB}',1,2,'ADD_GRANT','g','${s.t}');`,
-          'evidence to missing version in orgB',
-          /foreign key|toVersion/i
-        );
-      },
-    },
-    {
       name: 'actualización desde esquema anterior con datos sintéticos',
       run: () => {
-        // This scenario manages its own migrate path; outer loop still resets first.
         const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'nexora-point8-4a1b-upgrade-'));
         try {
           const prismaDir = path.join(tmp, 'prisma');
@@ -592,24 +719,35 @@ function main(): void {
             !pre.includes(`Applying migration \`${POINT8_4A1B_NAME}\``),
             'upgrade fixture must not include 4A-1B yet'
           );
-
           const s = seedTenants(url);
           const orgCountBefore = psql(url, `SELECT COUNT(*)::text FROM "Organization";`);
           assert(orgCountBefore === '2', 'synthetic orgs present before 4A-1B');
 
           const upgrade = runPrisma(['migrate', 'deploy'], env);
           assert(upgrade.includes(POINT8_4A1B_NAME), '4A-1B must apply on upgrade');
-          const orgCountAfter = psql(url, `SELECT COUNT(*)::text FROM "Organization";`);
-          assert(orgCountAfter === orgCountBefore, 'upgrade must preserve synthetic org rows');
-
+          assert(upgrade.includes(POINT8_4A1B_HARDENING_NAME), 'hardening must apply on upgrade');
+          assert(
+            psql(url, `SELECT COUNT(*)::text FROM "Organization";`) === orgCountBefore,
+            'upgrade must preserve synthetic org rows'
+          );
           const b = id('bundle');
           insertDraftBundle(url, { bundleId: b, orgId: s.orgA, version: 1, t: s.t });
-          const table = psql(
-            url,
-            `SELECT COUNT(*)::text FROM information_schema.tables
-             WHERE table_schema='public' AND table_name='CrmReadPolicyBundle';`
+          assert(
+            psql(
+              url,
+              `SELECT COUNT(*)::text FROM information_schema.tables
+               WHERE table_schema='public' AND table_name='CrmReadPolicyBundle';`
+            ) === '1',
+            'CrmReadPolicyBundle must exist after upgrade'
           );
-          assert(table === '1', 'CrmReadPolicyBundle must exist after upgrade');
+          assert(
+            psql(
+              url,
+              `SELECT relrowsecurity::text FROM pg_class
+               WHERE relname='CrmReadPolicyBundle' AND relnamespace='public'::regnamespace;`
+            ) === 'true',
+            'RLS enabled after upgrade path'
+          );
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }
@@ -617,8 +755,6 @@ function main(): void {
     },
   ];
 
-  // Isolate each scenario on a clean public schema + full migration chain
-  // (upgrade scenario re-manages migrate deploy itself after the shared reset).
   let failed = 0;
   for (const scenario of scenarios) {
     try {
