@@ -1,8 +1,12 @@
 # Punto 8 — Paso 4A-1C: diseño del sellado transaccional CRM (revisión de seguridad)
 
-**Estado:** diseño documental — **no aprobado para implementación**.  
+**Estado:** diseño documental — **no aprobado para implementación** (incluye verificación de viabilidad; ver Parte II).  
 **Alcance:** solo lectura/diseño. Sin código operativo, sin migraciones aplicadas, sin APIs, sin merge, sin deploy, sin producción.  
 **No modifica** PR #22, #23 ni #24.
+
+### Bloqueo de viabilidad (hallazgo)
+
+La verificación **Ed25519 dentro de SQL** propuesta en la revisión anterior **no es viable** en el PostgreSQL objetivo (Supabase hosted) vía `pgcrypto`. Ver Parte II §V1. La recomendación vigente pasa a la **arquitectura alternativa ALT-H/R** (HMAC-SHA256 con `pgcrypto` + separación de roles + fail-closed), no a Ed25519-in-SQL.
 
 ## HEADs de referencia (verificados al redactar)
 
@@ -73,69 +77,44 @@ Ninguno de esos valores prueba que `validateCrmReadPolicyBundle` / `validateCrmR
 | **C** | Reimplementar reglas `#23` en PL/pgSQL dentro del seal | Validación en el mismo sitio que escribe | Deriva del contrato `#23`; costo; prohibido por acoplamiento |
 | **D** | Columna `sealReadyChecksum` escrita por el app tras validar | Fácil de forjar con `UPDATE` DRAFT si el rol app puede escribirla | **Insuficiente** — rechazada como control primario |
 
-### Elección recomendada: **B + A (defensa en profundidad)**
+### Elección recomendada (actualizada tras viabilidad): **ALT-H + A**, no Ed25519-in-SQL
 
-1. **Atestación de sellado** (argumento de la función, no prueba por sí sola de autoridad):
+> **Hallazgo:** Ed25519 dentro de SQL (**B**) queda **descartado** como dependencia de producto en Supabase hosted. Motivos y alternativas en Parte II §V1–§V4.
+
+Control primario vigente:
+
+1. **Atestación HMAC-SHA256** (`pgcrypto.hmac`) sobre el mismo payload de atestación, emitida **solo** tras `#23` ok (ver §V4).
+2. Función SQL verifica el MAC con un secreto **no** poseído por el rol SQL ordinario (Vault / secreto solo legible por el owner de la función definer).
+3. Separación de roles: el rol que edita DRAFT **no** tiene `EXECUTE` ni puede `UPDATE status→VALIDATED`.
+4. `current_user` / ser el definer **no** cuenta como prueba de validación `#23`.
+5. Fail-closed de autoridad (§3): sin allow, no se emite MAC.
+
+El payload de atestación permanece:
 
 ```text
 SealAttestation = {
   v: 1,
-  organizationId,
-  bundleId,
-  version,
+  organizationId, bundleId, version,
   canonicalVersion: "crm-read-policy-canonical/v1",
-  contentChecksum,          // digest #23 del contenido hidratado
-  contentRevision,          // contador DB del bundle (ver §2)
-  predecessorVersion,       // null si version=1; si no, versión VALIDATED
-  predecessorChecksum,      // checksum del predecesor VALIDATED
-  issuedAt,                 // timestamptz
-  nonce                     // uuid anti-reuso en ventana DRAFT
+  contentChecksum, contentRevision,
+  predecessorVersion, predecessorChecksum,
+  issuedAt, nonce
 }
-signature = Ed25519_Sign(SEAL_ATTESTATION_PRIVATE_KEY, canonical_bytes(SealAttestation))
+mac = HMAC-SHA256(canonical_bytes(SealAttestation), SEAL_ATTESTATION_SECRET)
 ```
 
-2. Emisión **únicamente** en SealService **después** de:
-
-   - autoridad fail-closed = allow (hoy: nunca; ver §3),
-   - hidratar desde DB,
-   - `validateCrmReadPolicyBundle` = ok,
-   - si `version > 1`: predecesor **VALIDATED** + `validateCrmReadPolicySuccession` = ok,
-   - `computeCrmReadPolicyBundleChecksum` = `contentChecksum`,
-   - leer `contentRevision` bajo el mismo lock de transacción.
-
-3. Función SQL `crm_read_policy_seal_bundle(attestation jsonb, signature bytea, audit jsonb)`:
-
-   - Verifica firma con **clave pública** embebida/configurada en DB (no secreto privado).
-   - Parsea campos; rechaza atestación caducada (p. ej. TTL ≤ 60s desde `issuedAt`).
-   - Relee el bundle `FOR UPDATE`; exige `DRAFT`, mismos `organizationId`/`id`/`version`.
-   - Exige `bundle.contentRevision = attestation.contentRevision`.
-   - Exige `version = 1` ⇒ sin predecesor; `version > 1` ⇒ predecesor existe, same-org, **VALIDATED**, checksum de predecesor coincide.
-   - **No** acepta sellar por checksum suelto, `actorId` ni `sealAuthorityRef` sin firma válida.
-   - UPDATE mínimo: `status=VALIDATED`, `contentChecksum=attestation.contentChecksum`, columnas de auditoría (§4). Metadatos de sellado **no** alteran el checksum canónico.
-
-4. **Defensa en profundidad (A):** `REVOKE EXECUTE … FROM PUBLIC` y del rol app genérico si es distinto; `GRANT EXECUTE` solo al rol de conexión del SealService. Así un cliente Data API u otro rol no intenta ni verificar firmas.
-
-5. Clave privada: solo en entorno del proceso SealService (secret manager). **Nunca** en SQL, ni en GUC, ni en filas.
-
-### Por qué checksum / actor / authorityRef no bastan (explícito)
+### Por qué checksum / actor / authorityRef / current_user no bastan
 
 | Señal | Por qué falla como prueba de `#23` |
 |---|---|
-| Checksum no vacío | Puede inventarse o copiarse; no implica reglas de sucesión/evidencia/retired |
-| `actorId` | Identidad de invocación, no validación estructural |
-| `sealAuthorityRef` | Referencia opaca; forjable sin verifier real |
+| Checksum no vacío | Inventable; no implica sucesión/evidencia/retired |
+| `actorId` / `sealAuthorityRef` | No son validación estructural |
 | Columna “ready” escribible | El mismo rol que llama a seal puede ponerla |
-
-La **firma sobre el digest `#23` + `contentRevision` + identidad del bundle** es la prueba de que un poseedor de la clave privada atestiguó ese resultado. El proceso que posee la clave **solo firma tras `#23` ok** (invariante de implementación + tests).
+| `current_user = sealer` | Solo prueba **quién escribe**, no que `#23` corrió |
 
 ### Invariantes verificables (Postgres real)
 
-1. `EXECUTE` de `crm_read_policy_seal_bundle` con checksum inventado y **sin** firma → rechazo.  
-2. Firma válida pero payload con `contentChecksum` que no corresponde al contenido hidratable / revision → rechazo (revision o precondiciones).  
-3. Firma sobre attestation de bundle A aplicada a bundle B → rechazo.  
-4. Rol `anon`/`authenticated` sin `EXECUTE`.  
-5. Atestación expirada → rechazo.  
-6. Tras mutar un grant (revision↑) reutilizar atestación antigua → rechazo por `contentRevision`.
+Ver Parte II §V5 (pruebas negativas y de sensibilidad). Incluyen: MAC ausente/incorrecto, rol app sin EXECUTE, mutación que incrementa `contentRevision`, y elusión por `current_user`.
 
 ---
 
@@ -345,8 +324,8 @@ Idempotencia: si ya `VALIDATED` y checksum+version coinciden con la petición �
 
 | # | Caso | Esperado |
 |---|---|---|
-| E1 | Seal SQL con checksum libre, sin firma | rechazo |
-| E2 | Firma con clave incorrecta | rechazo |
+| E1 | Seal SQL con checksum libre, sin MAC | rechazo |
+| E2 | MAC con secreto incorrecto | rechazo |
 | E3 | Atestación de otro bundleId/version | rechazo |
 | E4 | Atestación con revision antigua tras mutar grant | rechazo |
 | E5 | Sucesión sin predecesor VALIDATED | rechazo en servicio (y SQL double-check) |
@@ -378,7 +357,7 @@ Idempotencia: si ya `VALIDATED` y checksum+version coinciden con la petición �
 | R2 | UPDATE hijo post-seal | rechazado OLD/NEW |
 | R3 | No existe GUC `allow_validated_snapshot_write` | confirmed |
 
-Harness de laboratorio para E/C (firma de test) **separado** de A1–A3 (camino productivo deny-all).
+Harness de laboratorio para E/C (MAC de test) **separado** de A1–A3 (camino productivo deny-all). Matriz ampliada en Parte II §V5.
 
 ---
 
@@ -386,10 +365,12 @@ Harness de laboratorio para E/C (firma de test) **separado** de A1–A3 (camino 
 
 | Riesgo | Mitigación |
 |---|---|
-| Compromiso de la clave privada de atestación | Equivale a compromiso SealService; rotación; F3 limita EXECUTE |
-| Olvidar una tabla hija en triggers de lock/revision | Lista explícita en migración + test que falle si se añade tabla sin trigger (inventory assert) |
-| Deriva SQL vs checksum `#23` | SQL **no** recalcula FNV canónico; vincula revision + checksum atestiguado tras hydrate TS |
-| Confundir auditoría `sealedByActorId` con allow | Fail-closed ignora actor para allow; tests A2 |
+| Compromiso del secreto HMAC / credencial sealer | Rotación; F3; secreto fuera del rol app; fail-closed no emite MAC |
+| Ed25519-in-SQL no disponible en Supabase/`pgcrypto` | Descartado; ALT-H (Parte II) |
+| Olvidar tabla hija en lock/revision | Inventario §V3 + test de sensibilidad |
+| `TRUNCATE` / `session_replication_role` / owner DISABLE TRIGGER | REVOKE TRUNCATE; roles no-owner; tests §V5 |
+| Deriva SQL vs checksum `#23` | SQL no recalcula FNV; revision + MAC tras hydrate TS |
+| Confundir `sealedByActorId` / `current_user` con allow o `#23` | Fail-closed + MAC obligatorio |
 | Auto-deploy Vercel al merge | Gate humano; este doc no autoriza merge |
 
 ---
@@ -398,9 +379,9 @@ Harness de laboratorio para E/C (firma de test) **separado** de A1–A3 (camino 
 
 | Corte | Contenido | ¿Código operativo? |
 |---|---|---|
-| **4A-1C-0** | Este diseño (doc) | No |
-| **4A-1C-1** | Migración: `contentRevision`, columnas auditoría mínimas, locks en triggers hijo, función seal + verify firma, REVOKE/GRANT; suite Postgres E/C/R | Sí — **requiere aprobación explícita** |
-| **4A-1C-2** | SealService TS: fail-closed authority, hydrate, `#23`, firmar, llamar seal; sin HTTP | Sí — tras 4A-1C-1 |
+| **4A-1C-0** | Este diseño (doc) + viabilidad | No |
+| **4A-1C-1** | Migración: `contentRevision`, auditoría mínima, locks/bump en **todas** las tablas §V3, función seal + **HMAC pgcrypto**, REVOKE/GRANT; suite Postgres §V5 | Sí — **requiere aprobación explícita** |
+| **4A-1C-2** | SealService TS: fail-closed, hydrate, `#23`, MAC, seal; sin HTTP | Sí — tras 4A-1C-1 |
 | **4A-1C-3** | Concurrencia/aislamiento org + sensibilidad | Sí |
 | **Futuro** | Verifier de autoridad real | Otro PR; sustituye fail-closed |
 
@@ -408,8 +389,224 @@ Harness de laboratorio para E/C (firma de test) **separado** de A1–A3 (camino 
 
 ## 9. Resumen ejecutivo para revisores
 
-1. **Sin `#23` no hay seal:** la función privilegiada exige atestación Ed25519 firmada solo tras validadores; checksum/actor/ref no bastan.  
-2. **Contenido estable:** DML hijo/evidencia toma `FOR UPDATE` de padres + `contentRevision` firmado + txn `SERIALIZABLE`.  
-3. **Fail-closed:** ninguna identidad ordinaria sella hasta existir autoridad verificable; el camino productivo no emite atestaciones.
+1. **Ed25519-in-SQL no es viable** en el Postgres Supabase objetivo con `pgcrypto`; no implementar 4A-1C-1 sobre esa premisa.  
+2. **Sin `#23` no hay seal:** MAC HMAC (`pgcrypto`) emitido solo tras validadores + roles separados; checksum/actor/ref/`current_user` no bastan.  
+3. **Contenido estable:** locks de padre en **todas** las tablas de contenido/evidencia + bump `contentRevision` (incl. UPDATE del propio bundle canónico) + `SERIALIZABLE`.  
+4. **Fail-closed:** ninguna identidad ordinaria sella hasta autoridad verificable.
 
-**No implementar 4A-1C-1 hasta nueva aprobación explícita de este diseño revisado.**
+**No implementar 4A-1C-1 hasta nueva aprobación explícita tras esta verificación de viabilidad.**
+
+---
+
+# Parte II — Verificación de viabilidad (PR #25)
+
+Análisis técnico-documental. Sin acceso a producción. Referencias: documentación pública PostgreSQL/`pgcrypto`, lista de extensiones privilegiadas de la imagen `supabase/postgres`, docs Supabase Vault/pgsodium, esquema/migraciones PR #24 HEAD `b57c233`.
+
+## V1. ¿Supabase/Postgres admite verificación Ed25519 desde SQL?
+
+### Hallazgos
+
+| Capacidad | ¿Disponible en objetivo Supabase hosted? | Notas |
+|---|---|---|
+| `pgcrypto` | **Sí** (extensión privilegiada habitual) | `digest`, `hmac`, PGP (`pgp_*`), `crypt`/`gen_salt`. **No** expone Ed25519 ni `ed25519_verify` / `crypto_sign_*` |
+| Extensión comunitaria `ed25519` / `pg_ed25519` | **No** en `supautils.privileged_extensions` de la imagen curated | Requiere `.so` nativo; hosted no permite instalar extensiones C arbitrarias |
+| `pgsodium.crypto_sign_verify_detached` | Extensión **listada**, API Ed25519 (libsodium) | Supabase documenta **pgsodium en deprecación**; **no recomendado** como dependencia de producto nueva. Vault **no** sustituye verify de firmas de aplicación |
+| `supabase_vault` | **Sí** (secretos cifrados) | Almacén de secretos; **no** es verificador Ed25519 |
+| `plv8` verificar en JS | Extensión posible en imagen | Fuera de contrato; superficie y mantenimiento inaceptables para este control |
+| Duplicar verify en PL/pgSQL puro | N/A | Inseguro / no estándar |
+
+### Conclusión V1
+
+**No asumir** que `pgcrypto` verifica Ed25519: **no lo hace**.  
+**Bloqueo:** diseñar el sellado como “la función SQL verifica Ed25519” **no es viable** en el entorno objetivo sin depender de `pgsodium` deprecado o de extensiones no alojadas.
+
+**Alternativa criptográfica viable en SQL:** `pgcrypto.hmac(..., 'sha256')` (ver §V4).
+
+### Permisos típicos (diseño)
+
+- `CREATE EXTENSION pgcrypto WITH SCHEMA extensions;` (o schema ya usado por el proyecto) — rol privilegiado de migración.  
+- `GRANT EXECUTE` solo de la función seal (no de helpers de secreto) al rol sealer.  
+- Secreto HMAC: **no** `GRANT` de lectura del secreto al rol que solo edita DRAFT.
+
+---
+
+## V2. SECURITY DEFINER, rol sealer y elusión de `#23`
+
+### Problema reforzado
+
+`current_user = nexora_crm_policy_sealer` (o `session_user <> current_user` por SECURITY DEFINER) **solo** demuestra el rol de escritura. Un operador con `psql` y esa credencial, o cualquier código que obtenga `EXECUTE`, puede llamar `crm_read_policy_seal_bundle` **sin** pasar por TypeScript/`#23`.
+
+### Modelo de privilegios propuesto (fail-closed)
+
+| Rol | DRAFT DML hijos | UPDATE bundle (campos draft) | `EXECUTE` seal | Lectura secreto HMAC | Comentario |
+|---|---|---|---|---|---|
+| `anon` / `authenticated` / Data API | No (REVOKE #24) | No | No | No | Intactos |
+| `nexora_app` (API/runtime general) | Sí (DRAFT) | Sí salvo transición VALIDATED | **No** | **No** | No puede sellar |
+| `nexora_sealer` (solo SealService) | Mínimo necesario para lock/read | No genérico; solo vía función | **Sí** (cuando autoridad exista) | **No** directo | Credencial distinta de `DATABASE_URL` general |
+| Owner de función / migración | DDL | — | define función | lee secreto en definer | Break-glass |
+
+### Cómo impedir transición directa DRAFT→VALIDATED eludiendo `#23`
+
+Controles **conjuntos** (ninguno basta solo):
+
+1. **Trigger de bundle:** rechaza todo UPDATE a VALIDATED que no sea el UPDATE mínimo ejecutado **dentro** de `crm_read_policy_seal_bundle` tras verificar MAC. Un `UPDATE … SET status='VALIDATED'` crudo del sealer **falla** si no pasa por la función (p. ej. la función es el único sitio con permiso de columna `status`, o el trigger exige un token de un solo uso materializado solo tras MAC ok en la misma función — **sin GUC de sesión**).  
+2. **MAC obligatorio** dentro de la función: sin MAC válido → no UPDATE. Poseer el rol sealer **sin** el secreto HMAC ⇒ no sella.  
+3. **Secreto HMAC** solo en: (a) entorno SealService, (b) lectura por el owner dentro del cuerpo SECURITY DEFINER (Vault u objeto sin `GRANT` al sealer login). El login sealer **no** puede `SELECT` el secreto.  
+4. **Fail-closed:** en producto, hasta autoridad real, **no** se hace `GRANT EXECUTE` al sealer de aplicación y SealService **no** carga el secreto de emisión (o verifier always-deny implica no emisión).  
+5. **Column privileges:** `REVOKE UPDATE (status) ON CrmReadPolicyBundle FROM nexora_app, nexora_sealer` si el UPDATE lo hace solo el owner vía definer — el sealer solo `EXECUTE` la función.
+
+### Qué queda como frontera de confianza (explícito)
+
+Quien posea **a la vez** `EXECUTE` + secreto HMAC (o sea el owner) puede fabricar un MAC sin correr `#23`. Eso se mitiga por:
+
+- Fail-closed (no grant / no secreto en prod hasta autoridad),
+- proceso SealService como único emisor (invariante de código + tests),
+- rotación y auditoría `sealedAt` / nonce.
+
+`current_user` **nunca** se documenta como prueba de `#23`.
+
+---
+
+## V3. Locks + `contentRevision` frente al inventario PR #24
+
+### Tablas de contenido / evidencia (#24)
+
+| # | Tabla | ¿En checksum canónico `#23`? | ¿Afecta sucesión `#23`? | Lock padre(s) requerido | ¿Bump `contentRevision`? |
+|---|---|---|---|---|---|
+| 1 | `CrmReadPolicyBundle` | Parcial: `organizationId`, `version` (no status/audit/checksum metadata) | Predecesor usado en sucesión | Self `FOR UPDATE` | **Sí** si cambian columnas canónicas o predecesor; **No** si solo audit/seal/status vía seal |
+| 2 | `CrmReadPolicyBundleMembershipLink` | Sí (`membershipIds`) | Catálogo | bundle `(org, bundleId)` | Sí (bundle) |
+| 3 | `CrmReadPolicyBundleLeadLink` | Sí (`leadIds`) | Catálogo | bundle | Sí |
+| 4 | `CrmReadPolicyRetiredGrantLogicalId` | Sí | Monotonicidad | bundle | Sí |
+| 5 | `CrmReadPolicyGrant` | Sí | Sí | OLD/NEW bundles (traslados) | Sí |
+| 6 | `CrmReadPolicyGrantFieldClass` | Sí (clases del grant) | Sí | bundle del grant | Sí |
+| 7 | `CrmReadPolicyRestriction` | Sí | Sí | OLD/NEW bundles | Sí |
+| 8 | `CrmReadPolicyRestrictionFieldClass` | Sí | Sí | bundle | Sí |
+| 9 | `CrmReadPolicyChangeEvidence` | **No** (fuera del digest) | **Sí** (obligatoria en sucesión) | bundles de `fromVersion` **y** `toVersion` (OLD+NEW) | **Sí en el candidato `toVersion`** (y en from/to afectados si cambian) |
+| 10 | `CrmReadPolicyChangeEvidenceFieldClass` | No | Sí (huellas de clases) | vía evidence → from/to bundles | Sí en candidato `toVersion` |
+
+Orden de lock: `(organizationId ASC, bundleId ASC)` o, para evidencia por versión, resolver ids de bundle y ordenar `(organizationId, version)` para evitar deadlocks.
+
+### Huecos si solo se hace `FOR UPDATE` del padre en el seal (sin triggers hijo)
+
+Cualquier DML concurrente en filas 2–10 **no espera** al lock del padre. Especialmente:
+
+- `INSERT` nuevo grant/restriction/retired/link/field class / evidence,
+- `UPDATE` que cambia `bundleId` / `organizationId` / `grantVersionId` / versiones de evidencia,
+- `DELETE`.
+
+### Huecos adicionales identificados (deben cubrirse en diseño)
+
+| Hueco | Riesgo | Control requerido |
+|---|---|---|
+| **H1** UPDATE directo de `CrmReadPolicyBundle.canonicalVersion` / `version` / `organizationId` / `predecessor*` en DRAFT | Cambia identidad canónica o sucesión sin tocar hijos | BEFORE UPDATE en bundle: lock self; bump `contentRevision` si columnas canónicas/predecesor cambian |
+| **H2** DML de **evidencia** (tablas 9–10) | Cambia sucesión validada; **no** está en checksum | Lock from+to; bump revision del **candidato** (`toVersion`) siempre |
+| **H3** Traslado multi-bundle de grant/restriction/field class | Contenido “desaparece”/aparece entre bundles | Lock OLD+NEW ordenado; bump **ambos** |
+| **H4** `TRUNCATE` de tablas hijas | Vacía contenido **sin** row triggers | `REVOKE TRUNCATE` (y preferir tests que fallen si el rol de prueba puede truncar) |
+| **H5** `SET session_replication_role = replica` | Desactiva triggers | Rol app/sealer sin privilegio; solo harness de test documentado (#24) |
+| **H6** Owner `ALTER TABLE … DISABLE TRIGGER` | Bypass total | App/sealer ≠ table owner |
+| **H7** DELETE CASCADE al borrar DRAFT bundle | Elimina hijos | Seal sostiene lock del bundle; borrado espera o falla |
+| **H8** Mutaciones en `Membership`/`CrmLead` referenciados | No cambian filas de política ni checksum de IDs | Fuera del digest; DELETE físico ya RESTRICT en #24 |
+| **H9** Evidencia `toVersion=N` mutada mientras se sella N, sin bump | Atestación con revision vieja aún “válida” si solo se bumpeaba por grants | **Obligatorio** bump en 9–10 |
+| **H10** Solo bumpear NEW y no OLD en traslado | Bundle origen cambia sin invalidar atestación allí | Bump OLD y NEW |
+
+### Relación con L1+L2+L3
+
+La recomendación §2 se **confirma**, con enmiendas: inventario completo 1–10, H1–H10, y tests de sensibilidad que fallen si falta un trigger en cualquier tabla del inventario.
+
+---
+
+## V4. Arquitectura alternativa recomendada (sin Ed25519-in-SQL)
+
+Conserva: fail-closed de autoridad, separación validación / autoridad / escritura, estabilidad L1+L2+L3, metadatos fuera del canónico, predecesor VALIDATED, sin activación.
+
+```text
+┌─────────────────────────────────────────┐
+│ SealService (único emisor de MAC)       │
+│  authority fail-closed → deny (hoy)     │
+│  SERIALIZABLE + lock bundle             │
+│  hydrate → validate #23 (+ succession)  │
+│  mac = HMAC-SHA256(attestation, secret) │
+│  CALL crm_read_policy_seal_bundle(...)  │
+└──────────────────┬──────────────────────┘
+                   │ EXECUTE (rol sealer)
+                   ▼
+┌─────────────────────────────────────────┐
+│ SQL SECURITY DEFINER (owner)            │
+│  1. leer secreto (Vault/objeto sin      │
+│     GRANT al login sealer)              │
+│  2. verificar hmac(attestation, secret) │
+│  3. chequear revision + pred VALIDATED  │
+│  4. UPDATE mínimo DRAFT→VALIDATED       │
+│  Trigger: rechaza UPDATE VALIDATED crudo│
+└─────────────────────────────────────────┘
+
+nexora_app: DRAFT only — sin EXECUTE, sin UPDATE(status)
+```
+
+### Comparación de alternativas post-viabilidad
+
+| Id | Enfoque | Viable en Supabase | Eluye `#23` con solo SQL EXECUTE? | Notas |
+|---|---|---|---|---|
+| **B (Ed25519 SQL)** | verify en SQL | **No** (sin pgsodium/ext externa) | No si hubiera verify | **Descartada** |
+| **ALT-H (HMAC pgcrypto)** | `hmac` + secreto | **Sí** | No sin secreto | **Recomendada** |
+| **ALT-R (solo roles)** | sealer credential = trust | Sí | **Sí** (psql como sealer) | Insuficiente sola; complemento de ALT-H |
+| **ALT-P (pgsodium sign)** | `crypto_sign_verify_detached` | Técnicamente posible hoy | No sin sk | **No recomendada** (deprecación) |
+| **ALT-0 (nada crypto)** | trigger + current_user | Sí | **Sí** | **Rechazada** |
+
+### Separación de preocupaciones
+
+| Preocupación | Dónde vive |
+|---|---|
+| Validez estructural/sucesión | Solo `#23` en SealService (TS) |
+| Autoridad para sellar | Fail-closed verifier (hoy deny) |
+| Escritura VALIDATED | Función SQL tras MAC + revision |
+| Prueba de que un emisor autorizado atestiguó ese digest/revision | MAC HMAC |
+
+---
+
+## V5. Pruebas negativas y de sensibilidad (Postgres desechable)
+
+Entorno: Postgres local desechable (mismo espíritu que `tenancy:validate-point8-4a1b`). **Sin** datos de producción. Harness puede usar privilegios de owner solo para montar roles/secretos de prueba.
+
+### Negativas — elusión de validación / privilegios
+
+| ID | Procedimiento | Esperado |
+|---|---|---|
+| N1 | Rol app: `UPDATE` bundle `status=VALIDATED` | rechazo trigger / privilegio columna |
+| N2 | Rol app: `SELECT crm_read_policy_seal_bundle(...)` | `permission denied` |
+| N3 | Rol sealer: seal con attestation sin MAC / MAC basura | rechazo |
+| N4 | Rol sealer: MAC válido de bundle A aplicado a B | rechazo |
+| N5 | Rol sealer: MAC con `contentRevision` obsoleto tras INSERT grant | rechazo |
+| N6 | Rol sealer: `UPDATE` crudo `DRAFT→VALIDATED` sin función | rechazo |
+| N7 | Login sealer: `SELECT` secreto HMAC / vault | `permission denied` |
+| N8 | `anon`/`authenticated`: cualquier DML/EXECUTE seal | denied (regresión #24) |
+| N9 | Camino servicio con authority fail-closed | no emite MAC; cero VALIDATED nuevos |
+| N10 | Argumentos solo checksum + actorId + authorityRef | rechazo (falta MAC) |
+
+### Sensibilidad — demostrar que el control es el que creemos
+
+| ID | Procedimiento | Esperado |
+|---|---|---|
+| S1 | Quitar verificación HMAC del cuerpo de la función (mutante de test) | N3 **pasa** indebidamente → prueba falla (el control real es el MAC) |
+| S2 | `GRANT EXECUTE` al rol app | N2 deja de cumplirse → sensibilidad de privilegios |
+| S3 | Omitir bump `contentRevision` en trigger de evidence | sellar tras mutar evidencia con MAC viejo **tiene éxito** → prueba de hueco H2/H9 falla el diseño |
+| S4 | Omitir lock de padre en INSERT grant | concurrent insert no bloquea (medir) → sensibilidad L1 |
+| S5 | Permitir `TRUNCATE` al rol app | vaciado sin bump → sensibilidad H4 |
+| S6 | Confiar solo en `current_user` (mutante sin MAC) | N3/N6 fallan abiertos → demuestra insuficiencia de `current_user` |
+
+### Concurrencia / inventario (desechable)
+
+Para **cada** tabla 2–10: INSERT, UPDATE (incl. traslado de claves de padre si aplica), DELETE concurrente con seal en curso → espera o abort limpio; post-sellado immutability.  
+Más: UPDATE bundle `predecessorVersion` / `canonicalVersion` durante seal → bump + invalidate MAC.
+
+---
+
+## V6. Bloqueos pendientes de aprobación (antes de 4A-1C-1)
+
+1. Aceptar **descarte** de Ed25519-in-SQL en favor de **ALT-H** (HMAC + roles).  
+2. Aceptar frontera residual: poseedor de secreto HMAC + EXECUTE ≡ puede atestar sin `#23` (mitigada por fail-closed y proceso único).  
+3. Aceptar inventario H1–H10 (esp. evidencia fuera del checksum pero dentro de revision; `TRUNCATE`/replication).  
+4. Estrategia exacta de almacenamiento del secreto (Vault vs secreto de migración solo-owner) en el hosting real — **sin** inspeccionar producción en este corte.  
+5. Confirmación de que no se usará `pgsodium` pese a estar listado.
+
+**Estado tras esta verificación:** diseño actualizado; **sigue sin aprobación** para implementar 4A-1C-1.
