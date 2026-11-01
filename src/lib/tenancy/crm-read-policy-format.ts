@@ -65,9 +65,11 @@ export type CrmReadPolicyFormatIssueCode =
   | 'reactivacion_invalida'
   | 'ampliacion_sin_evidencia'
   | 'evidencia_ajena'
+  | 'evidencia_inexacta'
   | 'auto_levantamiento'
   | 'contenido_mutado_tras_validacion'
-  | 'checksum_invalido';
+  | 'checksum_invalido'
+  | 'checksum_ausente';
 
 export type CrmReadPolicyFormatIssue = {
   code: CrmReadPolicyFormatIssueCode;
@@ -140,12 +142,23 @@ export type CrmReadPolicyChangeKind =
   | 'remove_grant'
   | 'revoke_grant'
   | 'invalidate_grant'
+  | 'reassign_grant'
+  | 'narrow_grant_classes'
+  | 'widen_grant_classes'
+  | 'widen_grant_scope'
+  | 'extend_grant_window'
+  | 'change_grant_parent'
+  | 'change_grant_origin'
   | 'add_restriction'
   | 'lift_restriction'
-  | 'narrow_restriction_classes'
-  | 'widen_grant_classes'
-  | 'widen_grant_scope';
+  | 'narrow_restriction_classes';
 
+/**
+ * Evidence must name the exact semantic delta. A changeKind label alone is
+ * not enough: class diffs use fieldClassesAdded / fieldClassesRemoved; other
+ * widenings use before/after snapshots that must match the reference and
+ * candidate values for the fields being changed.
+ */
 export type CrmReadPolicyChangeEvidence = {
   evidenceId: string;
   organizationId: string;
@@ -154,8 +167,28 @@ export type CrmReadPolicyChangeEvidence = {
   changeKind: CrmReadPolicyChangeKind;
   /** Logical id of the grant or restriction the evidence addresses. */
   targetLogicalId: string;
-  /** Extra classes when narrowing/widening field classes. */
+  /** Exact classes added by this evidence (sorted uniqueness enforced). */
+  fieldClassesAdded?: string[];
+  /** Exact classes removed by this evidence. */
+  fieldClassesRemoved?: string[];
+  before?: CrmReadPolicyEvidenceSnapshot;
+  after?: CrmReadPolicyEvidenceSnapshot;
+};
+
+export type CrmReadPolicyEvidenceSnapshot = {
+  membershipId?: string;
+  scopeKind?: 'company' | 'record';
+  scopeLeadId?: string | null;
   fieldClasses?: string[];
+  validFrom?: string | null;
+  validUntil?: string | null;
+  parentVersionId?: string | null;
+  grantVersion?: string | null;
+  requiredParentVersion?: string | null;
+  originKind?: CrmReadPolicyOriginKind;
+  originRootValidated?: boolean;
+  originRevoked?: boolean;
+  validity?: string;
 };
 
 type OwnRecord = Record<string, unknown>;
@@ -248,11 +281,16 @@ const CHANGE_KIND_SET: ReadonlySet<string> = new Set([
   'remove_grant',
   'revoke_grant',
   'invalidate_grant',
+  'reassign_grant',
+  'narrow_grant_classes',
+  'widen_grant_classes',
+  'widen_grant_scope',
+  'extend_grant_window',
+  'change_grant_parent',
+  'change_grant_origin',
   'add_restriction',
   'lift_restriction',
   'narrow_restriction_classes',
-  'widen_grant_classes',
-  'widen_grant_scope',
 ]);
 
 const STRUCTURE_PENDING: CrmReadPolicyPendingExternalCheck[] = [
@@ -280,12 +318,17 @@ export function validateCrmReadPolicyBundle(input: unknown): CrmReadPolicyStruct
   if (!parsed || issues.length > 0) {
     return { ok: false, kind: 'structure_invalid', issues };
   }
+  const checksum = computeBundleChecksum(parsed);
+  assertDeclaredChecksum(parsed, checksum, 'bundle', issues);
+  if (issues.length > 0) {
+    return { ok: false, kind: 'structure_invalid', issues };
+  }
   return {
     ok: true,
     kind: 'structure_valid',
     organizationId: parsed.organizationId,
     version: parsed.version,
-    checksum: computeBundleChecksum(parsed),
+    checksum,
     grantCount: parsed.grants.length,
     restrictionCount: parsed.restrictions.length,
     pendingExternalChecks: STRUCTURE_PENDING.slice(),
@@ -341,6 +384,10 @@ export function validateCrmReadPolicySuccession(input: unknown): CrmReadPolicySu
   }
 
   const referenceChecksum = computeBundleChecksum(reference);
+  const candidateChecksum = computeBundleChecksum(candidate);
+  assertDeclaredChecksum(reference, referenceChecksum, 'reference', issues);
+  assertDeclaredChecksum(candidate, candidateChecksum, 'candidate', issues);
+
   if (expected.version !== reference.version || expected.checksum !== referenceChecksum) {
     issues.push(
       issue(
@@ -349,19 +396,6 @@ export function validateCrmReadPolicySuccession(input: unknown): CrmReadPolicySu
         'expectedPredecessor does not match the reference bundle version/checksum'
       )
     );
-  }
-
-  if (candidate.contentChecksum !== null) {
-    const actual = computeBundleChecksum(candidate);
-    if (candidate.contentChecksum !== actual) {
-      issues.push(
-        issue(
-          'contenido_mutado_tras_validacion',
-          'candidate.contentChecksum',
-          'declared checksum does not match canonical candidate content'
-        )
-      );
-    }
   }
 
   for (const row of evidence) {
@@ -387,9 +421,48 @@ export function validateCrmReadPolicySuccession(input: unknown): CrmReadPolicySu
     organizationId: candidate.organizationId,
     fromVersion: reference.version,
     toVersion: candidate.version,
-    candidateChecksum: computeBundleChecksum(candidate),
+    candidateChecksum,
     pendingExternalChecks: STRUCTURE_PENDING.slice(),
   };
+}
+
+function assertDeclaredChecksum(
+  bundle: ParsedBundle,
+  actual: string,
+  path: string,
+  issues: CrmReadPolicyFormatIssue[]
+) {
+  if (bundle.status === 'validated') {
+    if (bundle.contentChecksum === null) {
+      issues.push(
+        issue(
+          'checksum_ausente',
+          `${path}.contentChecksum`,
+          'validated bundles must declare contentChecksum'
+        )
+      );
+      return;
+    }
+    if (bundle.contentChecksum !== actual) {
+      issues.push(
+        issue(
+          'checksum_invalido',
+          `${path}.contentChecksum`,
+          'declared contentChecksum does not match canonical content'
+        )
+      );
+    }
+    return;
+  }
+  if (bundle.contentChecksum !== null && bundle.contentChecksum !== actual) {
+    issues.push(
+      issue(
+        'checksum_invalido',
+        `${path}.contentChecksum`,
+        'declared contentChecksum does not match canonical content'
+      )
+    );
+  }
 }
 
 export function computeCrmReadPolicyBundleChecksum(input: unknown): string | null {
@@ -952,12 +1025,35 @@ function parseChangeEvidence(
   if (changeKind !== null && !CHANGE_KIND_SET.has(changeKind)) {
     issues.push(issue('entrada_invalida', `${path}.changeKind`, 'unknown changeKind'));
   }
-  let fieldClasses: string[] | undefined;
-  if (hasOwn(record, 'fieldClasses')) {
-    const parsed = parseFieldClasses(dataValue(record, 'fieldClasses'), issues, `${path}.fieldClasses`);
+
+  let fieldClassesAdded: string[] | undefined;
+  let fieldClassesRemoved: string[] | undefined;
+  if (hasOwn(record, 'fieldClassesAdded')) {
+    const parsed = parseFieldClasses(dataValue(record, 'fieldClassesAdded'), issues, `${path}.fieldClassesAdded`);
     if (!parsed) return null;
-    fieldClasses = parsed;
+    fieldClassesAdded = parsed;
   }
+  if (hasOwn(record, 'fieldClassesRemoved')) {
+    const parsed = parseFieldClasses(
+      dataValue(record, 'fieldClassesRemoved'),
+      issues,
+      `${path}.fieldClassesRemoved`
+    );
+    if (!parsed) return null;
+    fieldClassesRemoved = parsed;
+  }
+
+  let before: CrmReadPolicyEvidenceSnapshot | undefined;
+  let after: CrmReadPolicyEvidenceSnapshot | undefined;
+  if (hasOwn(record, 'before')) {
+    before = parseEvidenceSnapshot(dataValue(record, 'before'), issues, `${path}.before`) || undefined;
+    if (!before) return null;
+  }
+  if (hasOwn(record, 'after')) {
+    after = parseEvidenceSnapshot(dataValue(record, 'after'), issues, `${path}.after`) || undefined;
+    if (!after) return null;
+  }
+
   if (
     evidenceId === null ||
     organizationId === null ||
@@ -969,6 +1065,27 @@ function parseChangeEvidence(
   ) {
     return null;
   }
+
+  if (changeKind === 'widen_grant_classes' && !fieldClassesAdded) {
+    issues.push(
+      issue('evidencia_inexacta', `${path}.fieldClassesAdded`, 'widen_grant_classes requires fieldClassesAdded')
+    );
+  }
+  if (changeKind === 'narrow_restriction_classes' && !fieldClassesRemoved) {
+    issues.push(
+      issue(
+        'evidencia_inexacta',
+        `${path}.fieldClassesRemoved`,
+        'narrow_restriction_classes requires fieldClassesRemoved'
+      )
+    );
+  }
+  if (changeKind === 'narrow_grant_classes' && !fieldClassesRemoved) {
+    issues.push(
+      issue('evidencia_inexacta', `${path}.fieldClassesRemoved`, 'narrow_grant_classes requires fieldClassesRemoved')
+    );
+  }
+
   return {
     evidenceId,
     organizationId,
@@ -976,10 +1093,120 @@ function parseChangeEvidence(
     toVersion,
     changeKind: changeKind as CrmReadPolicyChangeKind,
     targetLogicalId,
-    fieldClasses,
+    fieldClassesAdded,
+    fieldClassesRemoved,
+    before,
+    after,
   };
 }
 
+function parseEvidenceSnapshot(
+  value: unknown,
+  issues: CrmReadPolicyFormatIssue[],
+  path: string
+): CrmReadPolicyEvidenceSnapshot | null {
+  const record = ownDataRecord(value);
+  if (!record) {
+    issues.push(issue('entrada_invalida', path, 'snapshot must be an own plain object'));
+    return null;
+  }
+  const snapshot: CrmReadPolicyEvidenceSnapshot = {};
+  if (hasOwn(record, 'membershipId')) {
+    const membershipId = readNonEmptyString(record, 'membershipId', issues, `${path}.membershipId`);
+    if (!membershipId) return null;
+    snapshot.membershipId = membershipId;
+  }
+  if (hasOwn(record, 'scopeKind')) {
+    const scopeKind = readNonEmptyString(record, 'scopeKind', issues, `${path}.scopeKind`);
+    if (scopeKind !== 'company' && scopeKind !== 'record') {
+      issues.push(issue('entrada_invalida', `${path}.scopeKind`, 'scopeKind must be company or record'));
+      return null;
+    }
+    snapshot.scopeKind = scopeKind;
+  }
+  if (hasOwn(record, 'scopeLeadId')) {
+    const raw = dataValue(record, 'scopeLeadId');
+    if (raw === null) snapshot.scopeLeadId = null;
+    else if (typeof raw === 'string') snapshot.scopeLeadId = raw;
+    else {
+      issues.push(issue('entrada_invalida', `${path}.scopeLeadId`, 'scopeLeadId must be string or null'));
+      return null;
+    }
+  }
+  if (hasOwn(record, 'fieldClasses')) {
+    const parsed = parseFieldClasses(dataValue(record, 'fieldClasses'), issues, `${path}.fieldClasses`);
+    if (!parsed) return null;
+    snapshot.fieldClasses = parsed;
+  }
+  for (const key of ['validFrom', 'validUntil'] as const) {
+    if (!hasOwn(record, key)) continue;
+    const raw = dataValue(record, key);
+    if (raw === null) snapshot[key] = null;
+    else if (typeof raw === 'string') {
+      if (parseInstant(raw) === null) {
+        issues.push(issue('ventana_invalida', `${path}.${key}`, 'instant must be a real UTC string'));
+        return null;
+      }
+      snapshot[key] = raw;
+    } else {
+      issues.push(issue('entrada_invalida', `${path}.${key}`, 'must be string or null'));
+      return null;
+    }
+  }
+  for (const key of ['parentVersionId', 'grantVersion', 'requiredParentVersion'] as const) {
+    if (!hasOwn(record, key)) continue;
+    const raw = dataValue(record, key);
+    if (raw === null) snapshot[key] = null;
+    else if (typeof raw === 'string') snapshot[key] = raw;
+    else {
+      issues.push(issue('entrada_invalida', `${path}.${key}`, 'must be string or null'));
+      return null;
+    }
+  }
+  if (hasOwn(record, 'originKind')) {
+    const kind = readNonEmptyString(record, 'originKind', issues, `${path}.originKind`);
+    if (!kind || !ORIGIN_KIND_SET.has(kind)) {
+      issues.push(issue('origen_invalido', `${path}.originKind`, 'unknown origin kind'));
+      return null;
+    }
+    snapshot.originKind = kind as CrmReadPolicyOriginKind;
+  }
+  if (hasOwn(record, 'originRootValidated')) {
+    const raw = dataValue(record, 'originRootValidated');
+    if (typeof raw !== 'boolean') {
+      issues.push(issue('entrada_invalida', `${path}.originRootValidated`, 'must be boolean'));
+      return null;
+    }
+    snapshot.originRootValidated = raw;
+  }
+  if (hasOwn(record, 'originRevoked')) {
+    const raw = dataValue(record, 'originRevoked');
+    if (typeof raw !== 'boolean') {
+      issues.push(issue('entrada_invalida', `${path}.originRevoked`, 'must be boolean'));
+      return null;
+    }
+    snapshot.originRevoked = raw;
+  }
+  if (hasOwn(record, 'validity')) {
+    const validity = readNonEmptyString(record, 'validity', issues, `${path}.validity`);
+    if (!validity) return null;
+    snapshot.validity = validity;
+  }
+  return snapshot;
+}
+
+/**
+ * Succession rules (final):
+ * - Compare set differences explicitly (added = next\prior, removed = prior\next).
+ * - Any access-widening grant change needs evidence whose exact values match.
+ * - Any restriction weakening (omit, lift, or remove classes) needs matching
+ *   evidence and fails auto-lift checks for the restriction target.
+ * - Adding restriction classes is strengthening and does not need lift evidence.
+ * - Same logicalId cannot change membership without reassign_grant evidence;
+ *   otherwise reject and require a new independent grant.
+ * - Revoked/invalidated logical grants cannot become active again.
+ * - Evidence labels without matching before/after or class deltas are rejected.
+ */
 function checkSuccessionSemantics(
   reference: ParsedBundle,
   candidate: ParsedBundle,
@@ -998,6 +1225,7 @@ function checkSuccessionSemantics(
     if (prior.validity !== 'active') continue;
     const next = candidate.restrictionsByLogicalId.get(prior.logicalId);
     const related = evidenceByTarget.get(prior.logicalId) || [];
+
     if (!next) {
       const lift = related.find((row) => row.changeKind === 'lift_restriction');
       if (!lift) {
@@ -1008,11 +1236,12 @@ function checkSuccessionSemantics(
             'active restriction omitted without lift evidence'
           )
         );
-        continue;
+      } else {
+        assertLiftAuthority(prior.membershipId, authority, issues, prior.logicalId);
       }
-      assertLiftAuthority(prior.membershipId, authority, issues, prior.logicalId);
       continue;
     }
+
     if (next.validity === 'lifted') {
       const lift = related.find((row) => row.changeKind === 'lift_restriction');
       if (!lift) {
@@ -1028,34 +1257,57 @@ function checkSuccessionSemantics(
       }
       continue;
     }
+
     if (next.validity !== 'active') continue;
-    // Fewer classes than before weakens the restriction and needs evidence.
-    if (isSubset(next.fieldClasses, prior.fieldClasses) && !sameStringSet(next.fieldClasses, prior.fieldClasses)) {
-      const narrow = related.find((row) => row.changeKind === 'narrow_restriction_classes');
+
+    if (prior.membershipId !== next.membershipId || !sameScope(prior.scope, next.scope)) {
+      issues.push(
+        issue(
+          'restriccion_omitida_sin_evidencia',
+          `restriction:${prior.logicalId}`,
+          'active restriction recipient/scope mutated; omit+add or lift with evidence required'
+        )
+      );
+      continue;
+    }
+
+    const removed = setDifference(prior.fieldClasses, next.fieldClasses);
+    const added = setDifference(next.fieldClasses, prior.fieldClasses);
+    if (removed.length > 0) {
+      const narrow = related.find(
+        (row) =>
+          row.changeKind === 'narrow_restriction_classes' &&
+          sameStringSet(row.fieldClassesRemoved || [], removed)
+      );
       if (!narrow) {
         issues.push(
           issue(
             'restriccion_reducida_sin_evidencia',
             `restriction:${prior.logicalId}`,
-            'restriction field classes narrowed without evidence'
+            'restriction classes removed without exact narrow evidence'
           )
         );
+      } else {
+        assertLiftAuthority(prior.membershipId, authority, issues, prior.logicalId);
+        if (narrow.fieldClassesAdded && narrow.fieldClassesAdded.length > 0) {
+          if (!sameStringSet(narrow.fieldClassesAdded, added)) {
+            issues.push(
+              issue(
+                'evidencia_inexacta',
+                `changeEvidence.${narrow.evidenceId}`,
+                'narrow evidence fieldClassesAdded does not match candidate delta'
+              )
+            );
+          }
+        }
       }
-    }
-    if (!sameScope(prior.scope, next.scope) || prior.membershipId !== next.membershipId) {
-      issues.push(
-        issue(
-          'restriccion_omitida_sin_evidencia',
-          `restriction:${prior.logicalId}`,
-          'active restriction identity mutated; treat as omit/replace with evidence'
-        )
-      );
     }
   }
 
   for (const prior of reference.grants) {
     const next = candidate.grantsByLogicalId.get(prior.logicalId);
     const related = evidenceByTarget.get(prior.logicalId) || [];
+
     if (prior.validity === 'revoked' || prior.validity === 'invalidated') {
       if (next && next.validity === 'active') {
         issues.push(
@@ -1069,6 +1321,7 @@ function checkSuccessionSemantics(
       continue;
     }
     if (prior.validity !== 'active') continue;
+
     if (!next) {
       const covered = related.some(
         (row) =>
@@ -1083,6 +1336,7 @@ function checkSuccessionSemantics(
       }
       continue;
     }
+
     if (next.validity === 'revoked' || next.validity === 'invalidated') {
       const covered = related.some(
         (row) => row.changeKind === 'revoke_grant' || row.changeKind === 'invalidate_grant'
@@ -1098,52 +1352,176 @@ function checkSuccessionSemantics(
       }
       continue;
     }
-    if (!isSubset(prior.fieldClasses, next.fieldClasses) && !sameStringSet(prior.fieldClasses, next.fieldClasses)) {
-      // next has fewer classes = narrowing permission; require remove/widen? narrowing grant classes is restriction of access — still needs evidence as remove+add or dedicated; treat as require revoke/remove/invalidate or widen is wrong.
-      // Actually fewer field classes on grant = less access = OK with remove/revoke style evidence. Use remove_grant semantics via widen? Spec said widen needs evidence. Narrowing grant (less privilege) should still be identified — require remove_grant or invalidate or a restatement. Use remove_grant/revoke/invalidate OR accept if same logical with subset and evidence remove is heavy.
-      // Design: narrowing grant classes requires evidence changeKind remove_grant is wrong. Use invalidate or require explicit — I'll use ampliacion only for widen; for narrow grant classes require revoke_grant or invalidate_grant or remove_grant+add new logical. If same logicalId with fewer classes without evidence → fail ampliacion_sin_evidencia renamed path.
-      const covered = related.some(
+
+    if (prior.membershipId !== next.membershipId) {
+      const reassign = related.find(
         (row) =>
-          row.changeKind === 'remove_grant' ||
-          row.changeKind === 'revoke_grant' ||
-          row.changeKind === 'invalidate_grant'
+          row.changeKind === 'reassign_grant' &&
+          row.before?.membershipId === prior.membershipId &&
+          row.after?.membershipId === next.membershipId
       );
-      if (!covered && !isSubset(next.fieldClasses, prior.fieldClasses)) {
-        // next not subset and not equal means next has extras and missing — handled below
-      }
-      if (isSubset(next.fieldClasses, prior.fieldClasses) && !sameStringSet(next.fieldClasses, prior.fieldClasses)) {
-        if (!covered) {
-          issues.push(
-            issue(
-              'ampliacion_sin_evidencia',
-              `grant:${prior.logicalId}`,
-              'grant field classes reduced without evidence'
-            )
-          );
-        }
+      if (!reassign) {
+        issues.push(
+          issue(
+            'ampliacion_sin_evidencia',
+            `grant:${prior.logicalId}`,
+            'membership change on same logicalId requires reassign_grant evidence or a new logical grant'
+          )
+        );
       }
     }
-    if (!isSubset(prior.fieldClasses, next.fieldClasses)) {
-      // next has classes not in prior = widen
-      const extra = next.fieldClasses.filter((item) => !prior.fieldClasses.includes(item));
-      if (extra.length > 0) {
-        const widen = related.find((row) => row.changeKind === 'widen_grant_classes');
-        if (!widen) {
-          issues.push(
-            issue(
-              'ampliacion_sin_evidencia',
-              `grant:${prior.logicalId}`,
-              'grant field classes widened without evidence'
-            )
-          );
-        }
-      }
-    }
-    if (scopeWidened(prior.scope, next.scope)) {
-      const widen = related.find((row) => row.changeKind === 'widen_grant_scope');
+
+    const addedClasses = setDifference(next.fieldClasses, prior.fieldClasses);
+    const removedClasses = setDifference(prior.fieldClasses, next.fieldClasses);
+    if (addedClasses.length > 0) {
+      const widen = related.find(
+        (row) =>
+          row.changeKind === 'widen_grant_classes' &&
+          sameStringSet(row.fieldClassesAdded || [], addedClasses)
+      );
       if (!widen) {
         issues.push(
-          issue('ampliacion_sin_evidencia', `grant:${prior.logicalId}`, 'grant scope widened without evidence')
+          issue(
+            'ampliacion_sin_evidencia',
+            `grant:${prior.logicalId}`,
+            'grant classes added without exact widen_grant_classes evidence'
+          )
+        );
+      }
+      for (const row of related) {
+        if (row.changeKind !== 'widen_grant_classes') continue;
+        if (sameStringSet(row.fieldClassesAdded || [], addedClasses)) continue;
+        issues.push(
+          issue(
+            'evidencia_inexacta',
+            `changeEvidence.${row.evidenceId}`,
+            'widen_grant_classes fieldClassesAdded does not match added class set'
+          )
+        );
+      }
+    }
+    if (removedClasses.length > 0) {
+      const narrow = related.find(
+        (row) =>
+          row.changeKind === 'narrow_grant_classes' &&
+          sameStringSet(row.fieldClassesRemoved || [], removedClasses)
+      );
+      if (!narrow) {
+        issues.push(
+          issue(
+            'ampliacion_sin_evidencia',
+            `grant:${prior.logicalId}`,
+            'grant classes removed without exact narrow_grant_classes evidence'
+          )
+        );
+      }
+    }
+
+    if (scopeWidened(prior.scope, next.scope)) {
+      const widen = related.find(
+        (row) =>
+          row.changeKind === 'widen_grant_scope' &&
+          snapshotMatchesScope(row.before, prior.scope) &&
+          snapshotMatchesScope(row.after, next.scope)
+      );
+      if (!widen) {
+        issues.push(
+          issue(
+            'ampliacion_sin_evidencia',
+            `grant:${prior.logicalId}`,
+            'grant scope widened without exact widen_grant_scope evidence'
+          )
+        );
+      }
+    } else if (!sameScope(prior.scope, next.scope)) {
+      issues.push(
+        issue(
+          'ampliacion_sin_evidencia',
+          `grant:${prior.logicalId}`,
+          'grant scope changed without documented evidence'
+        )
+      );
+    }
+
+    if (windowWidened(prior, next)) {
+      const extend = related.find(
+        (row) =>
+          row.changeKind === 'extend_grant_window' &&
+          snapshotMatchesWindow(row.before, prior) &&
+          snapshotMatchesWindow(row.after, next)
+      );
+      if (!extend) {
+        issues.push(
+          issue(
+            'ampliacion_sin_evidencia',
+            `grant:${prior.logicalId}`,
+            'grant validity window widened without exact extend_grant_window evidence'
+          )
+        );
+      }
+    }
+
+    if (prior.parentVersionId !== next.parentVersionId) {
+      const change = related.find(
+        (row) =>
+          row.changeKind === 'change_grant_parent' &&
+          (row.before?.parentVersionId ?? null) === prior.parentVersionId &&
+          (row.after?.parentVersionId ?? null) === next.parentVersionId
+      );
+      if (!change) {
+        issues.push(
+          issue(
+            'ampliacion_sin_evidencia',
+            `grant:${prior.logicalId}`,
+            'grant parent changed without change_grant_parent evidence'
+          )
+        );
+      }
+    }
+
+    if (
+      prior.grantVersion !== next.grantVersion ||
+      prior.requiredParentVersion !== next.requiredParentVersion
+    ) {
+      const change = related.find(
+        (row) =>
+          row.changeKind === 'change_grant_parent' &&
+          (row.before?.grantVersion ?? null) === prior.grantVersion &&
+          (row.after?.grantVersion ?? null) === next.grantVersion &&
+          (row.before?.requiredParentVersion ?? null) === prior.requiredParentVersion &&
+          (row.after?.requiredParentVersion ?? null) === next.requiredParentVersion
+      );
+      // Version string changes are treated as parent/version-condition changes.
+      if (
+        (prior.requiredParentVersion !== next.requiredParentVersion ||
+          prior.grantVersion !== next.grantVersion) &&
+        !change &&
+        versionConditionRelaxed(prior, next)
+      ) {
+        issues.push(
+          issue(
+            'ampliacion_sin_evidencia',
+            `grant:${prior.logicalId}`,
+            'grant version conditions relaxed without evidence'
+          )
+        );
+      }
+    }
+
+    if (originWidened(prior.origin, next.origin) || originIdentityChanged(prior.origin, next.origin)) {
+      const change = related.find(
+        (row) =>
+          row.changeKind === 'change_grant_origin' &&
+          snapshotMatchesOrigin(row.before, prior.origin) &&
+          snapshotMatchesOrigin(row.after, next.origin)
+      );
+      if (!change) {
+        issues.push(
+          issue(
+            'ampliacion_sin_evidencia',
+            `grant:${prior.logicalId}`,
+            'grant origin changed or widened without change_grant_origin evidence'
+          )
         );
       }
     }
@@ -1178,6 +1556,96 @@ function checkSuccessionSemantics(
       );
     }
   }
+}
+
+function setDifference(from: readonly string[], without: readonly string[]): string[] {
+  const exclude = new Set(without);
+  const out: string[] = [];
+  for (const item of from) {
+    if (!exclude.has(item)) out.push(item);
+  }
+  return out.sort(compareString);
+}
+
+function snapshotMatchesScope(
+  snapshot: CrmReadPolicyEvidenceSnapshot | undefined,
+  scope: ParsedScope
+): boolean {
+  if (!snapshot || snapshot.scopeKind !== scope.kind) return false;
+  if (scope.kind === 'company') return snapshot.scopeLeadId == null;
+  return snapshot.scopeLeadId === scope.leadId;
+}
+
+function snapshotMatchesWindow(
+  snapshot: CrmReadPolicyEvidenceSnapshot | undefined,
+  grant: ParsedGrant
+): boolean {
+  if (!snapshot) return false;
+  if (!('validFrom' in snapshot) || !('validUntil' in snapshot)) return false;
+  const from = snapshot.validFrom === null || snapshot.validFrom === undefined ? null : parseInstant(snapshot.validFrom);
+  const until =
+    snapshot.validUntil === null || snapshot.validUntil === undefined ? null : parseInstant(snapshot.validUntil);
+  if (snapshot.validFrom !== null && snapshot.validFrom !== undefined && from === null) return false;
+  if (snapshot.validUntil !== null && snapshot.validUntil !== undefined && until === null) return false;
+  return from === grant.validFrom && until === grant.validUntil;
+}
+
+function snapshotMatchesOrigin(
+  snapshot: CrmReadPolicyEvidenceSnapshot | undefined,
+  origin: ParsedOrigin
+): boolean {
+  if (!snapshot) return false;
+  return (
+    snapshot.originKind === origin.kind &&
+    snapshot.originRootValidated === origin.rootValidated &&
+    snapshot.originRevoked === origin.revoked
+  );
+}
+
+function windowWidened(prior: ParsedGrant, next: ParsedGrant): boolean {
+  // Removing an upper bound or moving it later widens access.
+  if (prior.validUntil !== null && next.validUntil === null) return true;
+  if (
+    prior.validUntil !== null &&
+    next.validUntil !== null &&
+    next.validUntil > prior.validUntil
+  ) {
+    return true;
+  }
+  // Removing a lower bound or moving it earlier widens access.
+  if (prior.validFrom !== null && next.validFrom === null) return true;
+  if (prior.validFrom !== null && next.validFrom !== null && next.validFrom < prior.validFrom) {
+    return true;
+  }
+  return false;
+}
+
+function versionConditionRelaxed(prior: ParsedGrant, next: ParsedGrant): boolean {
+  if (prior.requiredParentVersion !== null && next.requiredParentVersion === null) return true;
+  if (
+    prior.requiredParentVersion !== null &&
+    next.requiredParentVersion !== null &&
+    prior.requiredParentVersion !== next.requiredParentVersion
+  ) {
+    return true;
+  }
+  if (prior.grantVersion !== next.grantVersion) return true;
+  return false;
+}
+
+function originWidened(prior: ParsedOrigin, next: ParsedOrigin): boolean {
+  if (prior.rootValidated === false && next.rootValidated === true) return true;
+  if (prior.revoked === true && next.revoked === false) return true;
+  return false;
+}
+
+function originIdentityChanged(prior: ParsedOrigin, next: ParsedOrigin): boolean {
+  return (
+    prior.kind !== next.kind ||
+    prior.organizationId !== next.organizationId ||
+    prior.rootValidated !== next.rootValidated ||
+    prior.revoked !== next.revoked
+  );
 }
 
 function assertLiftAuthority(

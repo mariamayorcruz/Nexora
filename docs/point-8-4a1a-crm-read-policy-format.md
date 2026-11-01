@@ -25,6 +25,18 @@ Versión canónica: `crm-read-policy-canonical/v1`.
 Incluye organización, versión, catálogos de membresías/leads, grants y restrictions con alcance, clases ordenadas, validez, cadena (`parentVersionId`), vigencia, origen y procedencia.  
 Ordenaciones irrelevantes no cambian el digest; un cambio semántico sí. No se usa `JSON.stringify` de objetos de entrada sin canonicalizar.
 
+- `status: 'validated'` exige `contentChecksum` presente e igual al digest canónico.
+- `status: 'draft'` admite `contentChecksum: null`; si se declara, debe coincidir.
+- La misma regla se aplica al bundle suelto y a referencia/candidato en sucesión.
+
+## Sucesión y evidencia
+
+Las diferencias de clases se calculan como conjuntos (`añadidas = candidato \ referencia`, `retiradas = referencia \ candidato`). Añadir clases a una restricción no compensa retirar otras.
+
+La evidencia debe traer el delta exacto (`fieldClassesAdded` / `fieldClassesRemoved`) o `before`/`after` coherentes con destinatario, scope, ventana, padre u origen. Una etiqueta `changeKind` sola no cubre el cambio.
+
+Toda reducción de restricción (omisión, `lifted` o clases retiradas) pasa la comprobación de auto-levantamiento del `AuthorityContext` sintético, incluida la reducción parcial.
+
 ## Formato de entrada admitido
 
 - Objetos propios con prototipo `Object.prototype` o `null`, sin accessors propios.

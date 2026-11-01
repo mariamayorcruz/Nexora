@@ -357,7 +357,7 @@ const scenarios: Array<{ name: string; run: () => void }> = [
               toVersion: 2,
               changeKind: 'widen_grant_classes',
               targetLogicalId: 'g_logic_1',
-              fieldClasses: ['canal'],
+              fieldClassesAdded: ['canal'],
             },
             {
               evidenceId: 'e2',
@@ -670,8 +670,289 @@ const scenarios: Array<{ name: string; run: () => void }> = [
           changeEvidence: [],
           authority: authority(),
         }),
-        'contenido_mutado_tras_validacion'
+        'checksum_invalido'
       );
+    },
+  },
+  {
+    name: 'regresión: ampliación de clases sin evidencia se rechaza',
+    run: () => {
+      const reference = bundle({
+        version: 1,
+        grants: [baseGrant({ fieldClasses: ['identidad'] })],
+        restrictions: [],
+      });
+      const refSum = computeCrmReadPolicyBundleChecksum(reference)!;
+      assertIssue(
+        validateCrmReadPolicySuccession({
+          reference,
+          candidate: bundle({
+            version: 2,
+            grants: [baseGrant({ versionId: 'gv2', fieldClasses: ['identidad', 'reservado'] })],
+            restrictions: [],
+          }),
+          expectedPredecessor: { version: 1, checksum: refSum },
+          changeEvidence: [],
+          authority: authority(),
+        }),
+        'ampliacion_sin_evidencia'
+      );
+    },
+  },
+  {
+    name: 'regresión: cambio de destinatario sin evidencia se rechaza',
+    run: () => {
+      const reference = bundle({
+        version: 1,
+        grants: [baseGrant({ membershipId: MEM_A })],
+        restrictions: [],
+      });
+      const refSum = computeCrmReadPolicyBundleChecksum(reference)!;
+      assertIssue(
+        validateCrmReadPolicySuccession({
+          reference,
+          candidate: bundle({
+            version: 2,
+            grants: [baseGrant({ versionId: 'gv2', membershipId: MEM_B })],
+            restrictions: [],
+          }),
+          expectedPredecessor: { version: 1, checksum: refSum },
+          changeEvidence: [],
+          authority: authority(),
+        }),
+        'ampliacion_sin_evidencia'
+      );
+    },
+  },
+  {
+    name: 'regresión: ampliación de vigencia sin evidencia se rechaza',
+    run: () => {
+      const reference = bundle({
+        version: 1,
+        grants: [baseGrant({ validUntil: '2026-01-01T00:00:00.000Z' })],
+        restrictions: [],
+      });
+      const refSum = computeCrmReadPolicyBundleChecksum(reference)!;
+      assertIssue(
+        validateCrmReadPolicySuccession({
+          reference,
+          candidate: bundle({
+            version: 2,
+            grants: [baseGrant({ versionId: 'gv2', validUntil: null })],
+            restrictions: [],
+          }),
+          expectedPredecessor: { version: 1, checksum: refSum },
+          changeEvidence: [],
+          authority: authority(),
+        }),
+        'ampliacion_sin_evidencia'
+      );
+    },
+  },
+  {
+    name: 'regresión: restricción reducida por cambio mixto sin evidencia se rechaza',
+    run: () => {
+      const reference = bundle({
+        version: 1,
+        grants: [baseGrant()],
+        restrictions: [baseRestriction({ fieldClasses: ['reservado', 'gestion'] })],
+      });
+      const refSum = computeCrmReadPolicyBundleChecksum(reference)!;
+      assertIssue(
+        validateCrmReadPolicySuccession({
+          reference,
+          candidate: bundle({
+            version: 2,
+            grants: [baseGrant({ versionId: 'gv2' })],
+            restrictions: [baseRestriction({ versionId: 'rv2', fieldClasses: ['gestion', 'canal'] })],
+          }),
+          expectedPredecessor: { version: 1, checksum: refSum },
+          changeEvidence: [],
+          authority: authority(),
+        }),
+        'restriccion_reducida_sin_evidencia'
+      );
+    },
+  },
+  {
+    name: 'regresión: auto-levantamiento parcial se rechaza',
+    run: () => {
+      const reference = bundle({
+        version: 1,
+        grants: [baseGrant()],
+        restrictions: [baseRestriction({ membershipId: MEM_A, fieldClasses: ['reservado', 'gestion'] })],
+      });
+      const refSum = computeCrmReadPolicyBundleChecksum(reference)!;
+      assertIssue(
+        validateCrmReadPolicySuccession({
+          reference,
+          candidate: bundle({
+            version: 2,
+            grants: [baseGrant({ versionId: 'gv2' })],
+            restrictions: [baseRestriction({ versionId: 'rv2', membershipId: MEM_A, fieldClasses: ['gestion'] })],
+          }),
+          expectedPredecessor: { version: 1, checksum: refSum },
+          changeEvidence: [
+            {
+              evidenceId: 'e_partial',
+              organizationId: ORG,
+              fromVersion: 1,
+              toVersion: 2,
+              changeKind: 'narrow_restriction_classes',
+              targetLogicalId: 'r_logic_1',
+              fieldClassesRemoved: ['reservado'],
+            },
+          ],
+          authority: authority({ representedMembershipIds: [MEM_A] }),
+        }),
+        'auto_levantamiento'
+      );
+    },
+  },
+  {
+    name: 'regresión: evidencia que no corresponde al cambio se rechaza',
+    run: () => {
+      const reference = bundle({
+        version: 1,
+        grants: [baseGrant({ fieldClasses: ['identidad', 'gestion'] })],
+        restrictions: [],
+      });
+      const refSum = computeCrmReadPolicyBundleChecksum(reference)!;
+      const result = validateCrmReadPolicySuccession({
+        reference,
+        candidate: bundle({
+          version: 2,
+          grants: [baseGrant({ versionId: 'gv2', fieldClasses: ['identidad', 'reservado'] })],
+          restrictions: [],
+        }),
+        expectedPredecessor: { version: 1, checksum: refSum },
+        changeEvidence: [
+          {
+            evidenceId: 'e_wrong',
+            organizationId: ORG,
+            fromVersion: 1,
+            toVersion: 2,
+            changeKind: 'widen_grant_classes',
+            targetLogicalId: 'g_logic_1',
+            fieldClassesAdded: ['canal'],
+          },
+        ],
+        authority: authority(),
+      });
+      assert.equal(result.ok, false);
+      const issueCodes = codes(result as { ok: false; issues: Array<{ code: string }> });
+      assert.equal(issueCodes.includes('ampliacion_sin_evidencia'), true);
+      assert.equal(issueCodes.includes('evidencia_inexacta'), true);
+      // removed gestion also needs narrow evidence
+      assert.equal(issueCodes.includes('ampliacion_sin_evidencia'), true);
+    },
+  },
+  {
+    name: 'regresión: checksum falso o ausente en validated se rechaza',
+    run: () => {
+      assertIssue(
+        validateCrmReadPolicyBundle(
+          bundle({
+            status: 'validated',
+            contentChecksum: 'wrong',
+            restrictions: [],
+          })
+        ),
+        'checksum_invalido'
+      );
+      assertIssue(
+        validateCrmReadPolicyBundle(
+          bundle({
+            status: 'validated',
+            contentChecksum: null,
+            restrictions: [],
+          })
+        ),
+        'checksum_ausente'
+      );
+      const draft = bundle({ restrictions: [] });
+      const sum = computeCrmReadPolicyBundleChecksum(draft)!;
+      const ok = validateCrmReadPolicyBundle({
+        ...draft,
+        status: 'validated',
+        contentChecksum: sum,
+      });
+      assert.equal(ok.ok, true);
+    },
+  },
+  {
+    name: 'control positivo: ampliación y reasignación documentadas',
+    run: () => {
+      const reference = bundle({
+        version: 1,
+        grants: [
+          baseGrant({
+            fieldClasses: ['identidad'],
+            membershipId: MEM_A,
+            validUntil: '2026-01-01T00:00:00.000Z',
+          }),
+        ],
+        restrictions: [baseRestriction({ fieldClasses: ['reservado', 'gestion'] })],
+      });
+      const refSum = computeCrmReadPolicyBundleChecksum(reference)!;
+      const result = validateCrmReadPolicySuccession({
+        reference,
+        candidate: bundle({
+          version: 2,
+          grants: [
+            baseGrant({
+              versionId: 'gv2',
+              membershipId: MEM_B,
+              fieldClasses: ['identidad', 'reservado'],
+              validUntil: null,
+            }),
+          ],
+          restrictions: [baseRestriction({ versionId: 'rv2', fieldClasses: ['gestion', 'canal'] })],
+        }),
+        expectedPredecessor: { version: 1, checksum: refSum },
+        changeEvidence: [
+          {
+            evidenceId: 'e_reassign',
+            organizationId: ORG,
+            fromVersion: 1,
+            toVersion: 2,
+            changeKind: 'reassign_grant',
+            targetLogicalId: 'g_logic_1',
+            before: { membershipId: MEM_A },
+            after: { membershipId: MEM_B },
+          },
+          {
+            evidenceId: 'e_widen',
+            organizationId: ORG,
+            fromVersion: 1,
+            toVersion: 2,
+            changeKind: 'widen_grant_classes',
+            targetLogicalId: 'g_logic_1',
+            fieldClassesAdded: ['reservado'],
+          },
+          {
+            evidenceId: 'e_window',
+            organizationId: ORG,
+            fromVersion: 1,
+            toVersion: 2,
+            changeKind: 'extend_grant_window',
+            targetLogicalId: 'g_logic_1',
+            before: { validFrom: null, validUntil: '2026-01-01T00:00:00.000Z' },
+            after: { validFrom: null, validUntil: null },
+          },
+          {
+            evidenceId: 'e_narrow',
+            organizationId: ORG,
+            fromVersion: 1,
+            toVersion: 2,
+            changeKind: 'narrow_restriction_classes',
+            targetLogicalId: 'r_logic_1',
+            fieldClassesRemoved: ['reservado'],
+          },
+        ],
+        authority: authority({ representedMembershipIds: [MEM_B] }),
+      });
+      assert.equal(result.ok, true);
     },
   },
   {
