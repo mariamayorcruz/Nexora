@@ -1,20 +1,21 @@
 # Punto 8 — Paso 4A-1C: diseño del sellado transaccional CRM (revisión de seguridad)
 
-**Estado:** diseño documental — **no aprobado para implementación** (incluye verificación de viabilidad; ver Parte II).  
+**Estado:** diseño documental — **no aprobado para implementación** (verificación final de viabilidad/seguridad; Partes II–III).  
 **Alcance:** solo lectura/diseño. Sin código operativo, sin migraciones aplicadas, sin APIs, sin merge, sin deploy, sin producción.  
 **No modifica** PR #22, #23 ni #24.
 
-### Bloqueo de viabilidad (hallazgo)
+### Bloqueo de viabilidad (hallazgo confirmado)
 
-La verificación **Ed25519 dentro de SQL** propuesta en la revisión anterior **no es viable** en el PostgreSQL objetivo (Supabase hosted) vía `pgcrypto`. Ver Parte II §V1. La recomendación vigente pasa a la **arquitectura alternativa ALT-H/R** (HMAC-SHA256 con `pgcrypto` + separación de roles + fail-closed), no a Ed25519-in-SQL.
+La verificación **Ed25519 dentro de SQL** **no es viable** en el PostgreSQL objetivo (Supabase hosted) vía `pgcrypto`. Ver Parte II §V1 y Parte III. La arquitectura recomendada es **ALT-H** (HMAC-SHA256 con `pgcrypto` + separación de roles + fail-closed), no Ed25519-in-SQL.
 
-## HEADs de referencia (verificados al redactar)
+## HEADs de referencia (re-verificados en verificación final)
 
-| Artefacto | HEAD |
-|---|---|
-| PR #22 evaluador | `368fb25c7bf7a4674013c51d28b8a6919fbf7239` |
-| PR #23 validadores | `02c8a573b967d7656c8f5e057003b49ae214d0c5` |
-| PR #24 persistencia + hardening | `b57c233043bbde2c74f71c29a9296ae9bc494ff3` |
+| Artefacto | HEAD | Draft |
+|---|---|---|
+| PR #22 evaluador | `368fb25c7bf7a4674013c51d28b8a6919fbf7239` | sí |
+| PR #23 validadores | `02c8a573b967d7656c8f5e057003b49ae214d0c5` | sí |
+| PR #24 persistencia + hardening | `b57c233043bbde2c74f71c29a9296ae9bc494ff3` | sí |
+| PR #25 este diseño | *(actualizar al commit de esta revisión)* | sí |
 
 ## Decisiones de diseño fijadas en esta revisión
 
@@ -41,7 +42,7 @@ La verificación **Ed25519 dentro de SQL** propuesta en la revisión anterior **
 ### Propuesto (este documento, revisado)
 
 - Servicio de sellado con **fail-closed** de autoridad.
-- **Atestación firmada** que vincula el resultado `#23` al contenido DB.
+- **Atestación HMAC-SHA256** (`pgcrypto`) que vincula el resultado `#23` al contenido DB + `contentRevision`.
 - **Estabilidad transaccional del contenido** vía bloqueo de padres desde DML hijo + `contentRevision`.
 - Ajuste estrecho de trigger de bundle (sin GUC / sin booleanos de sesión).
 - Columnas mínimas de auditoría/revisión en el bundle existente.
@@ -610,3 +611,78 @@ Más: UPDATE bundle `predecessorVersion` / `canonicalVersion` durante seal → b
 5. Confirmación de que no se usará `pgsodium` pese a estar listado.
 
 **Estado tras esta verificación:** diseño actualizado; **sigue sin aprobación** para implementar 4A-1C-1.
+
+---
+
+# Parte III — Veredicto final de viabilidad y seguridad
+
+Fecha de verificación documental: re-chequeo contra HEADs anteriores, docs públicas PostgreSQL `pgcrypto`, lista `supautils.privileged_extensions` de la imagen Supabase, y docs Supabase Vault/pgsodium. Sin acceso a producción ni mutación de esquemas.
+
+## III.1 Hallazgos técnicos (resumen ejecutivo)
+
+| # | Tema | Veredicto |
+|---|---|---|
+| 1 | Ed25519 desde SQL | **No viable** con `pgcrypto` (sin API Ed25519). `pg_ed25519` no whitelisted. `pgsodium.crypto_sign_verify_detached` existiría pero **deprecado / no recomendado**. Vault ≠ verify de firmas. |
+| 2 | Prueba suficiente de `#23` / autoridad | **Rechazadas** como únicas: `current_user`, checksum no vacío, `actorId`, `sealAuthorityRef`. |
+| 3 | Camino SQL directo DRAFT→VALIDATED | Impedible solo con **controles conjuntos**: MAC HMAC + sin `UPDATE(status)` crudo + sin `EXECUTE` para app + fail-closed (sin grant/emisión) + secret no legible por login sealer. |
+| 4 | Locks solo en padre del seal | **Insuficiente.** INSERT/UPDATE/DELETE/traslados en tablas 2–10 y evidencia requieren lock de padre(s) + bump `contentRevision` (H1–H10). |
+| 5 | Arquitectura | **ALT-H** recomendada; Ed25519-in-SQL descartada; roles solos (ALT-R) insuficientes; `current_user`-only rechazado. |
+
+## III.2 Alternativas evaluadas
+
+| Id | Descripción | Decisión |
+|---|---|---|
+| B | Ed25519 verify en SQL | **Descartada** (no viable en objetivo sin pgsodium) |
+| ALT-P | `pgsodium` sign verify | **No recomendada** (deprecación Supabase) |
+| ALT-0 | Trigger + `current_user` | **Rechazada** (no prueba `#23`) |
+| ALT-R | Solo credencial sealer | **Insuficiente sola** (psql elude `#23`) |
+| ALT-H | HMAC-SHA256 (`pgcrypto.hmac`) + roles + fail-closed | **Recomendada** |
+
+## III.3 Arquitectura recomendada (normativa para un futuro 4A-1C-1)
+
+1. **Validación:** solo `validateCrmReadPolicyBundle` / `validateCrmReadPolicySuccession` + checksum `#23` en SealService (TS).  
+2. **Autoridad:** `FailClosedSealAuthority` → deny hasta verifier real aprobado; sin allow no hay emisión de MAC.  
+3. **Atestación:** HMAC-SHA256 sobre payload que incluye org/bundle/version/checksum/`contentRevision`/predecesor/nonce/`issuedAt`.  
+4. **Escritura:** `crm_read_policy_seal_bundle` SECURITY DEFINER verifica MAC (secreto solo-owner/Vault), revision, predecesor VALIDATED si `version>1`, luego UPDATE mínimo.  
+5. **Privilegios:** `nexora_app` sin EXECUTE seal y sin UPDATE de `status` a VALIDATED; Data API sigue REVOKE/#24; sealer distinto de `DATABASE_URL` general.  
+6. **Concurrencia:** `SERIALIZABLE` + `FOR UPDATE` bundle + triggers en tablas 1–10 (locks ordenados + bump revision; evidencia bumpea candidato).  
+7. **Inmutabilidad / aislamiento:** invariantes `#24` (OLD+NEW, FKs same-org, RLS/REVOKE) se conservan; sellar ≠ activar.  
+8. **Sin GUC / booleanos de sesión** como bypass de inmutabilidad.
+
+## III.4 Riesgos pendientes (aceptación explícita requerida)
+
+| Riesgo | Severidad | Tratamiento propuesto |
+|---|---|---|
+| Poseedor de secreto HMAC + `EXECUTE` puede fabricar MAC sin correr `#23` | Alta residual | Fail-closed hasta autoridad; un solo emisor SealService; rotación; auditoría; tests N/S |
+| Elección Vault vs secreto solo-owner en hosting real | Media | Decisión de ops antes de migrar (sin inspeccionar prod aquí) |
+| Olvidar trigger en alguna tabla del inventario | Alta | Test de inventario + sensibilidad S3/S4 |
+| `TRUNCATE` / replication role / DISABLE TRIGGER | Alta | REVOKE; roles ≠ owner; tests S5/H4–H6 |
+| Confundir sellado con activación CRM | Alta producto | Fuera de alcance; pending `activation_not_in_scope` |
+| Auto-deploy Vercel al merge a `main` | Alta proceso | Gate humano; este doc no autoriza merge |
+
+## III.5 Condiciones exactas para aprobar 4A-1C-1
+
+4A-1C-1 (migración + función seal + suite Postgres desechable) **solo** podrá autorizarse cuando un revisor humano confirme **todas** las casillas siguientes:
+
+- [ ] **C1.** Se acepta el descarte de Ed25519-in-SQL y la adopción de **ALT-H** (`pgcrypto.hmac` + roles).  
+- [ ] **C2.** Se acepta que `current_user` / checksum / `actorId` / `sealAuthorityRef` **no** son prueba de validación `#23` ni de autorización.  
+- [ ] **C3.** Se acepta el modelo fail-closed: en producto, sin autoridad verificable → sin `GRANT EXECUTE` útil / sin emisión de MAC / cero sellados ordinarios.  
+- [ ] **C4.** Se acepta la frontera residual HMAC+EXECUTE (mitigada por C3 y emisor único).  
+- [ ] **C5.** Se acepta el inventario de locks/revision tablas 1–10 y huecos **H1–H10** (incl. evidencia fuera del checksum pero dentro de revision; TRUNCATE/replication).  
+- [ ] **C6.** Se acepta predecesor **VALIDATED** obligatorio para `version > 1`; metadatos de sellado fuera del canónico; candidatos vacíos OK; **sin** activación operativa.  
+- [ ] **C7.** Se acepta la suite mínima N1–N10, S1–S6 y concurrencia por tabla antes de merge de 4A-1C-1.  
+- [ ] **C8.** Se confirma **no** usar `pgsodium` como dependencia nueva.  
+- [ ] **C9.** Se define (aunque sea “aplazar a 4A-1C-1 con Vault|solo-owner”) el alojamiento del secreto HMAC **sin** inspeccionar producción en este PR.  
+- [ ] **C10.** PR #22 / #23 / #24 permanecen sin modificar por el corte 4A-1C-1; este diseño (#25) no se mergea a `main` sin gate de deploy.
+
+**Mientras C1–C10 no estén explícitamente aprobados, 4A-1C-1 permanece bloqueado.**
+
+## III.6 Entrega de esta verificación
+
+| Campo | Valor |
+|---|---|
+| Documento | `docs/point-8-4a1c-crm-read-policy-seal-design.md` |
+| PR | https://github.com/mariamayorcruz/Nexora/pull/25 |
+| Código operativo | Ninguno |
+| Migraciones / APIs / merge / deploy / prod | No |
+| Próximo paso | Revisión humana de C1–C10; **detener** antes de implementar |
