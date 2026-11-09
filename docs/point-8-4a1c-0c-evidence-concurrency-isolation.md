@@ -11,7 +11,7 @@ Correcciones **aditivas** de laboratorio sobre PR #27 (candidate-anchor), que a 
 | PR #25 Partes IV–V | Diseño sellado ALT-H / conflictos | `29d8e3473ac1f445d14db8bfb36f2b37bad8b320` |
 | PR #26 | Laboratorio de seguridad | `d7b4b047fca2146b6b1b5447a0b4e87d4e41b7f8` |
 | PR #27 | Candidate-anchor + pruebas 0b | `0b901925f9773873fbc4a3cc3e800dd63bdf8226` |
-| **este PR (0c)** | Locks de padre + org-freeze + `contentRevision` | (HEAD del PR) |
+| **PR #28 (0c)** | Locks de padre + org-freeze + `contentRevision` | `6502451750f426b49acb845e6231db97408bb1f1` |
 
 Base experimental: rama de PR #27. Stack: **#24 → #27 → 0c**.
 
