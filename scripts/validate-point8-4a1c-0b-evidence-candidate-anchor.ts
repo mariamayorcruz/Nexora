@@ -10,6 +10,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import {
   BASELINE_NAME,
   POINT8B1_NAME,
@@ -22,6 +23,79 @@ import {
   runPrisma,
   sanitizeDbUrlForLog,
 } from './fr004-lib';
+
+/** Interactive psql session for overlapping-transaction concurrency tests. */
+class PsqlSession {
+  private readonly child: ChildProcessWithoutNullStreams;
+  private buf = '';
+  private waiters: Array<{ marker: string; resolve: (s: string) => void; reject: (e: Error) => void }> =
+    [];
+
+  constructor(databaseUrl: string) {
+    // No ON_ERROR_STOP: overlapping tests must keep the session alive after a rejected statement.
+    this.child = spawn('psql', [databaseUrl, '-Atq'], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: process.env,
+    });
+    this.child.stdout.setEncoding('utf8');
+    this.child.stderr.setEncoding('utf8');
+    this.child.stdout.on('data', (chunk: string) => this.onChunk(chunk));
+    this.child.stderr.on('data', (chunk: string) => this.onChunk(chunk));
+    this.child.on('exit', (code) => {
+      for (const w of this.waiters) {
+        w.reject(new Error(`psql session exited early code=${code}`));
+      }
+      this.waiters = [];
+    });
+  }
+
+  private onChunk(chunk: string) {
+    this.buf += chunk;
+    this.waiters = this.waiters.filter((w) => {
+      if (!this.buf.includes(w.marker)) return true;
+      const idx = this.buf.indexOf(w.marker);
+      const out = this.buf.slice(0, idx);
+      this.buf = this.buf.slice(idx + w.marker.length);
+      w.resolve(out);
+      return false;
+    });
+  }
+
+  async exec(sql: string, timeoutMs = 8000): Promise<string> {
+    const marker = `__M_${randomUUID().replace(/-/g, '')}__`;
+    const p = new Promise<string>((resolve, reject) => {
+      this.waiters.push({ marker, resolve, reject });
+      this.child.stdin.write(`${sql};\n\\echo ${marker}\n`);
+    });
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      const out = await Promise.race([
+        p,
+        new Promise<string>((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error(`psql exec timeout after ${timeoutMs}ms: ${sql.slice(0, 120)}`)),
+            timeoutMs
+          );
+        }),
+      ]);
+      if (/ERROR:/i.test(out)) {
+        throw new Error(out.trim());
+      }
+      return out;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  async close() {
+    try {
+      this.child.stdin.write('\\q\n');
+    } catch {
+      /* ignore */
+    }
+    this.child.kill('SIGTERM');
+  }
+}
 
 const POINT8_4A1B_NAME = '20261031200000_add_crm_read_policy_candidate_persistence';
 const POINT8_4A1B_HARDENING_NAME = '20261031210000_crm_read_policy_candidate_persistence_hardening';
@@ -210,7 +284,7 @@ $$;`,
   };
 }
 
-function main() {
+async function main() {
   const url = process.env.FR004_DATABASE_URL || process.env.DATABASE_URL || '';
   if (!url) throw new Error('Set FR004_DATABASE_URL to disposable local Postgres');
   assertDisposableDatabaseUrl(url);
@@ -508,7 +582,10 @@ function main() {
     record('E-FIX-12', false, String(e));
   }
 
-  // Concurrency: seal candidate while evidence edit attempted after
+  // ---------------------------------------------------------------------------
+  // Real concurrency: two independent psql sessions, overlapping transactions
+  // ---------------------------------------------------------------------------
+  // CONC-A: T1 prepares lab VALIDATED flip (held open); T2 tries evidence UPDATE.
   try {
     const s4 = seedTenants(url);
     const p = id('b');
@@ -522,53 +599,389 @@ function main() {
          ("id","evidenceId","organizationId","fromVersion","toVersion","changeKind","targetLogicalId","createdAt")
        VALUES ('${ev}','${id('evidence')}','${s4.orgA}',1,2,'ADD_GRANT','g_c','${s4.t}');`
     );
-    privilegedSealDraft(url, c);
-    expectFail(
-      url,
-      `UPDATE "CrmReadPolicyChangeEvidence" SET "targetLogicalId"='race' WHERE "id"='${ev}';`,
-      'CONC',
-      /VALIDATED|immutable/i
-    );
-    record('CONC', true, 'after lab seal of candidate, concurrent-style evidence UPDATE rejected');
+
+    const t1 = new PsqlSession(url);
+    const t2 = new PsqlSession(url);
+    try {
+      await t1.exec('BEGIN');
+      // Lab-only seal path inside open txn (product SealService not in scope).
+      await t1.exec(`SET LOCAL session_replication_role = replica`);
+      await t1.exec(
+        `UPDATE "CrmReadPolicyBundle"
+           SET "status"='VALIDATED', "contentChecksum"='crm-read-policy-canonical/v1:conc-a'
+         WHERE "id"='${c}' AND "status"='DRAFT'`
+      );
+      // Hold lock/row version uncommitted.
+
+      await t2.exec('BEGIN');
+      await t2.exec(`SET LOCAL lock_timeout = '1500ms'`);
+      let t2Ok = false;
+      let t2Err = '';
+      try {
+        await t2.exec(
+          `UPDATE "CrmReadPolicyChangeEvidence"
+             SET "targetLogicalId"='race_a'
+           WHERE "id"='${ev}'`
+        );
+        await t2.exec('COMMIT');
+        t2Ok = true;
+      } catch (e) {
+        t2Err = e instanceof Error ? e.message : String(e);
+        try {
+          await t2.exec('ROLLBACK');
+        } catch {
+          /* ignore */
+        }
+      }
+
+      await t1.exec(`SET LOCAL session_replication_role = origin`);
+      await t1.exec('COMMIT');
+
+      const status = psql(url, `SELECT "status" FROM "CrmReadPolicyBundle" WHERE "id"='${c}';`);
+      const target = psql(
+        url,
+        `SELECT "targetLogicalId" FROM "CrmReadPolicyChangeEvidence" WHERE "id"='${ev}';`
+      );
+      assert(status === 'VALIDATED', `candidate must be VALIDATED after T1 commit, got ${status}`);
+
+      // Post-commit immutability must hold regardless of overlap outcome.
+      expectFail(
+        url,
+        `UPDATE "CrmReadPolicyChangeEvidence" SET "targetLogicalId"='after' WHERE "id"='${ev}';`,
+        'CONC-A-POST',
+        /VALIDATED|immutable/i
+      );
+      record('CONC-A-POST', true, 'after both txns commit, evidence UPDATE rejected');
+
+      if (t2Ok) {
+        // Candidate-anchor alone does not lock parent on evidence DML, so T2 can
+        // still see DRAFT under READ COMMITTED and commit an edit overlapping T1's seal.
+        record(
+          'CONC-A-OVERLAP',
+          true,
+          `RESIDUAL_RACE: T2 evidence UPDATE committed during uncommitted lab seal (target=${target}). ` +
+            `4A-1C-0b candidate-anchor does NOT serialize seal vs evidence edit; parent locks belong to later 4A-1C-1 design (PR #25 IV), not this cut. t2Err=''`
+        );
+      } else {
+        record(
+          'CONC-A-OVERLAP',
+          true,
+          `T2 evidence UPDATE blocked during T1 open seal (${t2Err.slice(0, 160)}); post-commit still immutable`
+        );
+      }
+      record(
+        'CONC-A',
+        true,
+        `order seal-then-edit overlap completed; final targetLogicalId=${target}`
+      );
+    } finally {
+      await t1.close();
+      await t2.close();
+    }
   } catch (e) {
-    record('CONC', false, String(e));
+    record('CONC-A', false, String(e));
+    record('CONC-A-OVERLAP', false, String(e));
+    record('CONC-A-POST', false, String(e));
   }
 
-  // Isolation: orgB unaffected; cannot attach orgA versions under orgB
+  // CONC-B: T1 holds open evidence UPDATE; T2 seals candidate; T1 then commits.
+  try {
+    const s4b = seedTenants(url);
+    const p = id('b');
+    const c = id('b');
+    const ev = id('ev');
+    privilegedValidated(url, { bundleId: p, orgId: s4b.orgA, version: 1, memId: s4b.memA, t: s4b.t });
+    insertDraft(url, { bundleId: c, orgId: s4b.orgA, version: 2, t: s4b.t, predecessorVersion: 1 });
+    psql(
+      url,
+      `INSERT INTO "CrmReadPolicyChangeEvidence"
+         ("id","evidenceId","organizationId","fromVersion","toVersion","changeKind","targetLogicalId","createdAt")
+       VALUES ('${ev}','${id('evidence')}','${s4b.orgA}',1,2,'ADD_GRANT','g_b0','${s4b.t}');`
+    );
+
+    const t1 = new PsqlSession(url);
+    const t2 = new PsqlSession(url);
+    try {
+      await t1.exec('BEGIN');
+      await t1.exec(
+        `UPDATE "CrmReadPolicyChangeEvidence"
+           SET "targetLogicalId"='race_b'
+         WHERE "id"='${ev}'`
+      );
+      // Row lock held; trigger already evaluated while candidate was DRAFT.
+
+      await t2.exec('BEGIN');
+      await t2.exec(`SET LOCAL lock_timeout = '1500ms'`);
+      await t2.exec(`SET LOCAL session_replication_role = replica`);
+      let t2SealOk = false;
+      let t2Err = '';
+      try {
+        // May wait if T1 somehow locked bundle (it should not); otherwise seals under replica.
+        await t2.exec(
+          `UPDATE "CrmReadPolicyBundle"
+             SET "status"='VALIDATED', "contentChecksum"='crm-read-policy-canonical/v1:conc-b'
+           WHERE "id"='${c}' AND "status"='DRAFT'`
+        );
+        await t2.exec(`SET LOCAL session_replication_role = origin`);
+        await t2.exec('COMMIT');
+        t2SealOk = true;
+      } catch (e) {
+        t2Err = e instanceof Error ? e.message : String(e);
+        try {
+          await t2.exec('ROLLBACK');
+        } catch {
+          /* ignore */
+        }
+      }
+
+      let t1CommitOk = false;
+      try {
+        await t1.exec('COMMIT');
+        t1CommitOk = true;
+      } catch (e) {
+        try {
+          await t1.exec('ROLLBACK');
+        } catch {
+          /* ignore */
+        }
+        t2Err += ' | t1commit=' + (e instanceof Error ? e.message : String(e));
+      }
+
+      const status = psql(url, `SELECT "status" FROM "CrmReadPolicyBundle" WHERE "id"='${c}';`);
+      const target = psql(
+        url,
+        `SELECT "targetLogicalId" FROM "CrmReadPolicyChangeEvidence" WHERE "id"='${ev}';`
+      );
+
+      if (t2SealOk) {
+        assert(status === 'VALIDATED', `expected VALIDATED, got ${status}`);
+      }
+
+      // After candidate is VALIDATED (if T2 sealed), further edits must fail.
+      if (status === 'VALIDATED') {
+        expectFail(
+          url,
+          `UPDATE "CrmReadPolicyChangeEvidence" SET "targetLogicalId"='after_b' WHERE "id"='${ev}';`,
+          'CONC-B-POST',
+          /VALIDATED|immutable/i
+        );
+        record('CONC-B-POST', true, 'post-seal evidence UPDATE rejected');
+      } else {
+        record('CONC-B-POST', false, `candidate not VALIDATED after CONC-B (${status}); ${t2Err}`);
+      }
+
+      record(
+        'CONC-B-OVERLAP',
+        true,
+        t1CommitOk && t2SealOk
+          ? `RESIDUAL_RACE: T1 evidence UPDATE committed (${target}) overlapping T2 lab seal. ` +
+              `candidate-anchor alone does not prevent edit-then-seal races; needs 4A-1C-1 locks.`
+          : `overlap outcome t1Commit=${t1CommitOk} t2Seal=${t2SealOk} target=${target} err=${t2Err.slice(0, 120)}`
+      );
+      record('CONC-B', true, `order edit-then-seal overlap completed; status=${status} target=${target}`);
+    } finally {
+      await t1.close();
+      await t2.close();
+    }
+  } catch (e) {
+    record('CONC-B', false, String(e));
+    record('CONC-B-OVERLAP', false, String(e));
+    record('CONC-B-POST', false, String(e));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Real isolation: both orgs DRAFT — cross-org evidence / field-class moves
+  // ---------------------------------------------------------------------------
   try {
     const s5 = seedTenants(url);
     const pA = id('b');
     const cA = id('b');
     const pB = id('b');
     const cB = id('b');
-    privilegedValidated(url, { bundleId: pA, orgId: s5.orgA, version: 1, memId: s5.memA, t: s5.t });
+    // Both orgs: DRAFT predecessors + DRAFT candidates (no VALIDATED dependency)
+    insertDraft(url, { bundleId: pA, orgId: s5.orgA, version: 1, t: s5.t });
     insertDraft(url, { bundleId: cA, orgId: s5.orgA, version: 2, t: s5.t, predecessorVersion: 1 });
-    privilegedValidated(url, { bundleId: pB, orgId: s5.orgB, version: 1, memId: s5.memB, t: s5.t });
+    insertDraft(url, { bundleId: pB, orgId: s5.orgB, version: 1, t: s5.t });
     insertDraft(url, { bundleId: cB, orgId: s5.orgB, version: 2, t: s5.t, predecessorVersion: 1 });
+
+    const evA = id('ev');
+    const evidA = id('evidence');
+    const evB = id('ev');
     psql(
       url,
       `INSERT INTO "CrmReadPolicyChangeEvidence"
          ("id","evidenceId","organizationId","fromVersion","toVersion","changeKind","targetLogicalId","createdAt")
-       VALUES ('${id('ev')}','${id('evidence')}','${s5.orgA}',1,2,'ADD_GRANT','g_a','${s5.t}');`
+       VALUES
+         ('${evA}','${evidA}','${s5.orgA}',1,2,'ADD_GRANT','g_a','${s5.t}'),
+         ('${evB}','${id('evidence')}','${s5.orgB}',1,2,'ADD_GRANT','g_b','${s5.t}');
+       INSERT INTO "CrmReadPolicyChangeEvidenceFieldClass"
+         ("organizationId","evidenceRowId","direction","fieldClass")
+       VALUES ('${s5.orgA}','${evA}','ADDED','IDENTIDAD'),
+              ('${s5.orgB}','${evB}','ADDED','CANAL');`
     );
-    privilegedSealDraft(url, cA);
-    // orgB still DRAFT candidate — evidence OK
+
+    const beforeA = psql(
+      url,
+      `SELECT "organizationId"||':'||"targetLogicalId" FROM "CrmReadPolicyChangeEvidence" WHERE "id"='${evA}';`
+    );
+    const beforeFc = psql(
+      url,
+      `SELECT COUNT(*)::text FROM "CrmReadPolicyChangeEvidenceFieldClass"
+       WHERE "organizationId"='${s5.orgA}' AND "evidenceRowId"='${evA}';`
+    );
+
+    // FK-enforced: retarget to orgB versions that do not exist.
+    expectFail(
+      url,
+      `UPDATE "CrmReadPolicyChangeEvidence"
+         SET "organizationId"='${s5.orgB}', "fromVersion"=1, "toVersion"=99
+       WHERE "id"='${evA}';`,
+      'ISO-EV-FK',
+      /foreign key|violat/i
+    );
+    const afterA = psql(
+      url,
+      `SELECT "organizationId"||':'||"targetLogicalId" FROM "CrmReadPolicyChangeEvidence" WHERE "id"='${evA}';`
+    );
+    assert(beforeA === afterA, `partial evidence move: before=${beforeA} after=${afterA}`);
+
+    // Field class: keep orgA but point at orgB evidence id → composite FK fail.
+    expectFail(
+      url,
+      `UPDATE "CrmReadPolicyChangeEvidenceFieldClass"
+         SET "evidenceRowId"='${evB}'
+       WHERE "organizationId"='${s5.orgA}' AND "evidenceRowId"='${evA}' AND "fieldClass"='IDENTIDAD';`,
+      'ISO-FC-FK',
+      /foreign key|violat/i
+    );
+    // Field class: change organizationId to orgB while evidenceRowId still orgA's row.
+    expectFail(
+      url,
+      `UPDATE "CrmReadPolicyChangeEvidenceFieldClass"
+         SET "organizationId"='${s5.orgB}'
+       WHERE "organizationId"='${s5.orgA}' AND "evidenceRowId"='${evA}' AND "fieldClass"='IDENTIDAD';`,
+      'ISO-FC-ORG',
+      /foreign key|violat/i
+    );
+    const afterFc = psql(
+      url,
+      `SELECT COUNT(*)::text FROM "CrmReadPolicyChangeEvidenceFieldClass"
+       WHERE "organizationId"='${s5.orgA}' AND "evidenceRowId"='${evA}';`
+    );
+    assert(beforeFc === afterFc, `partial field-class move: before=${beforeFc} after=${afterFc}`);
+
+    // Version-aligned orgId rewrite: both orgs have versions 1 and 2, so composite FKs
+    // alone may ALLOW moving the evidence row to orgB. Document without adding triggers here.
+    let alignedMoveAllowed = false;
+    try {
+      psql(
+        url,
+        `UPDATE "CrmReadPolicyChangeEvidence"
+           SET "organizationId"='${s5.orgB}'
+         WHERE "id"='${evA}';`
+      );
+      alignedMoveAllowed = true;
+      // restore for cleanliness
+      psql(
+        url,
+        `UPDATE "CrmReadPolicyChangeEvidence"
+           SET "organizationId"='${s5.orgA}'
+         WHERE "id"='${evA}';`
+      );
+    } catch {
+      alignedMoveAllowed = false;
+    }
+
+    record(
+      'ISO-CROSS-ORG',
+      true,
+      'FK rejects incoherent cross-org retargets; no partial writes on failed statements'
+    );
+    record(
+      'ISO-ORG-ALIGN',
+      true,
+      alignedMoveAllowed
+        ? 'RESIDUAL: organizationId UPDATE to another org with matching version numbers is FK-legal; ' +
+            '4A-1C-0b does not add a forbid-org-rewrite trigger (out of cut). Product may need this later.'
+        : 'organizationId cross-org rewrite rejected even with aligned versions'
+    );
+  } catch (e) {
+    record('ISO-CROSS-ORG', false, String(e));
+    record('ISO-ORG-ALIGN', false, String(e));
+  }
+
+  // OLD/NEW retargets among DRAFT candidates vs onto VALIDATED
+  try {
+    const s6 = seedTenants(url);
+    const d1 = id('b');
+    const d2 = id('b');
+    const d3 = id('b');
+    insertDraft(url, { bundleId: d1, orgId: s6.orgA, version: 1, t: s6.t });
+    insertDraft(url, { bundleId: d2, orgId: s6.orgA, version: 2, t: s6.t, predecessorVersion: 1 });
+    insertDraft(url, { bundleId: d3, orgId: s6.orgA, version: 3, t: s6.t, predecessorVersion: 2 });
+    const ev = id('ev');
     psql(
       url,
       `INSERT INTO "CrmReadPolicyChangeEvidence"
          ("id","evidenceId","organizationId","fromVersion","toVersion","changeKind","targetLogicalId","createdAt")
-       VALUES ('${id('ev')}','${id('evidence')}','${s5.orgB}',1,2,'ADD_GRANT','g_b','${s5.t}');`
+       VALUES ('${ev}','${id('evidence')}','${s6.orgA}',1,2,'ADD_GRANT','g_old','${s6.t}');`
+    );
+    // OLD/NEW both DRAFT candidates: retarget toVersion 2→3 allowed
+    psql(url, `UPDATE "CrmReadPolicyChangeEvidence" SET "toVersion"=3, "fromVersion"=2 WHERE "id"='${ev}';`);
+    const mid = psql(url, `SELECT "toVersion"::text FROM "CrmReadPolicyChangeEvidence" WHERE "id"='${ev}';`);
+    assert(mid === '3', `expected toVersion 3, got ${mid}`);
+
+    privilegedSealDraft(url, d3);
+    expectFail(
+      url,
+      `UPDATE "CrmReadPolicyChangeEvidence" SET "toVersion"=2, "fromVersion"=1 WHERE "id"='${ev}';`,
+      'OLDNEW-away',
+      /VALIDATED|immutable/i
     );
     expectFail(
       url,
-      `UPDATE "CrmReadPolicyChangeEvidence" SET "organizationId"='${s5.orgB}'
-       WHERE "organizationId"='${s5.orgA}' AND "toVersion"=2;`,
-      'ISO-move',
-      /VALIDATED|immutable|foreign key|violat/i
+      `UPDATE "CrmReadPolicyChangeEvidence" SET "targetLogicalId"='no' WHERE "id"='${ev}';`,
+      'OLDNEW-post',
+      /VALIDATED|immutable/i
     );
-    record('ISO', true, 'org isolation preserved; cross-org evidence move blocked');
+    record('OLD-NEW', true, 'DRAFT→DRAFT retarget allowed; OLD/NEW involving VALIDATED candidate rejected');
   } catch (e) {
-    record('ISO', false, String(e));
+    record('OLD-NEW', false, String(e));
+  }
+
+  // Post-validation immutability dedicated case
+  try {
+    const s7 = seedTenants(url);
+    const p = id('b');
+    const c = id('b');
+    const ev = id('ev');
+    privilegedValidated(url, { bundleId: p, orgId: s7.orgA, version: 1, memId: s7.memA, t: s7.t });
+    insertDraft(url, { bundleId: c, orgId: s7.orgA, version: 2, t: s7.t, predecessorVersion: 1 });
+    psql(
+      url,
+      `INSERT INTO "CrmReadPolicyChangeEvidence"
+         ("id","evidenceId","organizationId","fromVersion","toVersion","changeKind","targetLogicalId","createdAt")
+       VALUES ('${ev}','${id('evidence')}','${s7.orgA}',1,2,'ADD_GRANT','g_pv','${s7.t}');
+       INSERT INTO "CrmReadPolicyChangeEvidenceFieldClass"
+         ("organizationId","evidenceRowId","direction","fieldClass")
+       VALUES ('${s7.orgA}','${ev}','ADDED','GESTION');`
+    );
+    privilegedSealDraft(url, c);
+    expectFail(
+      url,
+      `UPDATE "CrmReadPolicyChangeEvidence" SET "changeKind"='REMOVE_GRANT' WHERE "id"='${ev}';`,
+      'POST-VAL-EV',
+      /VALIDATED|immutable/i
+    );
+    expectFail(
+      url,
+      `DELETE FROM "CrmReadPolicyChangeEvidenceFieldClass" WHERE "evidenceRowId"='${ev}';`,
+      'POST-VAL-FC',
+      /VALIDATED|immutable/i
+    );
+    record('POST-VAL', true, 'after candidate VALIDATED, evidence and field-class DML rejected');
+  } catch (e) {
+    record('POST-VAL', false, String(e));
   }
 
   // Historical immutability of VALIDATED predecessor content (extra regression)
@@ -597,9 +1010,7 @@ function main() {
   console.log('[point8-4a1c-0b] PASS');
 }
 
-try {
-  main();
-} catch (err) {
+main().catch((err) => {
   console.error('[point8-4a1c-0b] FAIL', err instanceof Error ? err.message : err);
   process.exit(1);
-}
+});
