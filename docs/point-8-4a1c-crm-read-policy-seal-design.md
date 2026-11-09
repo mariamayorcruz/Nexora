@@ -1,12 +1,12 @@
 # Punto 8 — Paso 4A-1C: diseño del sellado transaccional CRM (revisión de seguridad)
 
-**Estado:** diseño documental — **no aprobado para implementación** (verificación final de viabilidad/seguridad; Partes II–III).  
+**Estado:** diseño documental — **4A-1C-1 bloqueado**. ALT-H es **arquitectura candidata aceptada** en revisión; faltan controles precisados en Parte IV antes de aprobar implementación.  
 **Alcance:** solo lectura/diseño. Sin código operativo, sin migraciones aplicadas, sin APIs, sin merge, sin deploy, sin producción.  
 **No modifica** PR #22, #23 ni #24.
 
 ### Bloqueo de viabilidad (hallazgo confirmado)
 
-La verificación **Ed25519 dentro de SQL** **no es viable** en el PostgreSQL objetivo (Supabase hosted) vía `pgcrypto`. Ver Parte II §V1 y Parte III. La arquitectura recomendada es **ALT-H** (HMAC-SHA256 con `pgcrypto` + separación de roles + fail-closed), no Ed25519-in-SQL.
+La verificación **Ed25519 dentro de SQL** **no es viable** en el PostgreSQL objetivo (Supabase hosted) vía `pgcrypto`. Ver Parte II §V1 y Parte III. La arquitectura candidata es **ALT-H** (HMAC-SHA256 con `pgcrypto` + separación de roles + fail-closed); detalle normativo del secreto y privilegios en **Parte IV**.
 
 ## HEADs de referencia (re-verificados en verificación final)
 
@@ -604,13 +604,16 @@ Más: UPDATE bundle `predecessorVersion` / `canonicalVersion` durante seal → b
 
 ## V6. Bloqueos pendientes de aprobación (antes de 4A-1C-1)
 
-1. Aceptar **descarte** de Ed25519-in-SQL en favor de **ALT-H** (HMAC + roles).  
-2. Aceptar frontera residual: poseedor de secreto HMAC + EXECUTE ≡ puede atestar sin `#23` (mitigada por fail-closed y proceso único).  
-3. Aceptar inventario H1–H10 (esp. evidencia fuera del checksum pero dentro de revision; `TRUNCATE`/replication).  
-4. Estrategia exacta de almacenamiento del secreto (Vault vs secreto de migración solo-owner) en el hosting real — **sin** inspeccionar producción en este corte.  
-5. Confirmación de que no se usará `pgsodium` pese a estar listado.
+Actualizado: ver matriz **C1–C10** en §III.5 y controles cerrados en **Parte IV**.
 
-**Estado tras esta verificación:** diseño actualizado; **sigue sin aprobación** para implementar 4A-1C-1.
+Pendiente **bloqueante** tras cierre de diseño:
+
+1. Aceptación humana de **H-OWNER-TABLE** (o H-VAULT) — C9.  
+2. Confirmación de fail-closed sin GRANT EXECUTE de producto en 4A-1C-1 — C3.  
+3. Ejecución futura de suite N/S/C en el PR de implementación — C7 (no en este doc).  
+4. Gate de merge/deploy — C10.
+
+**4A-1C-1 sigue bloqueado.**
 
 ---
 
@@ -660,22 +663,29 @@ Fecha de verificación documental: re-chequeo contra HEADs anteriores, docs púb
 | Confundir sellado con activación CRM | Alta producto | Fuera de alcance; pending `activation_not_in_scope` |
 | Auto-deploy Vercel al merge a `main` | Alta proceso | Gate humano; este doc no autoriza merge |
 
-## III.5 Condiciones exactas para aprobar 4A-1C-1
+## III.5 Condiciones C1–C10 — matriz actualizada (cierre de decisiones)
 
-4A-1C-1 (migración + función seal + suite Postgres desechable) **solo** podrá autorizarse cuando un revisor humano confirme **todas** las casillas siguientes:
+Leyenda de estado:
 
-- [ ] **C1.** Se acepta el descarte de Ed25519-in-SQL y la adopción de **ALT-H** (`pgcrypto.hmac` + roles).  
-- [ ] **C2.** Se acepta que `current_user` / checksum / `actorId` / `sealAuthorityRef` **no** son prueba de validación `#23` ni de autorización.  
-- [ ] **C3.** Se acepta el modelo fail-closed: en producto, sin autoridad verificable → sin `GRANT EXECUTE` útil / sin emisión de MAC / cero sellados ordinarios.  
-- [ ] **C4.** Se acepta la frontera residual HMAC+EXECUTE (mitigada por C3 y emisor único).  
-- [ ] **C5.** Se acepta el inventario de locks/revision tablas 1–10 y huecos **H1–H10** (incl. evidencia fuera del checksum pero dentro de revision; TRUNCATE/replication).  
-- [ ] **C6.** Se acepta predecesor **VALIDATED** obligatorio para `version > 1`; metadatos de sellado fuera del canónico; candidatos vacíos OK; **sin** activación operativa.  
-- [ ] **C7.** Se acepta la suite mínima N1–N10, S1–S6 y concurrencia por tabla antes de merge de 4A-1C-1.  
-- [ ] **C8.** Se confirma **no** usar `pgsodium` como dependencia nueva.  
-- [ ] **C9.** Se define (aunque sea “aplazar a 4A-1C-1 con Vault|solo-owner”) el alojamiento del secreto HMAC **sin** inspeccionar producción en este PR.  
-- [ ] **C10.** PR #22 / #23 / #24 permanecen sin modificar por el corte 4A-1C-1; este diseño (#25) no se mergea a `main` sin gate de deploy.
+- **Resuelta (arquitectura):** decisión de diseño cerrada en este documento; no bloquea por ambigüedad.
+- **Riesgo aceptado:** residual consciente; no se “elimina”, se mitiga.
+- **Solo pruebas reales:** la garantía no se da por redactada; exige suite Postgres desechable en 4A-1C-1.
+- **Bloqueante:** debe haber aceptación humana explícita **antes** de autorizar código 4A-1C-1.
 
-**Mientras C1–C10 no estén explícitamente aprobados, 4A-1C-1 permanece bloqueado.**
+| Id | Condición | Estado | Notas |
+|---|---|---|---|
+| **C1** | Descarte Ed25519-in-SQL; ALT-H candidata | **Resuelta (arquitectura)** | Aceptada en revisión de cierre; detalle HMAC = Parte IV §IV.1 |
+| **C2** | `current_user` / checksum / `actorId` / `sealAuthorityRef` no prueban `#23` ni auth | **Resuelta (arquitectura)** | Controles conjuntos §IV.2 |
+| **C3** | Fail-closed: sin autoridad → sin emisión MAC / sin EXECUTE útil / cero sellados ordinarios | **Riesgo aceptado** + **Bloqueante** hasta confirmación humana de que el corte 4A-1C-1 **no** otorgará EXECUTE de producto | Mitigación normativa §IV.1.5 |
+| **C4** | Frontera residual: HMAC secreto + EXECUTE ⇒ forja de MAC sin `#23` | **Riesgo aceptado** | Mitigado por C3, emisor único SealService, rotación §IV.1.6; no eliminable sin crypto en-proceso distinto |
+| **C5** | Inventario locks/revision tablas 1–10 + H1–H10 | **Resuelta (arquitectura)** + **Solo pruebas reales** | Especificación §IV.3; cumplimiento demostrable solo con N/S/C en desechable |
+| **C6** | Predecesor VALIDATED; metadatos fuera de canónico; vacíos OK; sin activación | **Resuelta (arquitectura)** | Decisiones fijadas al inicio del doc |
+| **C7** | Suite N1–N10, S1–S6, concurrencia por tabla | **Solo pruebas reales** + **Bloqueante** para merge de 4A-1C-1 | Definida; **no ejecutada** en este PR de diseño |
+| **C8** | No usar `pgsodium` | **Resuelta (arquitectura)** | Confirmado |
+| **C9** | Alojamiento concreto del secreto HMAC | **Resuelta (arquitectura candidata)** + **Bloqueante** | Norma §IV.1 (**H-OWNER-TABLE**); aceptar excepción de tabla mínima de claves o rechazar y elegir H-VAULT |
+| **C10** | No modificar #22/#23/#24; no merge a `main` sin gate deploy | **Bloqueante** (proceso) | Vigente |
+
+**4A-1C-1 permanece bloqueado** mientras C3 (grant fail-closed), C7 (pruebas aún no corridas en implementación), C9 (aceptación del almacén de secreto) y C10 (gate de merge) no estén cerrados por revisor humano. C1/C2/C5-diseño/C6/C8 ya no son ambigüedad arquitectónica.
 
 ## III.6 Entrega de esta verificación
 
@@ -685,4 +695,177 @@ Fecha de verificación documental: re-chequeo contra HEADs anteriores, docs púb
 | PR | https://github.com/mariamayorcruz/Nexora/pull/25 |
 | Código operativo | Ninguno |
 | Migraciones / APIs / merge / deploy / prod | No |
-| Próximo paso | Revisión humana de C1–C10; **detener** antes de implementar |
+| Próximo paso | Revisar Parte IV; **4A-1C-1 sigue bloqueado** |
+
+---
+
+# Parte IV — Cierre de controles de seguridad (ALT-H)
+
+Precisión normativa pedida por revisión. Sin implementación. **4A-1C-1 permanece bloqueado.**
+
+## IV.1 Arquitectura concreta del secreto HMAC
+
+### IV.1.1 Identidad del secreto
+
+| Campo | Valor normativo |
+|---|---|
+| Algoritmo | HMAC-SHA256 vía `pgcrypto` (`hmac(bytea, bytea, 'sha256')`) |
+| `keyId` | Estable en atestación, p. ej. `crm-seal-hmac/v1`, `crm-seal-hmac/v2`, … |
+| Material | ≥ 32 bytes aleatorios criptográficos |
+| Canónico del mensaje MAC | Bytes UTF-8 del JSON canónico de `SealAttestation` (mismo orden de campos que firme SealService; **sin** el MAC) |
+| Comparación | Igualdad en tiempo constante en SQL (`hmac(...) = mac` sobre `bytea` completos; rechazar longitudes distintas antes) |
+
+Payload de atestación (emisión y verify):
+
+```text
+SealAttestation = {
+  v: 1,
+  keyId,
+  organizationId, bundleId, version,
+  canonicalVersion: "crm-read-policy-canonical/v1",
+  contentChecksum, contentRevision,
+  predecessorVersion, predecessorChecksum,  // nulls si version=1
+  issuedAt, nonce
+}
+mac = HMAC-SHA256(canonical_bytes(SealAttestation), secret[keyId])
+```
+
+### IV.1.2 Almacenamiento y emisión en SealService
+
+| Aspecto | Norma |
+|---|---|
+| Dónde vive el material para **firmar** | Secret manager / env del **proceso SealService únicamente** (p. ej. `CRM_READ_POLICY_SEAL_HMAC_SECRETS_JSON` mapa `keyId → secret`). **Nunca** en el repo, ni en `NEXT_PUBLIC_*`, ni en el `DATABASE_URL` general de la app. |
+| Quién emite MAC | **Solo** SealService, y solo después de: (1) autoridad fail-closed = allow (hoy: **nunca** en producto), (2) hydrate bajo locks, (3) `#23` ok (+ sucesión si aplica), (4) lectura de `contentRevision`. |
+| Quién no emite | Rutas HTTP CRM, jobs genéricos, scripts de migración, consolas de operador ordinario, rol `nexora_app`. |
+| Fail-closed de emisión | Si el verifier de autoridad deniega **o** no hay secreto cargado **o** `keyId` activo ausente → no se calcula MAC → no se llama a la función SQL. |
+| Auditoría de emisión | Log estructurado interno: `organizationId`, `bundleId`, `version`, `keyId`, `contentRevision`, `nonce`, resultado autoridad — **sin** material del secreto ni MAC completo si la política de logs lo restringe (al menos no el secreto). |
+
+### IV.1.3 Verificación dentro de PostgreSQL
+
+Función única (nombre de diseño): `crm_read_policy_seal_bundle(attestation jsonb, mac bytea, audit jsonb)`.
+
+Orden fijo del cuerpo (SECURITY DEFINER, `search_path` fijo p. ej. `pg_catalog, public, extensions`):
+
+1. Parsear `attestation`; exigir `keyId`, campos de identidad, `contentChecksum`, `contentRevision`, `issuedAt`, `nonce`.  
+2. Rechazar si TTL excedido (p. ej. `issuedAt` no en `[now()-60s, now()+5s]`).  
+3. **Cargar material** de verify para `keyId` desde el almacén SQL (§IV.1.4) con `status IN ('active','verify_only')`; si no hay fila → rechazo.  
+4. `expected := extensions.hmac(canonical_bytes(attestation), secret_material, 'sha256')`; si `mac` distinto → rechazo.  
+5. `SELECT … FROM "CrmReadPolicyBundle" WHERE org+id FOR UPDATE`; exigir `DRAFT`, version/org coincidentes, `contentRevision` igual al de la atestación.  
+6. Si `version > 1`: predecesor same-org, **VALIDATED**, checksum de predecesor coincide.  
+7. UPDATE mínimo: `status=VALIDATED`, `contentChecksum`, columnas de auditoría de sellado; **no** mutar hijos.  
+8. Registrar `keyId` + `nonce` en columnas de auditoría del bundle (anti-reuso observable).
+
+La función **no** ejecuta validadores `#23`. El MAC solo prueba que un poseedor del secreto atestiguó ese digest/revision; el emisor productivo está obligado por §IV.1.2 a calcularlo solo tras `#23`.
+
+### IV.1.4 Acceso del propietario de la función SQL (almacén de verify)
+
+**Elección candidata normativa: H-OWNER-TABLE** (excepción mínima de tabla, no de contenido de política).
+
+| Objeto | Diseño |
+|---|---|
+| Schema | `crm_internal` (sin USAGE para `PUBLIC` / `anon` / `authenticated` / `nexora_app` / `nexora_sealer`) |
+| Tabla | `crm_internal.seal_hmac_key` |
+| Columnas | `key_id text PRIMARY KEY`, `secret bytea NOT NULL`, `status text CHECK (status IN ('active','verify_only','revoked'))`, `created_at`, `retired_at` |
+| Owner | Mismo rol dueño de `crm_read_policy_seal_bundle` (rol de migración / table owner de políticas candidatas) |
+| Privilegios | `REVOKE ALL ON SCHEMA crm_internal FROM PUBLIC`; `REVOKE ALL ON TABLE … FROM PUBLIC`; **sin** GRANT a `nexora_app` ni `nexora_sealer`. Solo el owner (vía definer) lee `secret`. |
+| Filas | Exactamente un `status='active'` a la vez (CHECK parcial / unique index). Varias `verify_only` durante ventana de rotación. |
+
+**Alternativa H-VAULT** (si se rechaza cualquier tabla nueva): secreto en `vault.secrets` con nombre estable por `keyId`; la función definer lee `vault.decrypted_secrets`; **obligatorio** demostrar con pruebas que `nexora_app` / `nexora_sealer` / clientes **no** pueden `SELECT` el material. Misma semántica `active|verify_only|revoked` vía metadata.
+
+**Prohibido:** embeber el secreto en `prosrc` de la función; GUC; columna en `CrmReadPolicyBundle`; secreto en filas de política candidata.
+
+### IV.1.5 Privilegios: rol sealer vs rol general de aplicación
+
+| Capacidad | `nexora_app` | `nexora_sealer` | Owner / migración |
+|---|---|---|---|
+| DML DRAFT en tablas 2–10 | Sí (mientras DRAFT) | Solo lectura necesaria para seal, o ninguno si SealService usa app+EXECUTE separado — **norma:** sealer **sin** DML de contenido | Según DDL |
+| `UPDATE "CrmReadPolicyBundle"(status)` a VALIDATED | **No** (`REVOKE UPDATE (status)` + trigger) | **No** directo; solo efecto vía `EXECUTE` de la función | Vía definer |
+| `EXECUTE crm_read_policy_seal_bundle` | **No** | **Sí solo cuando** autoridad real exista y se levante fail-closed; en 4A-1C-1 producto: **No grant** (fail-closed) | Define |
+| `SELECT` secreto HMAC / schema `crm_internal` | **No** | **No** | Sí |
+| `CREATE/ALTER/DROP TRIGGER` en tablas #24 | **No** | **No** | Sí |
+| `GRANT`/`REVOKE` sobre tablas/función seal | **No** | **No** | Sí |
+| `TRUNCATE` tablas #24 | **No** | **No** | Evitar; no usar en app |
+| Data API `anon`/`authenticated` | Sin privilegios (#24) | N/A | N/A |
+
+Credenciales: `DATABASE_URL` de la app API = `nexora_app` (o rol equivalente). SealService, cuando exista autoridad, usa conexión con `EXECUTE` sealer **distinta**. Hasta entonces SealService **no** dispone de grant ni de secreto de emisión en producto.
+
+### IV.1.6 Rotación y revocación
+
+| Operación | Pasos |
+|---|---|
+| **Rotar** | 1) Generar `keyId` nuevo + material. 2) Insertar fila SQL `active`; pasar anterior a `verify_only`. 3) Cargar el nuevo mapa en SealService; dejar el anterior en SealService solo si aún hay atestaciones in-flight (TTL ≤ 60s). 4) Tras TTL + margen, anterior puede quedarse `verify_only` o pasar a `revoked`. |
+| **Revocar de emergencia** | 1) `status='revoked'` (o delete material) en SQL para ese `keyId`. 2) Quitar secreto del env de SealService. 3) Cualquier MAC con ese `keyId` falla verify. 4) No “unseal” bundles ya VALIDATED. |
+| **Revocar EXECUTE** | `REVOKE EXECUTE ON FUNCTION crm_read_policy_seal_bundle FROM nexora_sealer` — camino de escritura cerrado sin tocar filas VALIDATED. |
+| **Fail-closed de producto** | Estado inicial post-migración 4A-1C-1: función creada, **sin** GRANT a sealer de producto, **sin** secreto de emisión en SealService productivo, verifier always-deny. |
+
+---
+
+## IV.2 Ningún rol ordinario: demostración de controles (diseño)
+
+“Rol ordinario” = `nexora_app`, `anon`, `authenticated`, `authenticator`, o cualquier login sin ownership de tablas #24.
+
+| Ataque | Por qué falla (diseño) | Prueba real que lo demostrará |
+|---|---|---|
+| `UPDATE` directo DRAFT→VALIDATED | `REVOKE UPDATE (status)` + trigger de bundle que solo permite el UPDATE mínimo **dentro** de la función tras MAC ok | N1, N6 |
+| `EXECUTE` seal sin ser sealer autorizado | Sin GRANT; fail-closed inicial sin GRANT a producto | N2, N8, N9 |
+| Llamar seal con checksum/actorId/authorityRef sin MAC | Función exige MAC verificado | N3, N10 |
+| Fabricar MAC sin secreto | Sin `SELECT` de `crm_internal.seal_hmac_key` / vault | N3, N7 |
+| Leer secreto y fabricar autorización “válida” (MAC) | Schema/table sin USAGE/SELECT para ordinarios y sealer login | N7; S2 si se otorga SELECT por error |
+| `ALTER FUNCTION` / cambiar cuerpo seal | No owner | Privilegio denied (añadir N11 en suite) |
+| `DROP/DISABLE TRIGGER` immutability o lock/revision | No owner; no `session_replication_role` | N12 / H5–H6; S5 |
+| `GRANT EXECUTE` a sí mismo | No es grantor | N13 |
+| `TRUNCATE` para vaciar contenido sin bump | `REVOKE TRUNCATE` | S5 / H4 |
+| Usar `current_user` como atajo en mutante | Norma: trigger/función no tratan current_user como prueba de `#23` | S6 |
+
+**Límite explícito (riesgo C4 aceptado):** quien sea **owner** o posea **a la vez** material HMAC + `EXECUTE` puede producir un MAC sin correr `#23`. Mitigación: no es “rol ordinario”; fail-closed evita que producto tenga ambos; SealService es el único emisor previsto.
+
+---
+
+## IV.3 Estabilidad del contenido — las diez tablas
+
+Regla general en toda txn de escritura de contenido:
+
+1. BEFORE INSERT/UPDATE/DELETE: adquirir `FOR UPDATE` de padre(s) en orden determinista.  
+2. Aplicar immutability `#24` si algún padre tocado es VALIDATED.  
+3. Si el DML altera contenido canónico o evidencia de sucesión del candidato: `contentRevision = contentRevision + 1` en el/los bundles afectados.  
+4. Seal: `SERIALIZABLE` + `FOR UPDATE` del candidato durante hydrate→MAC→seal; atestación lleva `contentRevision`; mismatch ⇒ rechazo.
+
+### Por tabla
+
+| # | Tabla | Concurrent INSERT | UPDATE in-place | Traslado (cambio de padre/versión) | DELETE | TRUNCATE |
+|---|---|---|---|---|---|---|
+| 1 | `CrmReadPolicyBundle` | N/A (identidad nueva) | Lock self; bump si cambian `canonicalVersion` / `version` / `organizationId` / `predecessor*`; **no** bump en solo audit/seal | N/A | Lock self; VALIDATED bloqueado por trigger | REVOKE; no path app |
+| 2 | `…MembershipLink` | Lock bundle; bump | Lock; bump | Lock OLD+NEW bundles ordenados; bump ambos | Lock; bump | REVOKE |
+| 3 | `…LeadLink` | Igual | Igual | Igual | Igual | REVOKE |
+| 4 | `…RetiredGrantLogicalId` | Igual | Igual (PK) | Lock OLD+NEW; bump ambos | Lock; bump | REVOKE |
+| 5 | `…Grant` | Lock bundle; bump | Lock; bump | Lock OLD+NEW `(org,bundleId)`; bump ambos | Lock; bump | REVOKE |
+| 6 | `…GrantFieldClass` | Lock bundle del grant; bump | Lock; bump | Lock OLD+NEW si cambia grant/bundle; bump ambos | Lock; bump | REVOKE |
+| 7 | `…Restriction` | Como grant | Como grant | Como grant | Como grant | REVOKE |
+| 8 | `…RestrictionFieldClass` | Como grant FC | Como grant FC | Como grant FC | Como grant FC | REVOKE |
+| 9 | `…ChangeEvidence` | Lock bundles `fromVersion` **y** `toVersion`; bump **candidato `toVersion`** (y from si aplica) | Lock OLD from/to + NEW from/to (ordenados); bump candidatos afectados | Cambio de from/to = traslado de vínculo de sucesión: lock todos; bump | Lock from/to; bump candidato | REVOKE |
+| 10 | `…ChangeEvidenceFieldClass` | Resolver evidence → lock from/to; bump `toVersion` | Igual OLD/NEW evidence | Si `evidenceRowId` cambia: lock ambos evidence→bundles; bump | Lock; bump | REVOKE |
+
+### Escenarios transversales
+
+| Escenario | Garantía de diseño |
+|---|---|
+| Editor INSERT grant mientras seal sostiene candidato | Trigger del INSERT espera `FOR UPDATE` del bundle; tras COMMIT VALIDATED → immutability rechaza; si seal aborta → INSERT procede y sube revision |
+| Evidencia mutada tras hydrate y antes del seal | Bump `contentRevision` del candidato; MAC con revision vieja falla en SQL |
+| Traslado grant DRAFT_A → DRAFT_B durante seal de A | Lock ordenado evita deadlock; A y B suben revision; atestación de A invalidada |
+| Dos seals del mismo DRAFT | Serialización por lock de fila; segundo ve VALIDATED → idempotente o conflicto |
+| `TRUNCATE` por rol ordinario | Permission denied (no silent empty) |
+| Aislamiento entre empresas | FKs composed `#24` + locks por `(organizationId, …)`; seal de org A no toma filas de org B |
+
+Estas garantías de IV.3 son **Solo pruebas reales** (C5/C7): el diseño fija el comportamiento; 4A-1C-1 deberá demostrarlas en Postgres desechable.
+
+---
+
+## IV.4 Estado de bloqueo tras este cierre
+
+| Ítem | Estado |
+|---|---|
+| ALT-H como candidata | Aceptada en revisión |
+| Secreto HMAC concreto (H-OWNER-TABLE) | Especificado; **aceptación C9 aún bloqueante** |
+| Privilegios ordinarios / no forja | Especificado; demostración = pruebas N/S |
+| Estabilidad 10 tablas | Especificada; demostración = pruebas C |
+| Implementar 4A-1C-1 | **BLOQUEADO** |
