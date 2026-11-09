@@ -552,6 +552,8 @@ model CrmReadPolicyBundle {
   /// Mirrors CRM_READ_POLICY_CANONICAL_VERSION from PR #23 validators.
   canonicalVersion           String
   contentChecksum            String?
+  /// 4A-1C-0c experimental: bumped on evidence DML against this bundle as candidate.
+  contentRevision            BigInt                    @default(0)
   predecessorOrganizationId  String?
   predecessorVersion         Int?
   createdAt                  DateTime                  @default(now())
