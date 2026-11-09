@@ -1,8 +1,8 @@
 # Punto 8 — Paso 4A-1C: diseño del sellado transaccional CRM (revisión de seguridad)
 
-**Estado:** diseño documental — **4A-1C-1 bloqueado**. ALT-H es **arquitectura candidata aceptada** en revisión; faltan controles precisados en Parte IV antes de aprobar implementación.  
+**Estado:** diseño documental — **4A-1C-1 bloqueado**. ALT-H candidata aceptada; Parte IV (HMAC/privilegios) cerrada a nivel de diseño; Parte V resuelve el conflicto de evidencia PR #24 vs laboratorio PR #26 — **pendiente aceptación humana** antes de cualquier migración correctiva o 4A-1C-1.  
 **Alcance:** solo lectura/diseño. Sin código operativo, sin migraciones aplicadas, sin APIs, sin merge, sin deploy, sin producción.  
-**No modifica** PR #22, #23 ni #24.
+**No modifica** PR #22, #23 ni #24 (solo propone migración **aditiva** futura).
 
 ### Bloqueo de viabilidad (hallazgo confirmado)
 
@@ -868,4 +868,214 @@ Estas garantías de IV.3 son **Solo pruebas reales** (C5/C7): el diseño fija el
 | Secreto HMAC concreto (H-OWNER-TABLE) | Especificado; **aceptación C9 aún bloqueante** |
 | Privilegios ordinarios / no forja | Especificado; demostración = pruebas N/S |
 | Estabilidad 10 tablas | Especificada; demostración = pruebas C |
-| Implementar 4A-1C-1 | **BLOQUEADO** |
+| Conflicto evidencia #24 vs sucesión | Resuelto en **diseño** en Parte V; requiere migración correctiva aditiva + pruebas |
+| Implementar 4A-1C-1 | **BLOQUEADO** hasta aceptación Parte V + C3/C9/C10 + suite |
+
+---
+
+# Parte V — Conflicto de evidencia PR #24 vs sucesión 4A-1C (cierre de diseño)
+
+**Referencias:** PR #24 HEAD `b57c233043bbde2c74f71c29a9296ae9bc494ff3`; PR #25 este diseño; PR #26 laboratorio ALT-H HEAD `d7b4b047fca2146b6b1b5447a0b4e87d4e41b7f8`.  
+**Alcance de esta parte:** solo documental. No edita migraciones `#24`, no implementa 4A-1C-1, no toca el lab `#26`.
+
+## V.1 Inspección de la regla actual (#24 hardening)
+
+Migración correctiva `20261031210000_crm_read_policy_candidate_persistence_hardening`:
+
+```sql
+-- Helper actual (simplificado)
+crm_read_policy_evidence_touches_validated(org, fromVersion, toVersion)
+  := EXISTS (
+       SELECT 1 FROM "CrmReadPolicyBundle" b
+       WHERE b."organizationId" = org
+         AND b."version" IN (fromVersion, toVersion)   -- ← CUALQUIER extremo
+         AND b."status" = 'VALIDATED'
+     );
+
+crm_read_policy_evidence_row_touches_validated(org, evidenceRowId)
+  := EXISTS (evidence e JOIN bundle b
+             ON b.version IN (e.fromVersion, e.toVersion) AND b.status = VALIDATED);
+```
+
+En `crm_read_policy_child_immutability()` para `CrmReadPolicyChangeEvidence` / `…FieldClass`:
+
+| Op | Comprobación |
+|---|---|
+| DELETE | OLD toca VALIDATED (either endpoint) → rechazo |
+| UPDATE | OLD toca VALIDATED → rechazo; luego NEW toca VALIDATED → rechazo |
+| INSERT | NEW toca VALIDATED → rechazo |
+
+Misma lógica vía `evidence_row_touches_validated` para `CrmReadPolicyChangeEvidenceFieldClass` (resuelve la fila de evidencia y aplica either-endpoint).
+
+**Sin GUC** en el hardening actual (correcto); el problema no es bypass sino **anclaje excesivo**.
+
+## V.2 Por qué bloquea la sucesión VALIDATED → DRAFT
+
+Secuencia exigida por 4A-1C (decisiones fijadas + ALT-H):
+
+1. Sellar `version = N` → `VALIDATED` (inmutable).  
+2. Crear candidato `version = N+1` en `DRAFT` con `predecessorVersion = N`.  
+3. Persistir filas de `CrmReadPolicyChangeEvidence` con `fromVersion = N`, `toVersion = N+1` (+ field classes) **antes** del sellado de `N+1`.  
+4. SealService corre `validateCrmReadPolicySuccession` sobre esa evidencia y sella `N+1`.
+
+Con la regla either-endpoint, el paso 3 ejecuta:
+
+`touches_validated(org, N, N+1) = true` porque el bundle `N` ya es `VALIDATED`.
+
+Por tanto **todo INSERT/UPDATE/DELETE de evidencia (y de EvidenceFieldClass) queda prohibido** en cuanto existe un predecesor sellado, aunque el candidato siga en `DRAFT`. Eso hace imposible preparar la sucesión que el propio diseño 4A-1C exige. El laboratorio PR #26 reprodujo el conflicto y adoptó temporalmente la ancla en el candidato; Parte V fija la norma de producto.
+
+La evidencia **no** forma parte del checksum canónico `#23` del predecesor; congelar el contenido del predecesor no requiere congelar filas de sucesión futuras que solo lo referencian como `fromVersion`.
+
+## V.3 Regla exacta recomendada — ancla en el candidato (`toVersion`)
+
+### Definición
+
+Sea el **candidato de una fila de evidencia** el bundle `(organizationId, toVersion)`.
+
+**Una fila de evidencia (y sus field classes) es inmutable si y solo si su candidato está `VALIDATED`.**
+
+El estado `VALIDATED` del bundle `fromVersion` (predecesor) **no** por sí solo congela la evidencia de una sucesión hacia un candidato aún `DRAFT`.
+
+### Helpers normativos (reemplazo semántico)
+
+```text
+crm_read_policy_evidence_candidate_is_validated(org, toVersion)
+  := EXISTS bundle WHERE organizationId=org AND version=toVersion AND status=VALIDATED
+
+crm_read_policy_evidence_row_candidate_is_validated(org, evidenceRowId)
+  := candidate_is_validated(org, evidence.toVersion)  -- via join a la fila
+```
+
+Los nombres antiguos `*_touches_validated` deben dejar de usarse con semántica either-endpoint (evitar trampas). Preferible `CREATE OR REPLACE` de las funciones existentes **cambiando el cuerpo** a solo `toVersion`, **o** funciones nuevas + triggers actualizados que dejen de llamar a la semántica vieja. En cualquier caso: **migración aditiva nueva**, sin reescribir `20261031200000` ni `20261031210000`.
+
+### Invariantes
+
+1. **Preparación:** INSERT/UPDATE/DELETE de evidencia y field classes permitidos mientras `toVersion` es `DRAFT` (aunque `fromVersion` sea `VALIDATED`).  
+2. **Sellado del candidato:** una vez `toVersion` es `VALIDATED`, toda mutación de esas filas (y field classes ligadas) se rechaza — OLD y NEW.  
+3. **Historia del predecesor:** el contenido del bundle `VALIDATED` (grants/restrictions/…) sigue inmutable por triggers de hijos `#24` (sin cambio). La evidencia nueva **no** reescribe filas del predecesor.  
+4. **Anti-elusión por traslado:** todo UPDATE que mueva `organizationId` / `fromVersion` / `toVersion` / `evidenceRowId` evalúa **OLD y NEW**; si el candidato OLD o NEW está `VALIDATED` → rechazo. No se puede “huir” de un candidato sellado ni “aportar” evidencia a un candidato ya sellado.  
+5. **Aislamiento org:** FKs compuestas `#24` + comprobaciones siempre scoped por `organizationId` de OLD/NEW; rechazo si NEW.organizationId ≠ contexto del bundle referenciado.  
+6. **Sin GUC / session markers / replication_role de producto** para autorizar evidencia.
+
+### Qué no cambia
+
+- Inmutabilidad de bundles `VALIDATED` y de hijos con `bundleId` (grants, etc.).  
+- RLS/REVOKE de clientes.  
+- ALT-H / fail-closed / HMAC (Parte IV).  
+- Prohibición de INSERT directo `VALIDATED` y de UPDATE crudo DRAFT→VALIDATED fuera del seal.
+
+## V.4 Matriz de operaciones (evidencia y field classes)
+
+Leyenda: **P** = permitido; **X** = prohibido.  
+`Cand` = bundle de `toVersion` (o del `toVersion` de la evidencia apuntada por field class).  
+`Pred` = bundle de `fromVersion`.
+
+### `CrmReadPolicyChangeEvidence`
+
+| Op | Pred DRAFT / Cand DRAFT | Pred VALIDATED / Cand DRAFT | Pred * / Cand VALIDATED | Cambio de org / retarget a otra org |
+|---|---|---|---|---|
+| INSERT | P | **P** (sucesión 4A-1C) | X | X (FK/org) |
+| UPDATE (payload/kind/ids sin mover cand a VALIDATED) | P | P | X (OLD o NEW) | X |
+| UPDATE `toVersion` → otro DRAFT same-org | P | P | X si OLD o NEW cand VALIDATED | X cross-org |
+| UPDATE `fromVersion` (pred puede ser VALIDATED) | P | P | X si cand VALIDATED | X cross-org |
+| DELETE | P | P | X | — |
+
+### `CrmReadPolicyChangeEvidenceFieldClass`
+
+| Op | Evidencia cuyo Cand es DRAFT | Evidencia cuyo Cand es VALIDATED | UPDATE `evidenceRowId` OLD→NEW |
+|---|---|---|---|
+| INSERT | P | X | — |
+| UPDATE (fieldClass/direction) | P | X | — |
+| UPDATE `evidenceRowId` | P solo si **ambos** candidatos OLD y NEW son DRAFT | X si cualquiera VALIDATED | Evaluar OLD+NEW |
+| DELETE | P | X | — |
+
+### Traslados / elusiones explícitamente cubiertos
+
+| Intento | Resultado |
+|---|---|
+| Tras sellar cand V2, DELETE evidencia `1→2` | X |
+| Tras sellar V2, INSERT field class en evidencia `1→2` | X |
+| UPDATE evidencia `toVersion` de V2(VALIDATED) a V3(DRAFT) para “editar historia” | X (OLD cand VALIDATED) |
+| UPDATE evidencia `toVersion` de V3(DRAFT) a V2(VALIDATED) | X (NEW cand VALIDATED) |
+| Mover `organizationId` a otra empresa | X (FK + trigger) |
+| Mutar grants del pred VALIDATED “para cuadrar evidencia” | X (immutability de hijos `#24`, intacta) |
+
+## V.5 Casos de prueba requeridos
+
+### A. Postgres desechable + esquema **real** PR #24 (tras migración correctiva propuesta)
+
+| Id | Caso | Esperado |
+|---|---|---|
+| E-FIX-1 | Pred V1 VALIDATED, cand V2 DRAFT: INSERT evidence `1→2` | **P** |
+| E-FIX-2 | Mismo: INSERT EvidenceFieldClass | **P** |
+| E-FIX-3 | UPDATE evidence kind/target mientras V2 DRAFT | **P** |
+| E-FIX-4 | DELETE evidence mientras V2 DRAFT | **P** |
+| E-FIX-5 | Sellar V2; luego INSERT/UPDATE/DELETE evidence `1→2` | **X** |
+| E-FIX-6 | Sellar V2; luego DML field class de esa evidence | **X** |
+| E-FIX-7 | UPDATE `toVersion` 2→3 con V2 ya VALIDATED | **X** |
+| E-FIX-8 | UPDATE `toVersion` 3→2 con V2 VALIDATED y V3 DRAFT | **X** |
+| E-FIX-9 | Cross-org evidence INSERT | **X** |
+| E-FIX-10 | Mutar grant de V1 VALIDATED | **X** (regresión hijos) |
+| E-FIX-11 | Pred DRAFT, cand DRAFT: evidence DML | **P** (ambos draft) |
+| E-FIX-12 | Sensibilidad: restaurar helper either-endpoint → E-FIX-1 debe **fallar**; prueba falla si el control nuevo no está | S |
+
+### B. Extensión del laboratorio ALT-H (PR #26) — opcional alineación
+
+Actualizar el lab para citar esta norma (mismo ancla `toVersion`) y añadir E-FIX-* sintéticos. **No** se hace en este corte documental del PR #25.
+
+### C. Sin usar
+
+GUC, `set_config` de producto, `session_replication_role` en caminos productivos, DISABLE TRIGGER por roles app/sealer.
+
+## V.6 Migración correctiva aditiva (propuesta; no aplicada aquí)
+
+| Pregunta | Respuesta |
+|---|---|
+| ¿Hace falta migración? | **Sí**, si se adopta esta norma en producto |
+| ¿Editar `20261031200000` / `…210000`? | **No** |
+| ¿Forma? | Nueva migración posterior, p. ej. `20YYMMDDHHMMSS_crm_read_policy_evidence_candidate_anchor` |
+| ¿Contenido? | `CREATE OR REPLACE` de helpers de evidencia para anclar solo en `toVersion`; triggers siguen llamando helpers (o se actualizan a nombres nuevos); `REVOKE` de funciones actualizadas a `PUBLIC`/clientes como en hardening; tests desechables E-FIX-* |
+| ¿Datos existentes? | Solo DRAFT operativo hoy en producto (VALIDATED bloqueado); correctiva es segura en greenfield y en DBs que solo tengan DRAFT |
+| ¿GUC? | Ninguno |
+
+**Esta migración correctiva es un corte previo o el primer paso de 4A-1C-1**, no un rewrite de `#24`. PR `#24` permanece históricamente intacto.
+
+## V.7 Riesgos residuales
+
+| Riesgo | Mitigación |
+|---|---|
+| Evidencia editable mientras cand DRAFT podría divergir del contenido del pred | SealService + `#23` succession + `contentRevision`; pred inmutable |
+| Operador borra evidencia necesaria antes del seal | Fallo de succession validation; no sellado |
+| Olvidar field-class helper en la correctiva | E-FIX-2/6 + sensibilidad S |
+| Confundir ancla `toVersion` con “cualquier VALIDATED en la org” | Helpers explícitos; pruebas E-FIX-1 vs E-FIX-5 |
+| Lab `#26` ya alineado en espíritu pero no sobre schema `#24` | Portar E-FIX al schema real en el PR de migración |
+
+## V.8 Impacto en C1–C10 y desbloqueo de 4A-1C-1
+
+| Ítem | Tras Parte V |
+|---|---|
+| Conflicto estructural lab `#26` | **Cerrado en diseño** con regla candidata-ancla |
+| C5 (evidencia en inventario) | Norma actualizada; sigue **Solo pruebas reales** en schema `#24` |
+| Migración correctiva evidencia | **Nueva condición bloqueante de implementación** hasta aceptarse y aterrizar |
+| 4A-1C-1 | Sigue **bloqueado** |
+
+### Recomendación sobre desbloqueo de 4A-1C-1
+
+**Aún no desbloquear 4A-1C-1 completo.** Orden recomendado tras aceptación humana de Parte V:
+
+1. **Corte 4A-1C-0b (o primer commit de 4A-1C-1):** migración aditiva candidate-anchor + suite E-FIX sobre schema real `#24` en Postgres desechable.  
+2. Confirmar C3/C9/C10 (fail-closed grants, H-OWNER-TABLE, gate merge).  
+3. Solo entonces autorizar el resto de 4A-1C-1 (seal HMAC operativo sin HTTP/activación).
+
+Si Parte V se rechaza, 4A-1C-1 permanece bloqueado: el hardening actual `#24` es incompatible con sucesión post-sellado del predecesor.
+
+## V.9 Resumen ejecutivo
+
+| Pregunta | Respuesta |
+|---|---|
+| ¿Regla actual? | Either-endpoint VALIDATED ⇒ evidencia inmutable |
+| ¿Por qué falla 4A-1C? | Bloquea evidencia `VALIDATED→DRAFT` necesaria antes del seal del candidato |
+| ¿Regla nueva? | Inmutabilidad anclada solo si **`toVersion` (candidato) es VALIDATED** |
+| ¿GUC/bypass? | No |
+| ¿Migración? | Aditiva posterior al hardening; no reescribir `#24` |
+| ¿4A-1C-1 ahora? | **No** — aceptar Parte V, aterrizar correctiva + E-FIX, luego resto |
