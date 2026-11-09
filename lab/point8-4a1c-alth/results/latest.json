@@ -1,0 +1,111 @@
+{
+  "lab": "point8-4a1c-alth",
+  "designRef": "PR #25 HEAD 1bab8f5f2d672f02702c41492c23adc829e37cf6",
+  "database": "nexora_point8_4a1c_lab (disposable local)",
+  "note": "MAC comparison uses bytea equality only; this lab does not claim constant-time resistance.",
+  "results": [
+    {
+      "id": "N1",
+      "ok": true,
+      "detail": "app cannot UPDATE status to VALIDATED"
+    },
+    {
+      "id": "N2",
+      "ok": true,
+      "detail": "app EXECUTE seal denied"
+    },
+    {
+      "id": "N3",
+      "ok": true,
+      "detail": "missing/wrong MAC rejected"
+    },
+    {
+      "id": "P1",
+      "ok": true,
+      "detail": "valid HMAC seals DRAFT→VALIDATED: {\"kind\": \"sealed\", \"version\": 1, \"bundleId\": \"bundleA1\", \"organizationId\": \"orgA\"}"
+    },
+    {
+      "id": "N4",
+      "ok": true,
+      "detail": "MAC for A rejected on B payload"
+    },
+    {
+      "id": "N5",
+      "ok": true,
+      "detail": "stale attestation rejected after grant insert (rev 1→2)"
+    },
+    {
+      "id": "N6",
+      "ok": true,
+      "detail": "sealer raw UPDATE status denied/blocked"
+    },
+    {
+      "id": "N7",
+      "ok": true,
+      "detail": "ordinary/sealer cannot SELECT HMAC secret"
+    },
+    {
+      "id": "N8",
+      "ok": true,
+      "detail": "PUBLIC lacks seal EXECUTE"
+    },
+    {
+      "id": "N9",
+      "ok": true,
+      "detail": "fail-closed REVOKE EXECUTE blocks seal even with valid MAC"
+    },
+    {
+      "id": "N10",
+      "ok": true,
+      "detail": "checksum/actor/authorityRef alone cannot seal"
+    },
+    {
+      "id": "N11",
+      "ok": true,
+      "detail": "app cannot ALTER FUNCTION seal"
+    },
+    {
+      "id": "N12",
+      "ok": true,
+      "detail": "app cannot drop/disable child triggers"
+    },
+    {
+      "id": "N13",
+      "ok": true,
+      "detail": "app cannot GRANT EXECUTE to itself"
+    },
+    {
+      "id": "C_INV",
+      "ok": true,
+      "detail": "membership 0→1; lead 1→2; retired 2→3; grant 3→4; grant_fc 4→5; restriction 5→6; restriction_fc 6→7; evidence 1→2; evidence_fc 2→3; transfer c3 1→2, c2 3→4; delete grant 4→5; parent FOR UPDATE path exercised via child triggers; TRUNCATE denied for app; orgB revision still 0; insert on VALIDATED rejected"
+    },
+    {
+      "id": "C_EVID",
+      "ok": true,
+      "detail": "evidence mutation invalidates prior attestation"
+    },
+    {
+      "id": "S1",
+      "ok": true,
+      "detail": "sensitivity: without HMAC check, wrong MAC sealed (control necessary); function restored"
+    },
+    {
+      "id": "S2",
+      "ok": true,
+      "detail": "sensitivity: GRANT EXECUTE to app removes N2 guarantee (then revoked)"
+    },
+    {
+      "id": "S6",
+      "ok": true,
+      "detail": "app forge via GUC marker=false; status=DRAFT (column REVOKE should block)"
+    },
+    {
+      "id": "S5",
+      "ok": true,
+      "detail": "TRUNCATE remains denied for app (H4)"
+    }
+  ],
+  "passed": 20,
+  "failed": 0,
+  "failedIds": []
+}
