@@ -15,7 +15,7 @@ La verificación **Ed25519 dentro de SQL** **no es viable** en el PostgreSQL obj
 | PR #22 evaluador | `368fb25c7bf7a4674013c51d28b8a6919fbf7239` | sí |
 | PR #23 validadores | `02c8a573b967d7656c8f5e057003b49ae214d0c5` | sí |
 | PR #24 persistencia + hardening | `b57c233043bbde2c74f71c29a9296ae9bc494ff3` | sí |
-| PR #25 este diseño | `147482de33e4cbbf04b7345718e25699e2c0aa3d` | sí |
+| PR #25 este diseño | tip de rama `cursor/point8-4a1c-crm-seal-design-0dea` (ver `git rev-parse HEAD` tras push) | sí |
 
 ## Decisiones de diseño fijadas en esta revisión
 
