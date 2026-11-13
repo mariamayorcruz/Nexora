@@ -31,7 +31,10 @@
     "fr004:prodsim": "tsx scripts/fr004-prodsim-validate.ts",
     "fr004:preflight": "tsx scripts/fr004-preflight-metadata.ts",
     "fr004:pending-proof": "tsx scripts/fr004-pending-migrations-proof.ts",
-    "tenancy:validate-point8-4a1a": "tsx scripts/validate-point8-4a1a-crm-read-policy-format.ts"
+    "tenancy:validate-point8-4a1a": "tsx scripts/validate-point8-4a1a-crm-read-policy-format.ts",
+    "tenancy:validate-point8-4a1b": "tsx scripts/validate-point8-4a1b-crm-read-policy-persistence.ts",
+    "tenancy:validate-point8-4a1c-0b": "tsx scripts/validate-point8-4a1c-0b-evidence-candidate-anchor.ts",
+    "tenancy:validate-point8-4a1c-0c": "tsx scripts/validate-point8-4a1c-0c-evidence-concurrency-isolation.ts"
   },
   "dependencies": {
     "@fal-ai/client": "^1.10.0",
