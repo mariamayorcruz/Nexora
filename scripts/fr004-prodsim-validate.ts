@@ -25,6 +25,8 @@ import {
   PENDING_AFTER_AUTH_A_HISTORICAL,
   POINT8B1_NAME,
   POINT8B6_NAME,
+  POINT8_4A1B_NAME,
+  POINT8_4A1B_HARDENING_NAME,
   SLICE0_NAME,
   assertActiveMigrationSet,
   assertDisposableDatabaseUrl,
@@ -137,7 +139,9 @@ function main(): void {
   console.log(`[fr004-prodsim] pending_proof=${pending.join(',')}`)
   assertPendingExactly(pending, PENDING_AFTER_AUTH_A_HISTORICAL)
 
-  console.log('[fr004-prodsim] prisma migrate deploy (expects Slice 0 then Point 8B-1 then Point 8B-6)')
+  console.log(
+    '[fr004-prodsim] prisma migrate deploy (expects Slice 0 then Point 8B-1 then Point 8B-6 then Point 8 4A-1B)',
+  )
   const deployOut = runPrisma(['migrate', 'deploy'], env)
   console.log(deployOut)
 
@@ -150,6 +154,12 @@ function main(): void {
   if (!deployOut.includes(POINT8B6_NAME)) {
     throw new Error('deploy output missing Point 8B-6')
   }
+  if (!deployOut.includes(POINT8_4A1B_NAME)) {
+    throw new Error('deploy output missing Point 8 4A-1B')
+  }
+  if (!deployOut.includes(POINT8_4A1B_HARDENING_NAME)) {
+    throw new Error('deploy output missing Point 8 4A-1B hardening')
+  }
   if (deployOut.includes(`Applying migration \`${BASELINE_NAME}\``)) {
     throw new Error('deploy unexpectedly applied baseline DDL')
   }
@@ -160,8 +170,16 @@ function main(): void {
   }
   if (appliedMatch) {
     const block = appliedMatch[1]
-    if (!block.includes(SLICE0_NAME) || !block.includes(POINT8B1_NAME) || !block.includes(POINT8B6_NAME)) {
-      throw new Error('deploy applied set must include Slice 0, Point 8B-1, and Point 8B-6')
+    if (
+      !block.includes(SLICE0_NAME) ||
+      !block.includes(POINT8B1_NAME) ||
+      !block.includes(POINT8B6_NAME) ||
+      !block.includes(POINT8_4A1B_NAME) ||
+      !block.includes(POINT8_4A1B_HARDENING_NAME)
+    ) {
+      throw new Error(
+        'deploy applied set must include Slice 0, Point 8B-1, Point 8B-6, Point 8 4A-1B, and hardening',
+      )
     }
   }
 
@@ -174,13 +192,15 @@ function main(): void {
     !finalNames.includes(BASELINE_NAME) ||
     !finalNames.includes(SLICE0_NAME) ||
     !finalNames.includes(POINT8B1_NAME) ||
-    !finalNames.includes(POINT8B6_NAME)
+    !finalNames.includes(POINT8B6_NAME) ||
+    !finalNames.includes(POINT8_4A1B_NAME) ||
+    !finalNames.includes(POINT8_4A1B_HARDENING_NAME)
   ) {
     throw new Error(`Final migration set incomplete: ${finalNames.join(',')}`)
   }
-  // six legacy + baseline + Slice 0 + Point 8B-1 + Point 8B-6
-  if (finalNames.length !== 10) {
-    throw new Error(`Expected 10 migration rows after deploy; got ${finalNames.length}`)
+  // six legacy + baseline + Slice 0 + Point 8B-1 + Point 8B-6 + Point 8 4A-1B + hardening
+  if (finalNames.length !== 12) {
+    throw new Error(`Expected 12 migration rows after deploy; got ${finalNames.length}`)
   }
 
   assertSlice0Present(url)
