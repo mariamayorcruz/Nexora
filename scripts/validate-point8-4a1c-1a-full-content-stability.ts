@@ -530,7 +530,7 @@ async function main() {
   // the same candidate is one candidate mutation and must bump exactly once.
   try {
     const b8 = id('bundle');
-    insertBundle(url, { id: b8, org: s.orgA, version: 8, predecessorVersion: 7, t: s.t });
+    insertBundle(url, { id: b8, org: s.orgA, version: 8, predecessorVersion: 4, t: s.t });
     const evA = id('ev');
     const evB = id('ev');
     psql(
@@ -538,9 +538,9 @@ async function main() {
       `INSERT INTO "CrmReadPolicyChangeEvidence"
        ("id","evidenceId","organizationId","fromVersion","toVersion","changeKind","targetLogicalId","createdAt")
        VALUES
-       (${sqlString(evA)},${sqlString(id('evidence'))},${sqlString(s.orgA)},7,8,
+       (${sqlString(evA)},${sqlString(id('evidence'))},${sqlString(s.orgA)},4,8,
         'ADD_GRANT','fc-move-a',${sqlString(s.t)}),
-       (${sqlString(evB)},${sqlString(id('evidence'))},${sqlString(s.orgA)},7,8,
+       (${sqlString(evB)},${sqlString(id('evidence'))},${sqlString(s.orgA)},4,8,
         'ADD_GRANT','fc-move-b',${sqlString(s.t)});`
     );
     psql(
