@@ -58,15 +58,29 @@ jobs:
           createdb -h 127.0.0.1 -U postgres point8_4a1c_0b
           createdb -h 127.0.0.1 -U postgres point8_4a1c_0c
 
+      - name: Stage migrations for historical cut validation
+        run: |
+          mkdir -p /tmp/point8-later-migrations
+          mv prisma/migrations/20261109010000_crm_read_policy_evidence_candidate_anchor /tmp/point8-later-migrations/
+          mv prisma/migrations/20261109020000_crm_read_policy_evidence_concurrency_isolation /tmp/point8-later-migrations/
+
       - name: Validate 4A-1B persistence
         env:
           FR004_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/point8_4a1b
         run: npm run tenancy:validate-point8-4a1b
 
+      - name: Restore 0b migration
+        run: |
+          mv /tmp/point8-later-migrations/20261109010000_crm_read_policy_evidence_candidate_anchor prisma/migrations/
+
       - name: Validate 4A-1C-0b candidate anchor
         env:
           FR004_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/point8_4a1c_0b
         run: npm run tenancy:validate-point8-4a1c-0b
+
+      - name: Restore 0c migration
+        run: |
+          mv /tmp/point8-later-migrations/20261109020000_crm_read_policy_evidence_concurrency_isolation prisma/migrations/
 
       - name: Validate 4A-1C-0c concurrency isolation
         env:
