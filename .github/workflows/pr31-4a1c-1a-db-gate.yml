@@ -1,0 +1,49 @@
+name: PR31 4A-1C-1A DB Gate
+
+on:
+  pull_request:
+    branches:
+      - point8/4a1c-1a-full-content-stability
+
+permissions:
+  contents: read
+
+jobs:
+  db-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGPASSWORD: postgres
+      FR004_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/point8_4a1c_1a
+    steps:
+      - name: Checkout validation snapshot
+        uses: actions/checkout@v4
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+      - name: Install dependencies
+        run: npm ci
+      - name: Create disposable database
+        run: createdb -h 127.0.0.1 -U postgres point8_4a1c_1a
+      - name: Validate 4A-1C-1A
+        run: npm run tenancy:validate-point8-4a1c-1a
