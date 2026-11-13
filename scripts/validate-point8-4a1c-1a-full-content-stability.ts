@@ -526,6 +526,45 @@ async function main() {
     record('E2', false, String(e));
   }
 
+  // E3: moving an EvidenceFieldClass between two evidence rows that belong to
+  // the same candidate is one candidate mutation and must bump exactly once.
+  try {
+    const b8 = id('bundle');
+    insertBundle(url, { id: b8, org: s.orgA, version: 8, predecessorVersion: 7, t: s.t });
+    const evA = id('ev');
+    const evB = id('ev');
+    psql(
+      url,
+      `INSERT INTO "CrmReadPolicyChangeEvidence"
+       ("id","evidenceId","organizationId","fromVersion","toVersion","changeKind","targetLogicalId","createdAt")
+       VALUES
+       (${sqlString(evA)},${sqlString(id('evidence'))},${sqlString(s.orgA)},7,8,
+        'ADD_GRANT','fc-move-a',${sqlString(s.t)}),
+       (${sqlString(evB)},${sqlString(id('evidence'))},${sqlString(s.orgA)},7,8,
+        'ADD_GRANT','fc-move-b',${sqlString(s.t)});`
+    );
+    psql(
+      url,
+      `INSERT INTO "CrmReadPolicyChangeEvidenceFieldClass"
+       ("organizationId","evidenceRowId","direction","fieldClass")
+       VALUES (${sqlString(s.orgA)},${sqlString(evA)},'ADDED','RESERVADO');`
+    );
+    const before = rev(url, b8);
+    psql(
+      url,
+      `UPDATE "CrmReadPolicyChangeEvidenceFieldClass"
+       SET "evidenceRowId"=${sqlString(evB)}
+       WHERE "organizationId"=${sqlString(s.orgA)}
+         AND "evidenceRowId"=${sqlString(evA)}
+         AND "direction"='ADDED'
+         AND "fieldClass"='RESERVADO';`
+    );
+    assert(rev(url, b8) === before + 1n, 'same-candidate EvidenceFieldClass move must bump exactly once');
+    record('E3', true, 'same-candidate EvidenceFieldClass move bumps revision exactly once');
+  } catch (e) {
+    record('E3', false, String(e));
+  }
+
   // I1: once candidate is VALIDATED, all ordinary child DML remains rejected.
   try {
     const b5 = id('bundle');
