@@ -1,0 +1,71 @@
+name: PR29 Point 8 DB Gate
+
+on:
+  push:
+    branches:
+      - validation/pr29-point8-db-gate
+
+permissions:
+  contents: read
+
+jobs:
+  point8-db-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      PGPASSWORD: postgres
+
+    steps:
+      - name: Checkout validation snapshot
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create disposable validation databases
+        run: |
+          createdb -h 127.0.0.1 -U postgres point8_4a1b
+          createdb -h 127.0.0.1 -U postgres point8_4a1c_0b
+          createdb -h 127.0.0.1 -U postgres point8_4a1c_0c
+
+      - name: Validate 4A-1B persistence
+        env:
+          FR004_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/point8_4a1b
+        run: npm run tenancy:validate-point8-4a1b
+
+      - name: Validate 4A-1C-0b candidate anchor
+        env:
+          FR004_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/point8_4a1c_0b
+        run: npm run tenancy:validate-point8-4a1c-0b
+
+      - name: Validate 4A-1C-0c concurrency isolation
+        env:
+          FR004_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/point8_4a1c_0c
+        run: npm run tenancy:validate-point8-4a1c-0c
