@@ -376,8 +376,10 @@ BEGIN
       PERFORM crm_read_policy_bump_content_revision(
         OLD."organizationId", old_to
       );
-      IF new_to IS DISTINCT FROM old_to
-         OR NEW."evidenceRowId" IS DISTINCT FROM OLD."evidenceRowId" THEN
+      -- If the row moves to another evidence row for the same candidate,
+      -- this is still one mutation of one candidate: bump once, not twice.
+      -- A second bump is required only when the candidate toVersion changes.
+      IF new_to IS DISTINCT FROM old_to THEN
         PERFORM crm_read_policy_bump_content_revision(
           NEW."organizationId", new_to
         );
