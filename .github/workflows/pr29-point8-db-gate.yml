@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - validation/pr29-point8-db-gate
+  pull_request:
+    branches:
+      - integration/point8-4a1b-4a1c-0c-current-main
 
 permissions:
   contents: read
